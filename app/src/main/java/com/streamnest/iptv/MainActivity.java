@@ -1,6 +1,9 @@
 package com.streamnest.iptv;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.text.InputType;
+import android.widget.EditText;
 import android.os.Bundle;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -92,10 +95,14 @@ public class MainActivity extends Activity {
                 : Color.rgb(35, 45, 65));
         });
 
-        item.setOnClickListener(view ->
-            Toast.makeText(this,
-                title + " — feature coming next",
-                Toast.LENGTH_SHORT).show());
+        item.setOnClickListener(view -> {
+            if (title.equals("LIVE TV")) {
+                showPlaylistDialog();
+            } else {
+                Toast.makeText(this, title + " — coming next",
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
 
         LinearLayout.LayoutParams params =
             new LinearLayout.LayoutParams(
@@ -104,4 +111,36 @@ public class MainActivity extends Activity {
         params.setMargins(0, dp(8), 0, 0);
         menu.addView(item, params);
     }
+
+    private void showPlaylistDialog() {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("https://example.com/playlist.m3u");
+        input.setInputType(InputType.TYPE_CLASS_TEXT |
+            InputType.TYPE_TEXT_VARIATION_URI);
+        input.setText(getPreferences(MODE_PRIVATE)
+            .getString("playlist_url", ""));
+
+        new AlertDialog.Builder(this)
+            .setTitle("M3U Playlist")
+            .setMessage("Enter your IPTV playlist URL")
+            .setView(input)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Save", (dialog, which) -> {
+                String url = input.getText().toString().trim();
+                if (url.startsWith("http://") ||
+                    url.startsWith("https://")) {
+                    getPreferences(MODE_PRIVATE).edit()
+                        .putString("playlist_url", url).apply();
+                    Toast.makeText(this, "Playlist URL saved",
+                        Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this,
+                        "Enter a valid http or https URL",
+                        Toast.LENGTH_LONG).show();
+                }
+            })
+            .show();
+    }
+
 }
