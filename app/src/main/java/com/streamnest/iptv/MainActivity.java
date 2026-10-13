@@ -5,6 +5,12 @@ import android.app.AlertDialog;
 import android.text.InputType;
 import android.widget.EditText;
 import android.os.Bundle;
+import java.util.ArrayList;
+import java.net.URL;
+import java.net.HttpURLConnection;
+import java.io.InputStreamReader;
+import java.io.BufferedReader;
+import android.os.StrictMode;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.view.Gravity;
@@ -112,10 +118,11 @@ public class MainActivity extends Activity {
         menu.addView(item, params);
     }
 
+
     private void showPlaylistDialog() {
         EditText input = new EditText(this);
         input.setSingleLine(true);
-        input.setHint("https://example.com/playlist.m3u");
+        input.setHint("Enter M3U playlist URL");
         input.setInputType(InputType.TYPE_CLASS_TEXT |
             InputType.TYPE_TEXT_VARIATION_URI);
         input.setText(getPreferences(MODE_PRIVATE)
@@ -126,20 +133,91 @@ public class MainActivity extends Activity {
             .setMessage("Enter your IPTV playlist URL")
             .setView(input)
             .setNegativeButton("Cancel", null)
-            .setPositiveButton("Save", (dialog, which) -> {
+            .setPositiveButton("Load", (dialog, which) -> {
                 String url = input.getText().toString().trim();
-                if (url.startsWith("http://") ||
-                    url.startsWith("https://")) {
-                    getPreferences(MODE_PRIVATE).edit()
-                        .putString("playlist_url", url).apply();
-                    Toast.makeText(this, "Playlist URL saved",
-                        Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(this,
-                        "Enter a valid http or https URL",
+                if (!url.startsWith("http://") &&
+                    !url.startsWith("https://")) {
+                    Toast.makeText(this, "Enter a valid URL",
                         Toast.LENGTH_LONG).show();
+                    return;
                 }
+                getPreferences(MODE_PRIVATE).edit()
+                    .putString("playlist_url", url).apply();
+                Toast.makeText(this, "Loading playlist...",
+                    Toast.LENGTH_SHORT).show();
+                loadPlaylist(url);
             })
+            .show();
+    }
+
+    private void loadPlaylist(String playlistUrl) {
+        new Thread(() -> {
+            ArrayList<String> names = new ArrayList<>();
+            ArrayList<String> streams = new ArrayList<>();
+            HttpURLConnection connection = null;
+
+            try {
+                connection = (HttpURLConnection)
+                    new URL(playlistUrl).openConnection();
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(20000);
+                connection.setRequestProperty(
+                    "User-Agent", "StreamNestIPTV/1.0");
+
+                try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(
+                        connection.getInputStream()))) {
+                    String line;
+                    String pendingName = null;
+
+                    while ((line = reader.readLine()) != null) {
+                        line = line.trim();
+
+                        if (line.startsWith("#EXTINF:")) {
+                            int comma = line.lastIndexOf(',');
+                            pendingName = comma >= 0
+                                ? line.substring(comma + 1).trim()
+                                : "Channel";
+                        } else if (!line.isEmpty()
+                            && !line.startsWith("#")
+                            && pendingName != null) {
+                            names.add(pendingName);
+                            streams.add(line);
+                            pendingName = null;
+                        }
+                    }
+                }
+
+                runOnUiThread(() -> {
+                    if (names.isEmpty()) {
+                        Toast.makeText(this,
+                            "No channels found. Check the playlist URL.",
+                            Toast.LENGTH_LONG).show();
+                    } else {
+                        showChannels(names, streams);
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(this,
+                    "Could not load playlist. Check the URL and connection.",
+                    Toast.LENGTH_LONG).show());
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        }).start();
+    }
+
+    private void showChannels(ArrayList<String> names,
+                              ArrayList<String> streams) {
+        new AlertDialog.Builder(this)
+            .setTitle("Live TV (" + names.size() + " channels)")
+            .setItems(names.toArray(new String[0]),
+                (dialog, which) -> Toast.makeText(this,
+                    names.get(which) + " selected. Playback is next.",
+                    Toast.LENGTH_SHORT).show())
+            .setNegativeButton("Close", null)
             .show();
     }
 
