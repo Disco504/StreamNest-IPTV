@@ -5,8 +5,11 @@
     <application
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:label="StreamNest IPTV"
-        android:usesCleartextTraffic="true"
-       >
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name="com.streamnest.iptv.PlayerActivity"
+            android:exported="false" />
 
         <activity
             android:name="com.streamnest.iptv.MainActivity"
