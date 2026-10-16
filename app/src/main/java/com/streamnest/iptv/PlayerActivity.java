@@ -5,6 +5,8 @@ import android.os.Bundle;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.Toast;
+import android.graphics.Color;
+import android.util.Log;
 
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
@@ -14,6 +16,7 @@ import androidx.media3.ui.PlayerView;
 
 public class PlayerActivity extends Activity {
 
+    private static final String TAG = "StreamNest";
     private ExoPlayer player;
     private PlayerView playerView;
     private String streamUrl;
@@ -33,11 +36,14 @@ public class PlayerActivity extends Activity {
             return;
         }
 
-        getWindow().setStatusBarColor(android.graphics.Color.BLACK);
-        getWindow().setNavigationBarColor(android.graphics.Color.BLACK);
+        Log.i(TAG, "Opening channel: " + channelName);
+        Log.i(TAG, "Stream URL scheme: " + android.net.Uri.parse(streamUrl).getScheme());
+
+        getWindow().setStatusBarColor(Color.BLACK);
+        getWindow().setNavigationBarColor(Color.BLACK);
 
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(android.graphics.Color.BLACK);
+        root.setBackgroundColor(Color.BLACK);
 
         playerView = new PlayerView(this);
         playerView.setUseController(true);
@@ -59,24 +65,33 @@ public class PlayerActivity extends Activity {
             return;
         }
 
-        player = new ExoPlayer.Builder(this).build();
-        playerView.setPlayer(player);
+        try {
+            player = new ExoPlayer.Builder(this).build();
+            playerView.setPlayer(player);
 
-        player.addListener(new Player.Listener() {
-            @Override
-            public void onPlayerError(PlaybackException error) {
-                String message = "Playback failed: "
-                        + error.getErrorCodeName();
-                Toast.makeText(PlayerActivity.this, message,
-                        Toast.LENGTH_LONG).show();
-                android.util.Log.e("StreamNest", message, error);
-            }
-        });
+            player.addListener(new Player.Listener() {
+                @Override
+                public void onPlayerError(PlaybackException error) {
+                    Log.e(TAG, "Playback error: " + error.getErrorCodeName()
+                            + ", code=" + error.errorCode, error);
 
-        player.setMediaItem(MediaItem.fromUri(streamUrl));
-        player.prepare();
-        player.play();
-        playerView.requestFocus();
+                    runOnUiThread(() -> Toast.makeText(
+                            PlayerActivity.this,
+                            "Playback failed: " + error.getErrorCodeName(),
+                            Toast.LENGTH_LONG).show());
+                }
+            });
+
+            player.setMediaItem(MediaItem.fromUri(streamUrl));
+            player.prepare();
+            player.play();
+            playerView.requestFocus();
+
+        } catch (Exception e) {
+            Log.e(TAG, "Player initialization failed", e);
+            Toast.makeText(this, "Player error: " + e.getClass().getSimpleName(),
+                    Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override
