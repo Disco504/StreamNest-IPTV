@@ -44,11 +44,13 @@ public class MainActivity extends Activity {
         String name;
         String url;
         String group;
+        String tvgId;
 
-        Channel(String name, String url, String group) {
+        Channel(String name, String url, String group, String tvgId) {
             this.name = name;
             this.url = url;
             this.group = group;
+            this.tvgId = tvgId;
         }
     }
 
@@ -125,7 +127,14 @@ public class MainActivity extends Activity {
             if ("LIVE TV".equals(title)) {
                 showPlaylistDialog();
             } else if ("SETTINGS".equals(title)) {
-                showPlaylistDialog();
+                showEpgDialog();
+            } else if ("TV GUIDE".equals(title)) {
+                String epgUrl = getPreferences(MODE_PRIVATE)
+                        .getString("epg_url", "");
+                String message = epgUrl.isEmpty()
+                        ? "Open Settings to enter your XMLTV EPG URL."
+                        : "EPG URL saved. Program guide is the next step.";
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
             } else {
                 Toast.makeText(this, title + " — coming next",
                         Toast.LENGTH_SHORT).show();
@@ -137,6 +146,40 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         params.setMargins(0, dp(7), 0, 0);
         menu.addView(item, params);
+    }
+
+
+    private void showEpgDialog() {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("Enter XMLTV EPG URL");
+        input.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_URI);
+        input.setText(getPreferences(MODE_PRIVATE)
+                .getString("epg_url", ""));
+
+        new AlertDialog.Builder(this)
+                .setTitle("TV Guide (XMLTV)")
+                .setMessage("Enter the separate EPG/XMLTV URL from your provider.")
+                .setView(input)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save", (dialog, which) -> {
+                    String url = input.getText().toString().trim();
+                    if (!url.isEmpty()
+                            && !url.startsWith("http://")
+                            && !url.startsWith("https://")) {
+                        Toast.makeText(this, "Enter a valid URL",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+
+                    getPreferences(MODE_PRIVATE).edit()
+                            .putString("epg_url", url)
+                            .apply();
+                    Toast.makeText(this, "EPG URL saved",
+                            Toast.LENGTH_SHORT).show();
+                })
+                .show();
     }
 
     private void showPlaylistDialog() {
@@ -191,6 +234,7 @@ public class MainActivity extends Activity {
                     String line;
                     String pendingName = null;
                     String pendingGroup = "Uncategorized";
+                    String pendingTvgId = "";
 
                     while ((line = reader.readLine()) != null) {
                         line = line.trim();
@@ -201,6 +245,7 @@ public class MainActivity extends Activity {
                                     ? line.substring(comma + 1).trim()
                                     : "Channel";
                             pendingGroup = readAttribute(line, "group-title");
+                            pendingTvgId = readAttribute(line, "tvg-id");
                             if (pendingGroup.isEmpty()) {
                                 pendingGroup = "Uncategorized";
                             }
@@ -208,9 +253,10 @@ public class MainActivity extends Activity {
                                 && !line.startsWith("#")
                                 && pendingName != null) {
                             loaded.add(new Channel(
-                                    pendingName, line, pendingGroup));
+                                    pendingName, line, pendingGroup, pendingTvgId));
                             pendingName = null;
                             pendingGroup = "Uncategorized";
+                            pendingTvgId = "";
                         }
                     }
                 }
