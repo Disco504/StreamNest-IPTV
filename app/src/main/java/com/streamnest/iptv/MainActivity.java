@@ -1,5 +1,17 @@
 package com.streamnest.iptv;
 
+import android.util.Xml;
+import org.xmlpull.v1.XmlPullParser;
+import java.io.InputStream;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
@@ -129,12 +141,7 @@ public class MainActivity extends Activity {
             } else if ("SETTINGS".equals(title)) {
                 showEpgDialog();
             } else if ("TV GUIDE".equals(title)) {
-                String epgUrl = getPreferences(MODE_PRIVATE)
-                        .getString("epg_url", "");
-                String message = epgUrl.isEmpty()
-                        ? "Open Settings to enter your XMLTV EPG URL."
-                        : "EPG URL saved. Program guide is the next step.";
-                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                showTvGuide();
             } else {
                 Toast.makeText(this, title + " — coming next",
                         Toast.LENGTH_SHORT).show();
@@ -478,6 +485,208 @@ public class MainActivity extends Activity {
         if (shown == 0) {
             channelPanel.addView(label(
                     "No channels in this category.", 15));
+        }
+    }
+
+
+    private static class EpgProgram {
+        String channelId;
+        String title;
+        long startMillis;
+        long stopMillis;
+
+        EpgProgram(String channelId, String title, long startMillis, long stopMillis) {
+            this.channelId = channelId;
+            this.title = title;
+            this.startMillis = startMillis;
+            this.stopMillis = stopMillis;
+        }
+    }
+
+    private void showTvGuide() {
+        String epgUrl = getPreferences(MODE_PRIVATE).getString("epg_url", "");
+        if (epgUrl.trim().isEmpty()) {
+            Toast.makeText(this, "Open Settings to enter your XMLTV EPG URL.",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (channels.isEmpty()) {
+            Toast.makeText(this, "Load your M3U playlist first.",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        final Map<String, Channel> channelMap = new HashMap<>();
+        for (Channel channel : channels) {
+            if (channel.tvgId != null && !channel.tvgId.trim().isEmpty()) {
+                channelMap.put(channel.tvgId.trim(), channel);
+            }
+        }
+
+        screen.removeAllViews();
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.addView(label("TV GUIDE", 25));
+
+        TextView status = label("Downloading programme listings...", 15);
+        screen.addView(status);
+
+        TextView back = label("← BACK TO HOME", 16);
+        back.setFocusable(true);
+        back.setOnClickListener(v -> recreate());
+        screen.addView(back);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout results = new LinearLayout(this);
+        results.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(results);
+        screen.addView(scroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
+
+        Thread worker = new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL(epgUrl.trim());
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(20000);
+                connection.setRequestProperty("User-Agent", "StreamNestIPTV/1.0");
+
+                ArrayList<EpgProgram> programs = new ArrayList<>();
+                try (InputStream input = connection.getInputStream()) {
+                    XmlPullParser parser = Xml.newPullParser();
+                    parser.setInput(input, "UTF-8");
+
+                    String currentChannel = null;
+                    String currentTitle = null;
+                    long currentStart = 0;
+                    long currentStop = 0;
+                    int event = parser.getEventType();
+
+                    while (event != XmlPullParser.END_DOCUMENT
+                            && programs.size() < 20000) {
+                        if (event == XmlPullParser.START_TAG
+                                && "programme".equals(parser.getName())) {
+                            currentChannel = parser.getAttributeValue(null, "channel");
+                            currentTitle = null;
+                            currentStart = parseXmltvTime(
+                                    parser.getAttributeValue(null, "start"));
+                            currentStop = parseXmltvTime(
+                                    parser.getAttributeValue(null, "stop"));
+                        } else if (event == XmlPullParser.START_TAG
+                                && "title".equals(parser.getName())
+                                && currentChannel != null) {
+                            currentTitle = parser.nextText();
+                        } else if (event == XmlPullParser.END_TAG
+                                && "programme".equals(parser.getName())) {
+                            if (currentChannel != null && currentTitle != null
+                                    && currentStart > 0 && currentStop > currentStart) {
+                                programs.add(new EpgProgram(currentChannel,
+                                        currentTitle.trim(), currentStart, currentStop));
+                            }
+                            currentChannel = null;
+                            currentTitle = null;
+                        }
+                        event = parser.next();
+                    }
+                }
+
+                final ArrayList<EpgProgram> loaded = programs;
+                runOnUiThread(() ->
+                        renderGuidePrograms(loaded, channelMap, status, results));
+            } catch (Exception e) {
+                final String message = e.getMessage() == null
+                        ? e.getClass().getSimpleName() : e.getMessage();
+                runOnUiThread(() -> status.setText(
+                        "Could not load the EPG: " + message
+                        + "\nCheck the saved URL and internet connection."));
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        });
+        worker.start();
+    }
+
+    private long parseXmltvTime(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return 0;
+        }
+        String[] patterns = {"yyyyMMddHHmmss Z", "yyyyMMddHHmmss"};
+        for (String pattern : patterns) {
+            try {
+                SimpleDateFormat format = new SimpleDateFormat(pattern, Locale.US);
+                format.setLenient(false);
+                Date date = format.parse(value.trim());
+                if (date != null) {
+                    return date.getTime();
+                }
+            } catch (ParseException ignored) {
+            }
+        }
+        return 0;
+    }
+
+    private void renderGuidePrograms(List<EpgProgram> programs,
+            Map<String, Channel> channelMap, TextView status, LinearLayout results) {
+        results.removeAllViews();
+        long now = System.currentTimeMillis();
+        long horizon = now + 24L * 60L * 60L * 1000L;
+        int matched = 0;
+        ArrayList<EpgProgram> visible = new ArrayList<>();
+
+        for (EpgProgram program : programs) {
+            if (channelMap.containsKey(program.channelId)) {
+                matched++;
+                if (program.stopMillis > now && program.startMillis < horizon) {
+                    visible.add(program);
+                }
+            }
+        }
+
+        Collections.sort(visible, Comparator.comparingLong(p -> p.startMillis));
+
+        if (matched == 0) {
+            status.setText("Downloaded " + programs.size()
+                    + " programmes, but none matched your M3U tvg-id values."
+                    + "\nThe playlist channel IDs must match the XMLTV channel IDs.");
+            return;
+        }
+
+        if (visible.isEmpty()) {
+            status.setText("Matched channels, but no current or upcoming programmes "
+                    + "were found in the next 24 hours.");
+            return;
+        }
+
+        status.setText("Guide loaded: " + visible.size()
+                + " current/upcoming listings. Showing up to 100.");
+
+        SimpleDateFormat clock = new SimpleDateFormat("h:mm a", Locale.getDefault());
+        int shown = 0;
+        for (EpgProgram program : visible) {
+            if (shown >= 100) {
+                break;
+            }
+            Channel channel = channelMap.get(program.channelId);
+            if (channel == null) {
+                continue;
+            }
+
+            String times = clock.format(new Date(program.startMillis)) + " – "
+                    + clock.format(new Date(program.stopMillis));
+            String text = channel.name + "\n" + times + "\n"
+                    + (program.title.isEmpty() ? "(Untitled programme)" : program.title);
+
+            TextView item = label(text, 15);
+            item.setPadding(dp(12), dp(10), dp(12), dp(10));
+            item.setBackgroundColor(PANEL);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            params.setMargins(0, dp(3), 0, dp(3));
+            results.addView(item, params);
+            shown++;
         }
     }
 
