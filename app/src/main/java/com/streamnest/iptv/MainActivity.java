@@ -1,6 +1,12 @@
 package com.streamnest.iptv;
 
 import android.util.Xml;
+import android.net.Uri;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 import org.xmlpull.v1.XmlPullParser;
 import java.io.InputStream;
 import java.text.ParseException;
@@ -137,7 +143,7 @@ public class MainActivity extends Activity {
 
         item.setOnClickListener(v -> {
             if ("LIVE TV".equals(title)) {
-                showPlaylistDialog();
+                showConnectionDialog();
             } else if ("SETTINGS".equals(title)) {
                 showEpgDialog();
             } else if ("TV GUIDE".equals(title)) {
@@ -187,6 +193,227 @@ public class MainActivity extends Activity {
                             Toast.LENGTH_SHORT).show();
                 })
                 .show();
+    }
+
+
+    private void showConnectionDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Connect Playlist")
+                .setItems(new String[]{
+                        "M3U Playlist",
+                        "Xtream Codes Login"
+                }, (dialog, which) -> {
+                    if (which == 0) {
+                        showPlaylistDialog();
+                    } else {
+                        showXtreamDialog();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showXtreamDialog() {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(8);
+        form.setPadding(pad, pad, pad, pad);
+
+        EditText server = new EditText(this);
+        server.setSingleLine(true);
+        server.setHint("Server URL (https://host:port)");
+        server.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_URI);
+        server.setText(getPreferences(MODE_PRIVATE)
+                .getString("xtream_server", ""));
+        form.addView(server);
+
+        EditText username = new EditText(this);
+        username.setSingleLine(true);
+        username.setHint("Username");
+        username.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+        username.setText(getPreferences(MODE_PRIVATE)
+                .getString("xtream_username", ""));
+        form.addView(username);
+
+        EditText password = new EditText(this);
+        password.setSingleLine(true);
+        password.setHint("Password");
+        password.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        form.addView(password);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(form);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Xtream Codes Login")
+                .setMessage("Enter the server URL, username and password from your IPTV provider.")
+                .setView(scroll)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Login", (dialog, which) -> {
+                    String base = server.getText().toString().trim();
+                    String user = username.getText().toString().trim();
+                    String pass = password.getText().toString();
+
+                    while (base.endsWith("/")) {
+                        base = base.substring(0, base.length() - 1);
+                    }
+                    if (base.endsWith("/player_api.php")) {
+                        base = base.substring(0,
+                                base.length() - "/player_api.php".length());
+                    }
+
+                    if ((!base.startsWith("https://")
+                            && !base.startsWith("http://"))
+                            || user.isEmpty() || pass.isEmpty()) {
+                        Toast.makeText(this,
+                                "Enter a valid server URL, username and password.",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+
+                    getPreferences(MODE_PRIVATE).edit()
+                            .putString("xtream_server", base)
+                            .putString("xtream_username", user)
+                            .apply();
+
+                    loadXtreamChannels(base, user, pass);
+                })
+                .show();
+    }
+
+    private String apiEncode(String value) throws Exception {
+        return URLEncoder.encode(value, "UTF-8");
+    }
+
+    private JSONArray getXtreamArray(String urlText) throws Exception {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection)
+                    new URL(urlText).openConnection();
+            connection.setConnectTimeout(15000);
+            connection.setReadTimeout(25000);
+            connection.setRequestProperty(
+                    "User-Agent", "StreamNestIPTV/1.0");
+
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) {
+                throw new java.io.IOException(
+                        "Provider returned HTTP " + status);
+            }
+
+            try (InputStream input = connection.getInputStream();
+                 java.io.ByteArrayOutputStream output =
+                         new java.io.ByteArrayOutputStream()) {
+                byte[] buffer = new byte[8192];
+                int count;
+                while ((count = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, count);
+                }
+                return new JSONArray(
+                        new String(output.toByteArray(),
+                                StandardCharsets.UTF_8));
+            }
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private void loadXtreamChannels(
+            String base, String username, String password) {
+        Toast.makeText(this, "Connecting to provider...",
+                Toast.LENGTH_SHORT).show();
+
+        new Thread(() -> {
+            ArrayList<Channel> loaded = new ArrayList<>();
+            String failure = null;
+
+            try {
+                String api = base + "/player_api.php?username="
+                        + apiEncode(username) + "&password="
+                        + apiEncode(password);
+
+                JSONArray categories = getXtreamArray(
+                        api + "&action=get_live_categories");
+
+                Map<String, String> groupNames = new HashMap<>();
+                for (int i = 0; i < categories.length(); i++) {
+                    JSONObject item = categories.getJSONObject(i);
+                    String id = item.optString("category_id", "");
+                    String name = item.optString(
+                            "category_name", "Uncategorized");
+                    if (!id.isEmpty()) {
+                        groupNames.put(id, name);
+                    }
+                }
+
+                JSONArray streams = getXtreamArray(
+                        api + "&action=get_live_streams");
+
+                for (int i = 0; i < streams.length(); i++) {
+                    JSONObject item = streams.getJSONObject(i);
+                    String id = item.optString("stream_id", "");
+                    if (id.isEmpty()) {
+                        continue;
+                    }
+
+                    String name = item.optString("name", "Channel");
+                    String categoryId =
+                            item.optString("category_id", "");
+                    String group = groupNames.get(categoryId);
+                    if (group == null || group.isEmpty()) {
+                        group = "Uncategorized";
+                    }
+
+                    String extension = item.optString(
+                            "container_extension", "ts");
+                    if (extension.isEmpty()) {
+                        extension = "ts";
+                    }
+
+                    String streamUrl = base + "/live/"
+                            + Uri.encode(username) + "/"
+                            + Uri.encode(password) + "/"
+                            + Uri.encode(id) + "."
+                            + Uri.encode(extension);
+
+                    String tvgId = item.optString(
+                            "epg_channel_id", "");
+
+                    loaded.add(new Channel(
+                            name, streamUrl, group, tvgId));
+                }
+            } catch (Exception e) {
+                android.util.Log.e("StreamNest",
+                        "Xtream connection failed", e);
+                failure = e.getMessage();
+            }
+
+            final String error = failure;
+            runOnUiThread(() -> {
+                if (error != null) {
+                    Toast.makeText(this,
+                            "Xtream login failed. Check the server, credentials and connection.",
+                            Toast.LENGTH_LONG).show();
+                } else if (loaded.isEmpty()) {
+                    Toast.makeText(this,
+                            "Login returned no live channels.",
+                            Toast.LENGTH_LONG).show();
+                } else {
+                    channels = loaded;
+                    selectedCategory = "All Channels";
+                    showLiveTv();
+                    Toast.makeText(this,
+                            "Loaded " + channels.size()
+                                    + " live channels",
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+        }).start();
     }
 
     private void showPlaylistDialog() {
