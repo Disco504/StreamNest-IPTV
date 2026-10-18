@@ -57,6 +57,8 @@ public class MainActivity extends Activity {
     private ArrayList<Channel> channels = new ArrayList<>();
     private Set<String> favorites = new LinkedHashSet<>();
     private String selectedCategory = "All Channels";
+    private boolean showingLiveTv = false;
+    private boolean showingTvGuide = false;
 
     private static class Channel {
         String name;
@@ -97,9 +99,52 @@ public class MainActivity extends Activity {
                 .getStringSet("favorite_urls", Collections.emptySet()));
 
         showHomeScreen();
+        restoreSavedConnection();
+    }
+
+    private void restoreSavedConnection() {
+        android.content.SharedPreferences prefs =
+                getPreferences(MODE_PRIVATE);
+
+        String type = prefs.getString("last_connection", "");
+
+        if ("xtream".equals(type)) {
+            String server = prefs.getString("xtream_server", "");
+            String username = prefs.getString("xtream_username", "");
+            String password = prefs.getString("xtream_password", "");
+
+            if (!server.isEmpty() && !username.isEmpty()
+                    && !password.isEmpty()) {
+                loadXtreamChannels(server, username, password);
+            } else {
+                Toast.makeText(this,
+                        "Please log in to Xtream Codes once more to save your password.",
+                        Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+
+        String playlistUrl = prefs.getString("playlist_url", "");
+        if ("m3u".equals(type)
+                || (type.isEmpty() && !playlistUrl.isEmpty())) {
+            if (!playlistUrl.isEmpty()) {
+                loadPlaylist(playlistUrl);
+            }
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (showingLiveTv || showingTvGuide) {
+            showHomeScreen();
+        } else {
+            super.onBackPressed();
+        }
     }
 
     private void showHomeScreen() {
+        showingLiveTv = false;
+        showingTvGuide = false;
         screen = new LinearLayout(this);
         screen.setOrientation(LinearLayout.VERTICAL);
         screen.setBackgroundColor(NAVY);
@@ -281,6 +326,8 @@ public class MainActivity extends Activity {
                     getPreferences(MODE_PRIVATE).edit()
                             .putString("xtream_server", base)
                             .putString("xtream_username", user)
+                            .putString("xtream_password", pass)
+                            .putString("last_connection", "xtream")
                             .apply();
 
                     loadXtreamChannels(base, user, pass);
@@ -453,7 +500,9 @@ public class MainActivity extends Activity {
                     }
 
                     getPreferences(MODE_PRIVATE).edit()
-                            .putString("playlist_url", url).apply();
+                            .putString("playlist_url", url)
+                            .putString("last_connection", "m3u")
+                            .apply();
 
                     Toast.makeText(this, "Loading playlist...",
                             Toast.LENGTH_SHORT).show();
@@ -549,6 +598,8 @@ public class MainActivity extends Activity {
     }
 
     private void showLiveTv() {
+        showingLiveTv = true;
+        showingTvGuide = false;
         screen.removeAllViews();
 
         TextView title = label("StreamNest  /  LIVE TV", 24);
@@ -743,6 +794,7 @@ public class MainActivity extends Activity {
     }
 
     private void showTvGuide() {
+        showingTvGuide = true;
         String epgUrl = getPreferences(MODE_PRIVATE).getString("epg_url", "");
         if (epgUrl.trim().isEmpty()) {
             Toast.makeText(this, "Open Settings to enter your XMLTV EPG URL.",
