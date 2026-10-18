@@ -115,7 +115,8 @@ public class MainActivity extends Activity {
 
             if (!server.isEmpty() && !username.isEmpty()
                     && !password.isEmpty()) {
-                loadXtreamChannels(server, username, password);
+                loadXtreamChannels(server, username, password,
+                        prefs.getBoolean("launch_live_tv_on_boot", true));
             } else {
                 Toast.makeText(this,
                         "Please log in to Xtream Codes once more to save your password.",
@@ -128,7 +129,8 @@ public class MainActivity extends Activity {
         if ("m3u".equals(type)
                 || (type.isEmpty() && !playlistUrl.isEmpty())) {
             if (!playlistUrl.isEmpty()) {
-                loadPlaylist(playlistUrl);
+                loadPlaylist(playlistUrl,
+                        prefs.getBoolean("launch_live_tv_on_boot", true));
             }
         }
     }
@@ -195,7 +197,7 @@ public class MainActivity extends Activity {
             if ("LIVE TV".equals(title)) {
                 showConnectionDialog();
             } else if ("SETTINGS".equals(title)) {
-                showEpgDialog();
+                showSettingsDialog();
             } else if ("TV GUIDE".equals(title)) {
                 showTvGuide();
             } else {
@@ -211,6 +213,33 @@ public class MainActivity extends Activity {
         menu.addView(item, params);
     }
 
+
+    private void showSettingsDialog() {
+        android.content.SharedPreferences prefs =
+                getPreferences(MODE_PRIVATE);
+        String[] options = {
+                "Launch Live TV on app boot",
+                "Launch Live TV after playlist change"
+        };
+        boolean[] checked = {
+                prefs.getBoolean("launch_live_tv_on_boot", true),
+                prefs.getBoolean("launch_live_tv_on_change", true)
+        };
+
+        new AlertDialog.Builder(this)
+                .setTitle("Settings")
+                .setMultiChoiceItems(options, checked,
+                        (dialog, which, isChecked) -> {
+                            String key = which == 0
+                                    ? "launch_live_tv_on_boot"
+                                    : "launch_live_tv_on_change";
+                            prefs.edit().putBoolean(key, isChecked).apply();
+                        })
+                .setPositiveButton("XMLTV EPG URL",
+                        (dialog, which) -> showEpgDialog())
+                .setNegativeButton("Done", null)
+                .show();
+    }
 
     private void showEpgDialog() {
         EditText input = new EditText(this);
@@ -384,6 +413,14 @@ public class MainActivity extends Activity {
 
     private void loadXtreamChannels(
             String base, String username, String password) {
+        boolean launchAfterLoad = getPreferences(MODE_PRIVATE)
+                .getBoolean("launch_live_tv_on_change", true);
+        loadXtreamChannels(base, username, password, launchAfterLoad);
+    }
+
+    private void loadXtreamChannels(
+            String base, String username, String password,
+            boolean launchAfterLoad) {
         Toast.makeText(this, "Connecting to provider...",
                 Toast.LENGTH_SHORT).show();
 
@@ -465,7 +502,9 @@ public class MainActivity extends Activity {
                 } else {
                     channels = loaded;
                     selectedCategory = "All Channels";
-                    showLiveTv();
+                    if (launchAfterLoad) {
+                        showLiveTv();
+                    }
                     Toast.makeText(this,
                             "Loaded " + channels.size()
                                     + " live channels",
@@ -512,6 +551,12 @@ public class MainActivity extends Activity {
     }
 
     private void loadPlaylist(String playlistUrl) {
+        boolean launchAfterLoad = getPreferences(MODE_PRIVATE)
+                .getBoolean("launch_live_tv_on_change", true);
+        loadPlaylist(playlistUrl, launchAfterLoad);
+    }
+
+    private void loadPlaylist(String playlistUrl, boolean launchAfterLoad) {
         new Thread(() -> {
             ArrayList<Channel> loaded = new ArrayList<>();
             HttpURLConnection connection = null;
@@ -564,7 +609,9 @@ public class MainActivity extends Activity {
                     } else {
                         channels = loaded;
                         selectedCategory = "All Channels";
+                        if (launchAfterLoad) {
                         showLiveTv();
+                    }
                         Toast.makeText(this,
                                 "Loaded " + channels.size() + " channels",
                                 Toast.LENGTH_SHORT).show();
