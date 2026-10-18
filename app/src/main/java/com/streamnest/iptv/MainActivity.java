@@ -297,7 +297,7 @@ public class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         scroll.addView(form);
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog loginDialog = new AlertDialog.Builder(this)
                 .setTitle("Xtream Codes Login")
                 .setView(scroll)
                 .setNegativeButton("Cancel", null)
@@ -333,14 +333,14 @@ public class MainActivity extends Activity {
                     loadXtreamChannels(base, user, pass);
                 })
                 .create();
-        dialog.setOnShowListener(v -> {
-            if (dialog.getWindow() != null) {
-                dialog.getWindow().setSoftInputMode(
+        loginDialog.setOnShowListener(v -> {
+            if (loginDialog.getWindow() != null) {
+                loginDialog.getWindow().setSoftInputMode(
                     android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
                 );
             }
         });
-        dialog.show();
+        loginDialog.show();
     }
 
     private String apiEncode(String value) throws Exception {
