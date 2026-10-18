@@ -96,6 +96,10 @@ public class MainActivity extends Activity {
         favorites = new LinkedHashSet<>(getPreferences(MODE_PRIVATE)
                 .getStringSet("favorite_urls", Collections.emptySet()));
 
+        showHomeScreen();
+    }
+
+    private void showHomeScreen() {
         screen = new LinearLayout(this);
         screen.setOrientation(LinearLayout.VERTICAL);
         screen.setBackgroundColor(NAVY);
@@ -130,6 +134,7 @@ public class MainActivity extends Activity {
 
         setContentView(screen);
         homeMenu.getChildAt(0).requestFocus();
+
     }
 
     private void addHomeSection(LinearLayout menu, String title,
@@ -247,9 +252,8 @@ public class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         scroll.addView(form);
 
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Xtream Codes Login")
-                .setMessage("Enter the server URL, username and password from your IPTV provider.")
                 .setView(scroll)
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Login", (dialog, which) -> {
@@ -281,7 +285,15 @@ public class MainActivity extends Activity {
 
                     loadXtreamChannels(base, user, pass);
                 })
-                .show();
+                .create();
+        dialog.setOnShowListener(v -> {
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setSoftInputMode(
+                    android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                );
+            }
+        });
+        dialog.show();
     }
 
     private String apiEncode(String value) throws Exception {
@@ -579,7 +591,7 @@ public class MainActivity extends Activity {
     }
 
     private void onCreateHomeAgain() {
-        recreate();
+        showHomeScreen();
     }
 
     private void renderCategories() {
@@ -759,7 +771,7 @@ public class MainActivity extends Activity {
 
         TextView back = label("← BACK TO HOME", 16);
         back.setFocusable(true);
-        back.setOnClickListener(v -> recreate());
+        back.setOnClickListener(v -> showHomeScreen());
         screen.addView(back);
 
         ScrollView scroll = new ScrollView(this);
