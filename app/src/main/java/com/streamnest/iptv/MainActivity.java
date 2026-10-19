@@ -1019,6 +1019,11 @@ public class MainActivity extends Activity {
             TextView item = label(text, 15);
             item.setPadding(dp(12), dp(10), dp(12), dp(10));
             item.setBackgroundColor(PANEL);
+            item.setFocusable(true);
+            item.setClickable(true);
+            item.setOnFocusChangeListener((v, focused) ->
+                    v.setBackgroundColor(focused ? BLUE : PANEL));
+            item.setOnClickListener(v -> playChannel(channel));
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT);
