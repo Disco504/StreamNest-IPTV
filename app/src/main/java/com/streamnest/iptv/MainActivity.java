@@ -998,14 +998,11 @@ public class MainActivity extends Activity {
         }
 
         status.setText("Guide loaded: " + visible.size()
-                + " current/upcoming listings. Showing up to 100.");
+                + " current/upcoming listings.");
 
         SimpleDateFormat clock = new SimpleDateFormat("h:mm a", Locale.getDefault());
         int shown = 0;
         for (EpgProgram program : visible) {
-            if (shown >= 100) {
-                break;
-            }
             Channel channel = channelMap.get(program.channelId);
             if (channel == null) {
                 continue;
