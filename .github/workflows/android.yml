@@ -33,12 +33,27 @@ jobs:
       - name: Install Android SDK components
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Build debug APK
-        run: gradle --no-daemon assembleDebug
+      - name: Prepare release keystore
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.Release }}
+        run: |
+          test -n "$RELEASE_KEYSTORE_BASE64" || {
+            echo "ERROR: Release keystore secret is empty."
+            exit 1
+          }
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/streamnest-release.jks"
+          echo "STREAMNEST_KEYSTORE_FILE=$RUNNER_TEMP/streamnest-release.jks" >> "$GITHUB_ENV"
 
-      - name: Upload APK
+      - name: Build signed release APK
+        env:
+          STREAMNEST_KEYSTORE_PASSWORD: ${{ secrets.STREAMNEST_KEYSTORE_PASSWORD }}
+          STREAMNEST_KEY_ALIAS: ${{ secrets.STREAMNEST_KEY_ALIAS }}
+          STREAMNEST_KEY_PASSWORD: ${{ secrets.STREAMNEST_KEY_PASSWORD }}
+        run: gradle --no-daemon assembleRelease
+
+      - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: StreamNest-IPTV-debug-APK
-          path: app/build/outputs/apk/debug/*.apk
+          name: StreamNest-IPTV-release-APK
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
