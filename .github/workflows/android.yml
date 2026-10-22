@@ -1,7 +1,7 @@
 cd ~/StreamNestIPTV
 cat .github/workflows/android.ymlname: Build StreamNest IPTV APK
 
-on:
+'on':
   push:
     branches: [main]
   workflow_dispatch:
