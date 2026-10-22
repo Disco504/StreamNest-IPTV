@@ -1,4 +1,5 @@
-name: Build StreamNest IPTV APK
+cd ~/StreamNestIPTV
+cat .github/workflows/android.ymlname: Build StreamNest IPTV APK
 
 on:
   push:
@@ -7,6 +8,7 @@ on:
 
 permissions:
   contents: read
+
 
 jobs:
   build:
