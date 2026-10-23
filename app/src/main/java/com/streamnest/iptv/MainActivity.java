@@ -873,11 +873,24 @@ public class MainActivity extends Activity {
         back.setOnClickListener(v -> showHomeScreen());
         screen.addView(back);
 
-        ScrollView scroll = new ScrollView(this);
+        LinearLayout guideContent = new LinearLayout(this);
+        guideContent.setOrientation(LinearLayout.HORIZONTAL);
+
+        LinearLayout categoryList = new LinearLayout(this);
+        categoryList.setOrientation(LinearLayout.VERTICAL);
+        ScrollView categoryScroll = new ScrollView(this);
+        categoryScroll.addView(categoryList);
+
         LinearLayout results = new LinearLayout(this);
         results.setOrientation(LinearLayout.VERTICAL);
-        scroll.addView(results);
-        screen.addView(scroll, new LinearLayout.LayoutParams(
+        ScrollView programScroll = new ScrollView(this);
+        programScroll.addView(results);
+
+        guideContent.addView(categoryScroll, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.MATCH_PARENT, 0.30f));
+        guideContent.addView(programScroll, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.MATCH_PARENT, 0.70f));
+        screen.addView(guideContent, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
 
         Thread worker = new Thread(() -> {
@@ -930,7 +943,7 @@ public class MainActivity extends Activity {
 
                 final ArrayList<EpgProgram> loaded = programs;
                 runOnUiThread(() ->
-                        renderGuidePrograms(loaded, channelMap, status, results));
+                        renderGuidePrograms(loaded, channelMap, status, categoryList, results));
             } catch (Exception e) {
                 final String message = e.getMessage() == null
                         ? e.getClass().getSimpleName() : e.getMessage();
@@ -966,21 +979,19 @@ public class MainActivity extends Activity {
     }
 
     private void renderGuidePrograms(List<EpgProgram> programs,
-            Map<String, Channel> channelMap, TextView status, LinearLayout results) {
+            Map<String, Channel> channelMap, TextView status,
+            LinearLayout categoryList, LinearLayout results) {
+        categoryList.removeAllViews();
         results.removeAllViews();
 
         long now = System.currentTimeMillis();
         long horizon = now + 24L * 60L * 60L * 1000L;
         int matched = 0;
-
         Map<String, ArrayList<EpgProgram>> grouped = new HashMap<>();
 
         for (EpgProgram program : programs) {
             Channel channel = channelMap.get(program.channelId);
-            if (channel == null) {
-                continue;
-            }
-
+            if (channel == null) continue;
             matched++;
 
             if (program.stopMillis > now && program.startMillis < horizon) {
@@ -988,7 +999,6 @@ public class MainActivity extends Activity {
                 if (category == null || category.trim().isEmpty()) {
                     category = "Uncategorized";
                 }
-
                 if (!grouped.containsKey(category)) {
                     grouped.put(category, new ArrayList<>());
                 }
@@ -1015,56 +1025,81 @@ public class MainActivity extends Activity {
             totalVisible += list.size();
         }
 
-        status.setText("Guide loaded: " + totalVisible
-                + " listings across " + grouped.size() + " categories.");
-
-        SimpleDateFormat clock =
-                new SimpleDateFormat("h:mm a", Locale.getDefault());
+        status.setText("Guide loaded: " + totalVisible + " listings across "
+                + grouped.size() + " categories. Select a category on the left.");
 
         TreeSet<String> categories = new TreeSet<>(grouped.keySet());
 
         for (String category : categories) {
-            TextView heading = label(category + " ("
-                    + grouped.get(category).size() + ")", 18);
-            heading.setPadding(dp(12), dp(12), dp(12), dp(8));
-            heading.setBackgroundColor(BLUE);
-
-            LinearLayout.LayoutParams headingParams =
-                    new LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT);
-            headingParams.setMargins(0, dp(10), 0, dp(4));
-            results.addView(heading, headingParams);
-
-            for (EpgProgram program : grouped.get(category)) {
-                Channel channel = channelMap.get(program.channelId);
-                if (channel == null) {
-                    continue;
+            TextView item = label(
+                    category + " (" + grouped.get(category).size() + ")", 15);
+            item.setPadding(dp(10), dp(14), dp(8), dp(14));
+            item.setBackgroundColor(PANEL);
+            item.setFocusable(true);
+            item.setClickable(true);
+            item.setOnFocusChangeListener((v, focused) ->
+                    v.setBackgroundColor(focused ? BLUE : PANEL));
+            item.setOnClickListener(v -> {
+                for (int i = 0; i < categoryList.getChildCount(); i++) {
+                    android.view.View child = categoryList.getChildAt(i);
+                    child.setBackgroundColor(child == item ? BLUE : PANEL);
                 }
+                renderGuideCategoryPrograms(category, grouped, channelMap, results);
+            });
 
-                String times = clock.format(new Date(program.startMillis))
-                        + " – " + clock.format(new Date(program.stopMillis));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            params.setMargins(dp(2), dp(2), dp(2), dp(2));
+            categoryList.addView(item, params);
+        }
 
-                String text = channel.name + "\n" + times + "\n"
-                        + (program.title.isEmpty()
-                        ? "(Untitled programme)" : program.title);
+        if (categoryList.getChildCount() > 0) {
+            categoryList.getChildAt(0).performClick();
+        }
+    }
 
-                TextView item = label(text, 15);
-                item.setPadding(dp(12), dp(10), dp(12), dp(10));
-                item.setBackgroundColor(PANEL);
-                item.setFocusable(true);
-                item.setClickable(true);
-                item.setOnFocusChangeListener((v, focused) ->
-                        v.setBackgroundColor(focused ? BLUE : PANEL));
-                item.setOnClickListener(v -> playChannel(channel));
+    private void renderGuideCategoryPrograms(String category,
+            Map<String, ArrayList<EpgProgram>> grouped,
+            Map<String, Channel> channelMap, LinearLayout results) {
+        results.removeAllViews();
 
-                LinearLayout.LayoutParams params =
-                        new LinearLayout.LayoutParams(
-                                LinearLayout.LayoutParams.MATCH_PARENT,
-                                LinearLayout.LayoutParams.WRAP_CONTENT);
-                params.setMargins(0, dp(3), 0, dp(3));
-                results.addView(item, params);
-            }
+        TextView heading = label(category + " — PROGRAMS", 18);
+        heading.setPadding(dp(12), dp(12), dp(12), dp(8));
+        heading.setBackgroundColor(BLUE);
+        results.addView(heading, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        SimpleDateFormat clock =
+                new SimpleDateFormat("h:mm a", Locale.getDefault());
+        ArrayList<EpgProgram> categoryPrograms = grouped.get(category);
+        if (categoryPrograms == null) return;
+
+        for (EpgProgram program : categoryPrograms) {
+            Channel channel = channelMap.get(program.channelId);
+            if (channel == null) continue;
+
+            String times = clock.format(new Date(program.startMillis))
+                    + " – " + clock.format(new Date(program.stopMillis));
+            String text = channel.name + "\n" + times + "\n"
+                    + (program.title.isEmpty()
+                    ? "(Untitled programme)" : program.title);
+
+            TextView item = label(text, 15);
+            item.setPadding(dp(12), dp(10), dp(12), dp(10));
+            item.setBackgroundColor(PANEL);
+            item.setFocusable(true);
+            item.setClickable(true);
+            item.setOnFocusChangeListener((v, focused) ->
+                    v.setBackgroundColor(focused ? BLUE : PANEL));
+            item.setOnClickListener(v -> playChannel(channel));
+
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            params.setMargins(0, dp(3), 0, dp(3));
+            results.addView(item, params);
         }
     }
 
