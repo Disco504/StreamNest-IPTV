@@ -29,6 +29,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -1064,43 +1065,141 @@ public class MainActivity extends Activity {
             Map<String, Channel> channelMap, LinearLayout results) {
         results.removeAllViews();
 
-        TextView heading = label(category + " — PROGRAMS", 18);
+        TextView heading = label(category + " — TV GUIDE", 18);
         heading.setPadding(dp(12), dp(12), dp(12), dp(8));
         heading.setBackgroundColor(BLUE);
         results.addView(heading, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
+        ArrayList<EpgProgram> categoryPrograms = grouped.get(category);
+        if (categoryPrograms == null || categoryPrograms.isEmpty()) {
+            results.addView(label("No programs available for this category.", 14));
+            return;
+        }
+
+        final long slotMillis = 30L * 60L * 1000L;
+        final long gridStart =
+                (System.currentTimeMillis() / slotMillis) * slotMillis;
+        final long gridEnd = gridStart + 24L * 60L * 60L * 1000L;
+        final int pixelsPerMinute = 2;
+        final int channelWidth = dp(120);
+        final int slotWidth = dp(60);
+        final int rowHeight = dp(76);
+
         SimpleDateFormat clock =
                 new SimpleDateFormat("h:mm a", Locale.getDefault());
-        ArrayList<EpgProgram> categoryPrograms = grouped.get(category);
-        if (categoryPrograms == null) return;
 
+        LinearLayout grid = new LinearLayout(this);
+        grid.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout timeHeader = new LinearLayout(this);
+        timeHeader.setOrientation(LinearLayout.HORIZONTAL);
+
+        TextView channelHeader = label("CHANNEL", 13);
+        channelHeader.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        channelHeader.setPadding(dp(6), dp(6), dp(6), dp(6));
+        channelHeader.setBackgroundColor(BLUE);
+        timeHeader.addView(channelHeader, new LinearLayout.LayoutParams(
+                channelWidth, dp(42)));
+
+        for (long time = gridStart; time < gridEnd; time += slotMillis) {
+            TextView tick = label(clock.format(new Date(time)), 12);
+            tick.setGravity(android.view.Gravity.CENTER);
+            tick.setPadding(dp(2), dp(4), dp(2), dp(4));
+            tick.setBackgroundColor(BLUE);
+            LinearLayout.LayoutParams tickParams =
+                    new LinearLayout.LayoutParams(slotWidth, dp(42));
+            tickParams.setMargins(dp(1), 0, dp(1), 0);
+            timeHeader.addView(tick, tickParams);
+        }
+        grid.addView(timeHeader);
+
+        Map<String, ArrayList<EpgProgram>> byChannel = new java.util.TreeMap<>();
         for (EpgProgram program : categoryPrograms) {
             Channel channel = channelMap.get(program.channelId);
             if (channel == null) continue;
-
-            String times = clock.format(new Date(program.startMillis))
-                    + " – " + clock.format(new Date(program.stopMillis));
-            String text = channel.name + "\n" + times + "\n"
-                    + (program.title.isEmpty()
-                    ? "(Untitled programme)" : program.title);
-
-            TextView item = label(text, 15);
-            item.setPadding(dp(12), dp(10), dp(12), dp(10));
-            item.setBackgroundColor(PANEL);
-            item.setFocusable(true);
-            item.setClickable(true);
-            item.setOnFocusChangeListener((v, focused) ->
-                    v.setBackgroundColor(focused ? BLUE : PANEL));
-            item.setOnClickListener(v -> playChannel(channel));
-
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT);
-            params.setMargins(0, dp(3), 0, dp(3));
-            results.addView(item, params);
+            byChannel.computeIfAbsent(channel.name,
+                    key -> new ArrayList<>()).add(program);
         }
+
+        for (Map.Entry<String, ArrayList<EpgProgram>> entry : byChannel.entrySet()) {
+            ArrayList<EpgProgram> programs = entry.getValue();
+            Collections.sort(programs, Comparator.comparingLong(
+                    program -> program.startMillis));
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+
+            TextView channelLabel = label(entry.getKey(), 13);
+            channelLabel.setGravity(
+                    android.view.Gravity.CENTER_VERTICAL);
+            channelLabel.setPadding(dp(6), dp(4), dp(6), dp(4));
+            channelLabel.setBackgroundColor(PANEL);
+            channelLabel.setFocusable(true);
+            row.addView(channelLabel, new LinearLayout.LayoutParams(
+                    channelWidth, rowHeight));
+
+            long cursor = gridStart;
+            for (EpgProgram program : programs) {
+                long startTime = Math.max(program.startMillis, gridStart);
+                long stopTime = Math.min(program.stopMillis, gridEnd);
+                if (stopTime <= startTime) continue;
+
+                if (startTime > cursor) {
+                    int gapMinutes = (int) ((startTime - cursor) / 60000L);
+                    if (gapMinutes > 0) {
+                        android.view.View gap = new android.view.View(this);
+                        row.addView(gap, new LinearLayout.LayoutParams(
+                                Math.max(1, dp(gapMinutes * pixelsPerMinute)),
+                                rowHeight));
+                    }
+                }
+
+                long durationMillis = stopTime - startTime;
+                int durationMinutes =
+                        Math.max(1, (int) (durationMillis / 60000L));
+                int brickWidth = Math.max(1, dp(
+                        durationMinutes * pixelsPerMinute));
+
+                String title = program.title.isEmpty()
+                        ? "(Untitled programme)" : program.title;
+                TextView brick = label(
+                        title + "\n" + clock.format(new Date(startTime)),
+                        12);
+                brick.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                brick.setPadding(dp(5), dp(4), dp(5), dp(4));
+                brick.setBackgroundColor(PANEL);
+                brick.setFocusable(true);
+                brick.setClickable(true);
+                brick.setMaxLines(3);
+                brick.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                brick.setOnFocusChangeListener((v, focused) ->
+                        v.setBackgroundColor(focused ? BLUE : PANEL));
+
+                Channel channel = channelMap.get(program.channelId);
+                if (channel != null) {
+                    brick.setOnClickListener(v -> playChannel(channel));
+                }
+
+                LinearLayout.LayoutParams brickParams =
+                        new LinearLayout.LayoutParams(brickWidth, rowHeight);
+                brickParams.setMargins(dp(1), dp(1), dp(1), dp(1));
+                row.addView(brick, brickParams);
+
+                cursor = Math.max(cursor, stopTime);
+            }
+
+            grid.addView(row, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, rowHeight));
+        }
+
+        HorizontalScrollView horizontalScroll = new HorizontalScrollView(this);
+        horizontalScroll.setHorizontalScrollBarEnabled(true);
+        horizontalScroll.addView(grid);
+        results.addView(horizontalScroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
     }
 
     private void playChannel(Channel channel) {
