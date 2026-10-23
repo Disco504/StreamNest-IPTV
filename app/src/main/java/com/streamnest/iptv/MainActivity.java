@@ -968,21 +968,33 @@ public class MainActivity extends Activity {
     private void renderGuidePrograms(List<EpgProgram> programs,
             Map<String, Channel> channelMap, TextView status, LinearLayout results) {
         results.removeAllViews();
+
         long now = System.currentTimeMillis();
         long horizon = now + 24L * 60L * 60L * 1000L;
         int matched = 0;
-        ArrayList<EpgProgram> visible = new ArrayList<>();
+
+        Map<String, ArrayList<EpgProgram>> grouped = new HashMap<>();
 
         for (EpgProgram program : programs) {
-            if (channelMap.containsKey(program.channelId)) {
-                matched++;
-                if (program.stopMillis > now && program.startMillis < horizon) {
-                    visible.add(program);
+            Channel channel = channelMap.get(program.channelId);
+            if (channel == null) {
+                continue;
+            }
+
+            matched++;
+
+            if (program.stopMillis > now && program.startMillis < horizon) {
+                String category = channel.group;
+                if (category == null || category.trim().isEmpty()) {
+                    category = "Uncategorized";
                 }
+
+                if (!grouped.containsKey(category)) {
+                    grouped.put(category, new ArrayList<>());
+                }
+                grouped.get(category).add(program);
             }
         }
-
-        Collections.sort(visible, Comparator.comparingLong(p -> p.startMillis));
 
         if (matched == 0) {
             status.setText("Downloaded " + programs.size()
@@ -991,42 +1003,68 @@ public class MainActivity extends Activity {
             return;
         }
 
-        if (visible.isEmpty()) {
+        if (grouped.isEmpty()) {
             status.setText("Matched channels, but no current or upcoming programmes "
                     + "were found in the next 24 hours.");
             return;
         }
 
-        status.setText("Guide loaded: " + visible.size()
-                + " current/upcoming listings.");
+        int totalVisible = 0;
+        for (ArrayList<EpgProgram> list : grouped.values()) {
+            Collections.sort(list, Comparator.comparingLong(p -> p.startMillis));
+            totalVisible += list.size();
+        }
 
-        SimpleDateFormat clock = new SimpleDateFormat("h:mm a", Locale.getDefault());
-        int shown = 0;
-        for (EpgProgram program : visible) {
-            Channel channel = channelMap.get(program.channelId);
-            if (channel == null) {
-                continue;
+        status.setText("Guide loaded: " + totalVisible
+                + " listings across " + grouped.size() + " categories.");
+
+        SimpleDateFormat clock =
+                new SimpleDateFormat("h:mm a", Locale.getDefault());
+
+        TreeSet<String> categories = new TreeSet<>(grouped.keySet());
+
+        for (String category : categories) {
+            TextView heading = label(category + " ("
+                    + grouped.get(category).size() + ")", 18);
+            heading.setPadding(dp(12), dp(12), dp(12), dp(8));
+            heading.setBackgroundColor(BLUE);
+
+            LinearLayout.LayoutParams headingParams =
+                    new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT);
+            headingParams.setMargins(0, dp(10), 0, dp(4));
+            results.addView(heading, headingParams);
+
+            for (EpgProgram program : grouped.get(category)) {
+                Channel channel = channelMap.get(program.channelId);
+                if (channel == null) {
+                    continue;
+                }
+
+                String times = clock.format(new Date(program.startMillis))
+                        + " – " + clock.format(new Date(program.stopMillis));
+
+                String text = channel.name + "\n" + times + "\n"
+                        + (program.title.isEmpty()
+                        ? "(Untitled programme)" : program.title);
+
+                TextView item = label(text, 15);
+                item.setPadding(dp(12), dp(10), dp(12), dp(10));
+                item.setBackgroundColor(PANEL);
+                item.setFocusable(true);
+                item.setClickable(true);
+                item.setOnFocusChangeListener((v, focused) ->
+                        v.setBackgroundColor(focused ? BLUE : PANEL));
+                item.setOnClickListener(v -> playChannel(channel));
+
+                LinearLayout.LayoutParams params =
+                        new LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT);
+                params.setMargins(0, dp(3), 0, dp(3));
+                results.addView(item, params);
             }
-
-            String times = clock.format(new Date(program.startMillis)) + " – "
-                    + clock.format(new Date(program.stopMillis));
-            String text = channel.name + "\n" + times + "\n"
-                    + (program.title.isEmpty() ? "(Untitled programme)" : program.title);
-
-            TextView item = label(text, 15);
-            item.setPadding(dp(12), dp(10), dp(12), dp(10));
-            item.setBackgroundColor(PANEL);
-            item.setFocusable(true);
-            item.setClickable(true);
-            item.setOnFocusChangeListener((v, focused) ->
-                    v.setBackgroundColor(focused ? BLUE : PANEL));
-            item.setOnClickListener(v -> playChannel(channel));
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT);
-            params.setMargins(0, dp(3), 0, dp(3));
-            results.addView(item, params);
-            shown++;
         }
     }
 
