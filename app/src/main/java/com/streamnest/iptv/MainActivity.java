@@ -18,6 +18,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import androidx.media3.common.MediaItem;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.ui.PlayerView;
+
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
@@ -60,6 +64,10 @@ public class MainActivity extends Activity {
     private String selectedCategory = "All Channels";
     private boolean showingLiveTv = false;
     private boolean showingTvGuide = false;
+
+    private ExoPlayer previewPlayer;
+    private PlayerView previewPlayerView;
+    private String previewChannelUrl;
 
     private static class Channel {
         String name;
@@ -146,6 +154,7 @@ public class MainActivity extends Activity {
     }
 
     private void showHomeScreen() {
+        releaseGuidePreview();
         showingLiveTv = false;
         showingTvGuide = false;
         screen = new LinearLayout(this);
@@ -877,17 +886,29 @@ public class MainActivity extends Activity {
         LinearLayout guideContent = new LinearLayout(this);
         guideContent.setOrientation(LinearLayout.HORIZONTAL);
 
+        LinearLayout leftPanel = new LinearLayout(this);
+        leftPanel.setOrientation(LinearLayout.VERTICAL);
+
+        previewPlayerView = new PlayerView(this);
+        previewPlayerView.setUseController(false);
+        previewPlayerView.setFocusable(false);
+        previewPlayerView.setBackgroundColor(Color.BLACK);
+        leftPanel.addView(previewPlayerView, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(150)));
+
         LinearLayout categoryList = new LinearLayout(this);
         categoryList.setOrientation(LinearLayout.VERTICAL);
         ScrollView categoryScroll = new ScrollView(this);
         categoryScroll.addView(categoryList);
+        leftPanel.addView(categoryScroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         LinearLayout results = new LinearLayout(this);
         results.setOrientation(LinearLayout.VERTICAL);
         ScrollView programScroll = new ScrollView(this);
         programScroll.addView(results);
 
-        guideContent.addView(categoryScroll, new LinearLayout.LayoutParams(
+        guideContent.addView(leftPanel, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.MATCH_PARENT, 0.30f));
         guideContent.addView(programScroll, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.MATCH_PARENT, 0.70f));
@@ -1123,6 +1144,8 @@ public class MainActivity extends Activity {
                     key -> new ArrayList<>()).add(program);
         }
 
+        Channel firstPreviewChannel = null;
+
         for (Map.Entry<String, ArrayList<EpgProgram>> entry : byChannel.entrySet()) {
             ArrayList<EpgProgram> programs = entry.getValue();
             Collections.sort(programs, Comparator.comparingLong(
@@ -1174,11 +1197,21 @@ public class MainActivity extends Activity {
                 brick.setClickable(true);
                 brick.setMaxLines(3);
                 brick.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                brick.setOnFocusChangeListener((v, focused) ->
-                        v.setBackgroundColor(focused ? BLUE : PANEL));
+                brick.setOnFocusChangeListener((v, focused) -> {
+                    v.setBackgroundColor(focused ? BLUE : PANEL);
+                    if (focused) {
+                        Channel previewChannel = channelMap.get(program.channelId);
+                        if (previewChannel != null) {
+                            playGuidePreview(previewChannel);
+                        }
+                    }
+                });
 
                 Channel channel = channelMap.get(program.channelId);
                 if (channel != null) {
+                    if (firstPreviewChannel == null) {
+                        firstPreviewChannel = channel;
+                    }
                     brick.setOnClickListener(v -> playChannel(channel));
                 }
 
@@ -1194,6 +1227,10 @@ public class MainActivity extends Activity {
                     LinearLayout.LayoutParams.WRAP_CONTENT, rowHeight));
         }
 
+        if (firstPreviewChannel != null) {
+            playGuidePreview(firstPreviewChannel);
+        }
+
         HorizontalScrollView horizontalScroll = new HorizontalScrollView(this);
         horizontalScroll.setHorizontalScrollBarEnabled(true);
         horizontalScroll.addView(grid);
@@ -1202,7 +1239,45 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.WRAP_CONTENT));
     }
 
+    private void playGuidePreview(Channel channel) {
+        if (channel.url == null || channel.url.trim().isEmpty()
+                || previewPlayerView == null) {
+            return;
+        }
+
+        if (channel.url.equals(previewChannelUrl) && previewPlayer != null) {
+            return;
+        }
+
+        try {
+            if (previewPlayer == null) {
+                previewPlayer = new ExoPlayer.Builder(this).build();
+                previewPlayerView.setPlayer(previewPlayer);
+            }
+
+            previewChannelUrl = channel.url;
+            previewPlayer.setMediaItem(MediaItem.fromUri(channel.url));
+            previewPlayer.prepare();
+            previewPlayer.play();
+        } catch (Exception e) {
+            android.util.Log.e("StreamNest", "TV Guide preview failed", e);
+        }
+    }
+
+    private void releaseGuidePreview() {
+        if (previewPlayerView != null) {
+            previewPlayerView.setPlayer(null);
+        }
+        if (previewPlayer != null) {
+            previewPlayer.release();
+            previewPlayer = null;
+        }
+        previewChannelUrl = null;
+        previewPlayerView = null;
+    }
+
     private void playChannel(Channel channel) {
+        releaseGuidePreview();
         Intent intent = new Intent(this, PlayerActivity.class);
         intent.putExtra("channel_name", channel.name);
         intent.putExtra("stream_url", channel.url);
