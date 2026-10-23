@@ -68,6 +68,7 @@ public class MainActivity extends Activity {
     private ExoPlayer previewPlayer;
     private PlayerView previewPlayerView;
     private String previewChannelUrl;
+    private Channel guidePreviewChannel;
 
     private static class Channel {
         String name;
@@ -150,6 +151,15 @@ public class MainActivity extends Activity {
             showHomeScreen();
         } else {
             super.onBackPressed();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (showingTvGuide && previewPlayerView != null
+                && guidePreviewChannel != null) {
+            playGuidePreview(guidePreviewChannel);
         }
     }
 
@@ -894,7 +904,7 @@ public class MainActivity extends Activity {
         previewPlayerView.setFocusable(false);
         previewPlayerView.setBackgroundColor(Color.BLACK);
         leftPanel.addView(previewPlayerView, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(150)));
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(220)));
 
         LinearLayout categoryList = new LinearLayout(this);
         categoryList.setOrientation(LinearLayout.VERTICAL);
@@ -909,9 +919,9 @@ public class MainActivity extends Activity {
         programScroll.addView(results);
 
         guideContent.addView(leftPanel, new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.MATCH_PARENT, 0.30f));
+                0, LinearLayout.LayoutParams.MATCH_PARENT, 0.40f));
         guideContent.addView(programScroll, new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.MATCH_PARENT, 0.70f));
+                0, LinearLayout.LayoutParams.MATCH_PARENT, 0.60f));
         screen.addView(guideContent, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
 
@@ -1212,7 +1222,7 @@ public class MainActivity extends Activity {
                     if (firstPreviewChannel == null) {
                         firstPreviewChannel = channel;
                     }
-                    brick.setOnClickListener(v -> playChannel(channel));
+                    brick.setOnClickListener(v -> playGuidePreview(channel));
                 }
 
                 LinearLayout.LayoutParams brickParams =
@@ -1244,6 +1254,7 @@ public class MainActivity extends Activity {
                 || previewPlayerView == null) {
             return;
         }
+        guidePreviewChannel = channel;
 
         if (channel.url.equals(previewChannelUrl) && previewPlayer != null) {
             return;
@@ -1264,6 +1275,17 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void releaseGuidePreviewPlayer() {
+        if (previewPlayerView != null) {
+            previewPlayerView.setPlayer(null);
+        }
+        if (previewPlayer != null) {
+            previewPlayer.release();
+            previewPlayer = null;
+        }
+        previewChannelUrl = null;
+    }
+
     private void releaseGuidePreview() {
         if (previewPlayerView != null) {
             previewPlayerView.setPlayer(null);
@@ -1274,10 +1296,11 @@ public class MainActivity extends Activity {
         }
         previewChannelUrl = null;
         previewPlayerView = null;
+        guidePreviewChannel = null;
     }
 
     private void playChannel(Channel channel) {
-        releaseGuidePreview();
+        releaseGuidePreviewPlayer();
         Intent intent = new Intent(this, PlayerActivity.class);
         intent.putExtra("channel_name", channel.name);
         intent.putExtra("stream_url", channel.url);
