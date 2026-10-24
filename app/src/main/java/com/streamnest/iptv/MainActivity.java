@@ -64,6 +64,7 @@ public class MainActivity extends Activity {
     private String selectedCategory = "All Channels";
     private boolean showingLiveTv = false;
     private boolean showingTvGuide = false;
+    private ScrollView guideCategoryScrollView;
 
     private ExoPlayer previewPlayer;
     private PlayerView previewPlayerView;
@@ -153,6 +154,20 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        if (showingTvGuide
+                && event.getAction() == android.view.KeyEvent.ACTION_DOWN
+                && guideCategoryScrollView != null) {
+            if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_LEFT
+                    && guideCategoryScrollView.getVisibility() != android.view.View.VISIBLE) {
+                guideCategoryScrollView.setVisibility(android.view.View.VISIBLE);
+                return true;
+            }
+            if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_RIGHT
+                    && guideCategoryScrollView.getVisibility() == android.view.View.VISIBLE) {
+                guideCategoryScrollView.setVisibility(android.view.View.GONE);
+                return true;
+            }
+        }
         if (showingTvGuide
                 && event.getKeyCode() == android.view.KeyEvent.KEYCODE_BACK
                 && event.getAction() == android.view.KeyEvent.ACTION_DOWN
@@ -913,19 +928,13 @@ public class MainActivity extends Activity {
         screen.removeAllViews();
         screen.setOrientation(LinearLayout.VERTICAL);
 
-        LinearLayout guideContent = new LinearLayout(this);
-        guideContent.setOrientation(LinearLayout.HORIZONTAL);
-
-        LinearLayout leftPanel = new LinearLayout(this);
-        leftPanel.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout previewRow = new LinearLayout(this);
+        previewRow.setOrientation(LinearLayout.HORIZONTAL);
 
         previewPlayerView = new PlayerView(this);
         previewPlayerView.setUseController(false);
         previewPlayerView.setFocusable(false);
         previewPlayerView.setBackgroundColor(Color.BLACK);
-        LinearLayout previewRow = new LinearLayout(this);
-        previewRow.setOrientation(LinearLayout.HORIZONTAL);
-
         previewRow.addView(previewPlayerView, new LinearLayout.LayoutParams(
                 0, dp(150), 1f));
 
@@ -939,26 +948,31 @@ public class MainActivity extends Activity {
         previewInfo.addView(guidePreviewProgramInfoView);
         previewRow.addView(previewInfo, new LinearLayout.LayoutParams(
                 0, dp(150), 1f));
-        leftPanel.addView(previewRow);
+
+        screen.addView(previewRow, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(150)));
+
+        LinearLayout guideContent = new LinearLayout(this);
+        guideContent.setOrientation(LinearLayout.HORIZONTAL);
 
         LinearLayout categoryList = new LinearLayout(this);
         categoryList.setOrientation(LinearLayout.VERTICAL);
-        ScrollView categoryScroll = new ScrollView(this);
-        categoryScroll.addView(categoryList);
-        leftPanel.addView(categoryScroll, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+        guideCategoryScrollView = new ScrollView(this);
+        guideCategoryScrollView.addView(categoryList);
+        guideCategoryScrollView.setVisibility(android.view.View.GONE);
+        guideContent.addView(guideCategoryScrollView,
+                new LinearLayout.LayoutParams(dp(240),
+                        LinearLayout.LayoutParams.MATCH_PARENT));
 
         LinearLayout results = new LinearLayout(this);
         results.setOrientation(LinearLayout.VERTICAL);
         ScrollView programScroll = new ScrollView(this);
         programScroll.addView(results);
-
-        guideContent.addView(leftPanel, new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.MATCH_PARENT, 0.40f));
         guideContent.addView(programScroll, new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.MATCH_PARENT, 0.60f));
+                0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
+
         screen.addView(guideContent, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         Thread worker = new Thread(() -> {
             HttpURLConnection connection = null;
@@ -1322,9 +1336,54 @@ public class MainActivity extends Activity {
             playGuidePreview(firstPreviewChannel);
         }
 
+        android.widget.FrameLayout gridFrame =
+                new android.widget.FrameLayout(this);
+        gridFrame.addView(grid, new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        android.view.View currentTimeMarker = new android.view.View(this);
+        currentTimeMarker.setBackgroundColor(Color.RED);
+        android.widget.FrameLayout.LayoutParams markerParams =
+                new android.widget.FrameLayout.LayoutParams(
+                        dp(2), android.view.ViewGroup.LayoutParams.MATCH_PARENT);
+        markerParams.leftMargin = channelWidth;
+        gridFrame.addView(currentTimeMarker, markerParams);
+
+        final android.os.Handler clockHandler =
+                new android.os.Handler(android.os.Looper.getMainLooper());
+        final Runnable[] markerUpdater = new Runnable[1];
+        markerUpdater[0] = new Runnable() {
+            @Override
+            public void run() {
+                long now = System.currentTimeMillis();
+                int minutes = (int) ((now - gridStart) / 60000L);
+                int markerX = channelWidth
+                        + dp(Math.max(0, minutes * pixelsPerMinute));
+                android.widget.FrameLayout.LayoutParams params =
+                        (android.widget.FrameLayout.LayoutParams)
+                                currentTimeMarker.getLayoutParams();
+                params.leftMargin = markerX;
+                currentTimeMarker.setLayoutParams(params);
+                clockHandler.postDelayed(this, 30000L);
+            }
+        };
+        gridFrame.post(markerUpdater[0]);
+        gridFrame.addOnAttachStateChangeListener(
+                new android.view.View.OnAttachStateChangeListener() {
+                    @Override
+                    public void onViewAttachedToWindow(android.view.View v) {
+                    }
+
+                    @Override
+                    public void onViewDetachedFromWindow(android.view.View v) {
+                        clockHandler.removeCallbacks(markerUpdater[0]);
+                    }
+                });
+
         HorizontalScrollView horizontalScroll = new HorizontalScrollView(this);
         horizontalScroll.setHorizontalScrollBarEnabled(true);
-        horizontalScroll.addView(grid);
+        horizontalScroll.addView(gridFrame);
         results.addView(horizontalScroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
