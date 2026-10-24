@@ -896,15 +896,6 @@ public class MainActivity extends Activity {
 
         screen.removeAllViews();
         screen.setOrientation(LinearLayout.VERTICAL);
-        screen.addView(label("TV GUIDE", 25));
-
-        TextView status = label("Downloading programme listings...", 15);
-        screen.addView(status);
-
-        TextView back = label("← BACK TO HOME", 16);
-        back.setFocusable(true);
-        back.setOnClickListener(v -> showHomeScreen());
-        screen.addView(back);
 
         LinearLayout guideContent = new LinearLayout(this);
         guideContent.setOrientation(LinearLayout.HORIZONTAL);
