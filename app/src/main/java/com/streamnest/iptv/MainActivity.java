@@ -1218,15 +1218,37 @@ public class MainActivity extends Activity {
         grid.addView(timeHeader);
 
         Map<String, ArrayList<EpgProgram>> byChannel = new java.util.TreeMap<>();
+        Map<String, Channel> rowChannels = new java.util.TreeMap<>();
+
+        // Create a row for every playlist channel in this category.
+        for (Channel channel : channels) {
+            String channelCategory = channel.group;
+            if (channelCategory == null || channelCategory.trim().isEmpty()) {
+                channelCategory = "Uncategorized";
+            }
+            if (!category.equals(channelCategory)) continue;
+
+            String name = channel.name;
+            if (name == null || name.trim().isEmpty()) name = "Unnamed channel";
+
+            rowChannels.put(name, channel);
+            byChannel.put(name, new ArrayList<>());
+        }
+
+        // Add EPG programmes where a matching channel ID exists.
         for (EpgProgram program : categoryPrograms) {
             Channel channel = channelMap.get(program.channelId);
             if (channel == null) continue;
-            byChannel.computeIfAbsent(channel.name,
-                    key -> new ArrayList<>()).add(program);
+
+            String name = channel.name;
+            if (name == null || name.trim().isEmpty()) name = "Unnamed channel";
+
+            if (byChannel.containsKey(name)) {
+                byChannel.get(name).add(program);
+            }
         }
 
         Channel firstPreviewChannel = null;
-
         for (Map.Entry<String, ArrayList<EpgProgram>> entry : byChannel.entrySet()) {
             ArrayList<EpgProgram> programs = entry.getValue();
             Collections.sort(programs, Comparator.comparingLong(
@@ -1235,7 +1257,9 @@ public class MainActivity extends Activity {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
 
-            Channel rowChannel = channelMap.get(programs.get(0).channelId);
+            Channel rowChannel = rowChannels.get(entry.getKey());
+        if (rowChannel == null) continue;
+        if (firstPreviewChannel == null) firstPreviewChannel = rowChannel;
             LinearLayout channelCell = new LinearLayout(this);
             channelCell.setOrientation(LinearLayout.HORIZONTAL);
             channelCell.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -1265,7 +1289,18 @@ public class MainActivity extends Activity {
                 loadChannelLogo(logoView, rowChannel.logoUrl);
             }
 
-            long cursor = gridStart;
+            if (programs.isEmpty()) {
+            TextView noInfo = label("No programme info", 12);
+            noInfo.setGravity(android.view.Gravity.CENTER);
+            noInfo.setBackgroundColor(Color.DKGRAY);
+            row.addView(noInfo, new LinearLayout.LayoutParams(
+                    dp(24 * 60 * pixelsPerMinute), rowHeight));
+            grid.addView(row, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, rowHeight));
+            continue;
+        }
+
+        long cursor = gridStart;
             for (EpgProgram program : programs) {
                 long startTime = Math.max(program.startMillis, gridStart);
                 long stopTime = Math.min(program.stopMillis, gridEnd);
@@ -1372,7 +1407,8 @@ public class MainActivity extends Activity {
                 long now = System.currentTimeMillis();
                 int minutes = (int) ((now - gridStart) / 60000L);
                 int markerX = channelWidth
-                        + dp(Math.max(0, minutes * pixelsPerMinute));
+                        + dp(Math.max(0, minutes * pixelsPerMinute))
+                        + dp((Math.max(0, minutes) / 30) * 2);
                 android.widget.FrameLayout.LayoutParams params =
                         (android.widget.FrameLayout.LayoutParams)
                                 currentTimeMarker.getLayoutParams();
