@@ -75,12 +75,18 @@ public class MainActivity extends Activity {
         String url;
         String group;
         String tvgId;
+        String logoUrl;
 
         Channel(String name, String url, String group, String tvgId) {
+            this(name, url, group, tvgId, "");
+        }
+
+        Channel(String name, String url, String group, String tvgId, String logoUrl) {
             this.name = name;
             this.url = url;
             this.group = group;
             this.tvgId = tvgId;
+            this.logoUrl = logoUrl;
         }
     }
 
@@ -514,8 +520,9 @@ public class MainActivity extends Activity {
                     String tvgId = item.optString(
                             "epg_channel_id", "");
 
+                    String logoUrl = item.optString("stream_icon", "");
                     loaded.add(new Channel(
-                            name, streamUrl, group, tvgId));
+                            name, streamUrl, group, tvgId, logoUrl));
                 }
             } catch (Exception e) {
                 android.util.Log.e("StreamNest",
@@ -609,6 +616,7 @@ public class MainActivity extends Activity {
                     String pendingName = null;
                     String pendingGroup = "Uncategorized";
                     String pendingTvgId = "";
+                    String pendingLogoUrl = "";
 
                     while ((line = reader.readLine()) != null) {
                         line = line.trim();
@@ -620,6 +628,7 @@ public class MainActivity extends Activity {
                                     : "Channel";
                             pendingGroup = readAttribute(line, "group-title");
                             pendingTvgId = readAttribute(line, "tvg-id");
+                            pendingLogoUrl = readAttribute(line, "tvg-logo");
                             if (pendingGroup.isEmpty()) {
                                 pendingGroup = "Uncategorized";
                             }
@@ -627,10 +636,11 @@ public class MainActivity extends Activity {
                                 && !line.startsWith("#")
                                 && pendingName != null) {
                             loaded.add(new Channel(
-                                    pendingName, line, pendingGroup, pendingTvgId));
+                                    pendingName, line, pendingGroup, pendingTvgId, pendingLogoUrl));
                             pendingName = null;
                             pendingGroup = "Uncategorized";
                             pendingTvgId = "";
+                            pendingLogoUrl = "";
                         }
                     }
                 }
@@ -860,6 +870,10 @@ public class MainActivity extends Activity {
     }
 
 
+    private TextView guidePreviewChannelNameView;
+    private TextView guidePreviewProgramInfoView;
+    private ArrayList<EpgProgram> guidePrograms = new ArrayList<>();
+
     private static class EpgProgram {
         String channelId;
         String title;
@@ -909,8 +923,23 @@ public class MainActivity extends Activity {
         previewPlayerView.setUseController(false);
         previewPlayerView.setFocusable(false);
         previewPlayerView.setBackgroundColor(Color.BLACK);
-        leftPanel.addView(previewPlayerView, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(220)));
+        LinearLayout previewRow = new LinearLayout(this);
+        previewRow.setOrientation(LinearLayout.HORIZONTAL);
+
+        previewRow.addView(previewPlayerView, new LinearLayout.LayoutParams(
+                0, dp(150), 1f));
+
+        LinearLayout previewInfo = new LinearLayout(this);
+        previewInfo.setOrientation(LinearLayout.VERTICAL);
+        previewInfo.setPadding(dp(10), dp(8), dp(8), dp(8));
+        guidePreviewChannelNameView = label("Now Playing", 16);
+        previewInfo.addView(guidePreviewChannelNameView);
+        guidePreviewProgramInfoView = label(
+                "Programme information unavailable", 13);
+        previewInfo.addView(guidePreviewProgramInfoView);
+        previewRow.addView(previewInfo, new LinearLayout.LayoutParams(
+                0, dp(150), 1f));
+        leftPanel.addView(previewRow);
 
         LinearLayout categoryList = new LinearLayout(this);
         categoryList.setOrientation(LinearLayout.VERTICAL);
@@ -980,8 +1009,10 @@ public class MainActivity extends Activity {
                 }
 
                 final ArrayList<EpgProgram> loaded = programs;
-                runOnUiThread(() ->
-                        renderGuidePrograms(loaded, channelMap, status, categoryList, results));
+                runOnUiThread(() -> {
+                    guidePrograms = loaded;
+                    renderGuidePrograms(loaded, channelMap, status, categoryList, results);
+                });
             } catch (Exception e) {
                 final String message = e.getMessage() == null
                         ? e.getClass().getSimpleName() : e.getMessage();
@@ -1177,14 +1208,35 @@ public class MainActivity extends Activity {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
 
+            Channel rowChannel = channelMap.get(programs.get(0).channelId);
+            LinearLayout channelCell = new LinearLayout(this);
+            channelCell.setOrientation(LinearLayout.HORIZONTAL);
+            channelCell.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            channelCell.setPadding(dp(5), dp(3), dp(5), dp(3));
+            channelCell.setBackgroundColor(PANEL);
+            channelCell.setFocusable(true);
+
+            android.widget.ImageView logoView =
+                    new android.widget.ImageView(this);
+            logoView.setScaleType(
+                    android.widget.ImageView.ScaleType.FIT_CENTER);
+            channelCell.addView(logoView, new LinearLayout.LayoutParams(
+                    dp(34), dp(34)));
+
             TextView channelLabel = label(entry.getKey(), 13);
             channelLabel.setGravity(
                     android.view.Gravity.CENTER_VERTICAL);
-            channelLabel.setPadding(dp(6), dp(4), dp(6), dp(4));
-            channelLabel.setBackgroundColor(PANEL);
-            channelLabel.setFocusable(true);
-            row.addView(channelLabel, new LinearLayout.LayoutParams(
+            channelLabel.setPadding(dp(6), dp(4), dp(2), dp(4));
+            channelCell.addView(channelLabel, new LinearLayout.LayoutParams(
+                    0, rowHeight, 1f));
+
+            row.addView(channelCell, new LinearLayout.LayoutParams(
                     channelWidth, rowHeight));
+
+            if (rowChannel != null && rowChannel.logoUrl != null
+                    && !rowChannel.logoUrl.trim().isEmpty()) {
+                loadChannelLogo(logoView, rowChannel.logoUrl);
+            }
 
             long cursor = gridStart;
             for (EpgProgram program : programs) {
@@ -1278,12 +1330,70 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.WRAP_CONTENT));
     }
 
+    private void loadChannelLogo(
+            android.widget.ImageView imageView, String logoUrl) {
+        imageView.setTag(logoUrl);
+        new Thread(() -> {
+            java.net.HttpURLConnection connection = null;
+            try {
+                java.net.URL url = new java.net.URL(logoUrl);
+                connection = (java.net.HttpURLConnection)
+                        url.openConnection();
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(5000);
+                connection.setInstanceFollowRedirects(true);
+                connection.connect();
+
+                android.graphics.Bitmap bitmap;
+                try (java.io.InputStream stream =
+                             connection.getInputStream()) {
+                    bitmap = android.graphics.BitmapFactory
+                            .decodeStream(stream);
+                }
+
+                if (bitmap != null) {
+                    imageView.post(() -> {
+                        if (logoUrl.equals(imageView.getTag())) {
+                            imageView.setImageBitmap(bitmap);
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                android.util.Log.d("StreamNest",
+                        "Channel logo unavailable: " + logoUrl);
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        }).start();
+    }
+
     private void playGuidePreview(Channel channel) {
         if (channel.url == null || channel.url.trim().isEmpty()
                 || previewPlayerView == null) {
             return;
         }
         guidePreviewChannel = channel;
+
+        if (guidePreviewChannelNameView != null) {
+            guidePreviewChannelNameView.setText(channel.name);
+        }
+
+        String currentProgram = "Programme information unavailable";
+        long now = System.currentTimeMillis();
+        for (EpgProgram program : guidePrograms) {
+            if (channel.tvgId != null
+                    && channel.tvgId.trim().equals(program.channelId)
+                    && program.startMillis <= now
+                    && program.stopMillis > now) {
+                currentProgram = program.title;
+                break;
+            }
+        }
+        if (guidePreviewProgramInfoView != null) {
+            guidePreviewProgramInfoView.setText("Now: " + currentProgram);
+        }
 
         if (channel.url.equals(previewChannelUrl) && previewPlayer != null) {
             return;
