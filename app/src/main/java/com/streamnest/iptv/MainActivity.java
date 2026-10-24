@@ -558,7 +558,7 @@ public class MainActivity extends Activity {
                 } else {
                     channels = loaded;
                     selectedCategory = "All Channels";
-                    if (launchAfterLoad) {
+                    if (launchAfterLoad && !launchLastPlayedChannel()) {
                         showLiveTv();
                     }
                     Toast.makeText(this,
@@ -668,9 +668,9 @@ public class MainActivity extends Activity {
                     } else {
                         channels = loaded;
                         selectedCategory = "All Channels";
-                        if (launchAfterLoad) {
-                        showLiveTv();
-                    }
+                        if (launchAfterLoad && !launchLastPlayedChannel()) {
+                            showLiveTv();
+                        }
                         Toast.makeText(this,
                                 "Loaded " + channels.size() + " channels",
                                 Toast.LENGTH_SHORT).show();
@@ -1097,16 +1097,20 @@ public class MainActivity extends Activity {
         }
 
         if (matched == 0) {
-            status.setText("Downloaded " + programs.size()
-                    + " programmes, but none matched your M3U tvg-id values."
-                    + "\nThe playlist channel IDs must match the XMLTV channel IDs.");
-            return;
-        }
-
-        if (grouped.isEmpty()) {
-            status.setText("Matched channels, but no current or upcoming programmes "
-                    + "were found in the next 24 hours.");
-            return;
+            status.setText("No EPG programmes matched the playlist channel IDs. "
+                    + "Channels are still available to watch in Live TV.");
+        } else {
+            boolean hasVisiblePrograms = false;
+            for (ArrayList<EpgProgram> list : grouped.values()) {
+                if (!list.isEmpty()) {
+                    hasVisiblePrograms = true;
+                    break;
+                }
+            }
+            if (!hasVisiblePrograms) {
+                status.setText("No current or upcoming EPG programmes were found. "
+                        + "Channels are still available to watch in Live TV.");
+            }
         }
 
         int totalVisible = 0;
@@ -1121,8 +1125,17 @@ public class MainActivity extends Activity {
         TreeSet<String> categories = new TreeSet<>(grouped.keySet());
 
         for (String category : categories) {
-            TextView item = label(
-                    category + " (" + grouped.get(category).size() + ")", 15);
+            int channelCount = 0;
+            for (Channel channel : channels) {
+                String channelCategory = channel.group;
+                if (channelCategory == null || channelCategory.trim().isEmpty()) {
+                    channelCategory = "Uncategorized";
+                }
+                if (category.equals(channelCategory)) {
+                    channelCount++;
+                }
+            }
+            TextView item = label(category + " (" + channelCount + ")", 15);
             item.setPadding(dp(10), dp(14), dp(8), dp(14));
             item.setBackgroundColor(PANEL);
             item.setFocusable(true);
@@ -1497,7 +1510,25 @@ public class MainActivity extends Activity {
         guidePreviewChannel = null;
     }
 
-    private void playChannel(Channel channel) {
+    private boolean launchLastPlayedChannel() {
+    String lastUrl = getPreferences(MODE_PRIVATE)
+            .getString("last_channel_url", "");
+
+    if (lastUrl == null || lastUrl.trim().isEmpty()) {
+        return false;
+    }
+
+    for (Channel channel : channels) {
+        if (lastUrl.equals(channel.url)) {
+            playChannel(channel);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+private void playChannel(Channel channel) {
         getPreferences(MODE_PRIVATE).edit()
                 .putString("last_channel_url", channel.url)
                 .putString("last_channel_name", channel.name)
