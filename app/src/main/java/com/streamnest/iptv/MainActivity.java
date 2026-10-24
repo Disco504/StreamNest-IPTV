@@ -936,7 +936,7 @@ public class MainActivity extends Activity {
         previewPlayerView.setFocusable(false);
         previewPlayerView.setBackgroundColor(Color.BLACK);
         previewRow.addView(previewPlayerView, new LinearLayout.LayoutParams(
-                0, dp(150), 1f));
+                0, dp(210), 1f));
 
         LinearLayout previewInfo = new LinearLayout(this);
         previewInfo.setOrientation(LinearLayout.VERTICAL);
@@ -947,10 +947,10 @@ public class MainActivity extends Activity {
                 "Programme information unavailable", 13);
         previewInfo.addView(guidePreviewProgramInfoView);
         previewRow.addView(previewInfo, new LinearLayout.LayoutParams(
-                0, dp(150), 1f));
+                0, dp(210), 1f));
 
         screen.addView(previewRow, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(150)));
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(210)));
 
         LinearLayout guideContent = new LinearLayout(this);
         guideContent.setOrientation(LinearLayout.HORIZONTAL);
@@ -1175,10 +1175,9 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
         ArrayList<EpgProgram> categoryPrograms = grouped.get(category);
-        if (categoryPrograms == null || categoryPrograms.isEmpty()) {
-            results.addView(label("No programs available for this category.", 14));
-            return;
-        }
+if (categoryPrograms == null) {
+    categoryPrograms = new ArrayList<>();
+}
 
         final long slotMillis = 30L * 60L * 1000L;
         final long gridStart =
@@ -1266,6 +1265,8 @@ public class MainActivity extends Activity {
             channelCell.setPadding(dp(5), dp(3), dp(5), dp(3));
             channelCell.setBackgroundColor(PANEL);
             channelCell.setFocusable(true);
+            channelCell.setClickable(true);
+            channelCell.setOnClickListener(v -> playGuidePreview(rowChannel));
 
             android.widget.ImageView logoView =
                     new android.widget.ImageView(this);
@@ -1395,7 +1396,8 @@ public class MainActivity extends Activity {
         android.widget.FrameLayout.LayoutParams markerParams =
                 new android.widget.FrameLayout.LayoutParams(
                         dp(2), android.view.ViewGroup.LayoutParams.MATCH_PARENT);
-        markerParams.leftMargin = channelWidth;
+        markerParams.leftMargin = channelWidth + dp(1);
+        markerParams.topMargin = dp(42);
         gridFrame.addView(currentTimeMarker, markerParams);
 
         final android.os.Handler clockHandler =
@@ -1500,7 +1502,7 @@ public class MainActivity extends Activity {
             }
         }
         if (guidePreviewProgramInfoView != null) {
-            guidePreviewProgramInfoView.setText("Now: " + currentProgram);
+            guidePreviewProgramInfoView.setText("Time: " + new SimpleDateFormat("h:mm a", Locale.getDefault()).format(new Date()) + "  |  Now: " + currentProgram);
         }
 
         if (channel.url.equals(previewChannelUrl) && previewPlayer != null) {
