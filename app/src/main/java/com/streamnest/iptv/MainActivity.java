@@ -1024,6 +1024,15 @@ public class MainActivity extends Activity {
         long horizon = now + 24L * 60L * 60L * 1000L;
         int matched = 0;
         Map<String, ArrayList<EpgProgram>> grouped = new HashMap<>();
+        for (Channel channel : channels) {
+            String category = channel.group;
+            if (category == null || category.trim().isEmpty()) {
+                category = "Uncategorized";
+            }
+            if (!grouped.containsKey(category)) {
+                grouped.put(category, new ArrayList<>());
+            }
+        }
 
         for (EpgProgram program : programs) {
             Channel channel = channelMap.get(program.channelId);
