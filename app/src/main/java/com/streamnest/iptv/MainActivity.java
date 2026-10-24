@@ -182,6 +182,7 @@ public class MainActivity extends Activity {
         showingTvGuide = false;
         screen = new LinearLayout(this);
         screen.setOrientation(LinearLayout.VERTICAL);
+        TextView status = label("Downloading programme listings...", 15);
         screen.setBackgroundColor(NAVY);
         screen.setPadding(dp(16), dp(8), dp(16), dp(12));
 
@@ -888,6 +889,7 @@ public class MainActivity extends Activity {
         }
 
         final Map<String, Channel> channelMap = new HashMap<>();
+        TextView status = new TextView(this);
         for (Channel channel : channels) {
             if (channel.tvgId != null && !channel.tvgId.trim().isEmpty()) {
                 channelMap.put(channel.tvgId.trim(), channel);
@@ -983,9 +985,7 @@ public class MainActivity extends Activity {
             } catch (Exception e) {
                 final String message = e.getMessage() == null
                         ? e.getClass().getSimpleName() : e.getMessage();
-                runOnUiThread(() -> status.setText(
-                        "Could not load the EPG: " + message
-                        + "\nCheck the saved URL and internet connection."));
+                android.util.Log.e("StreamNest", "Could not load the EPG: " + message);
             } finally {
                 if (connection != null) {
                     connection.disconnect();
