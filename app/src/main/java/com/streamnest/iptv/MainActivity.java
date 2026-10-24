@@ -146,6 +146,19 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        if (showingTvGuide
+                && event.getKeyCode() == android.view.KeyEvent.KEYCODE_BACK
+                && event.getAction() == android.view.KeyEvent.ACTION_DOWN
+                && event.isLongPress()
+                && guidePreviewChannel != null) {
+            playChannel(guidePreviewChannel);
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
     public void onBackPressed() {
         if (showingLiveTv || showingTvGuide) {
             showHomeScreen();
@@ -1209,12 +1222,6 @@ public class MainActivity extends Activity {
                 brick.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 brick.setOnFocusChangeListener((v, focused) -> {
                     v.setBackgroundColor(focused ? BLUE : PANEL);
-                    if (focused) {
-                        Channel previewChannel = channelMap.get(program.channelId);
-                        if (previewChannel != null) {
-                            playGuidePreview(previewChannel);
-                        }
-                    }
                 });
 
                 Channel channel = channelMap.get(program.channelId);
@@ -1222,7 +1229,14 @@ public class MainActivity extends Activity {
                     if (firstPreviewChannel == null) {
                         firstPreviewChannel = channel;
                     }
-                    brick.setOnClickListener(v -> playGuidePreview(channel));
+                    brick.setOnClickListener(v -> {
+                        if (guidePreviewChannel != null
+                                && channel.url.equals(guidePreviewChannel.url)) {
+                            playChannel(channel);
+                        } else {
+                            playGuidePreview(channel);
+                        }
+                    });
                 }
 
                 LinearLayout.LayoutParams brickParams =
@@ -1237,7 +1251,22 @@ public class MainActivity extends Activity {
                     LinearLayout.LayoutParams.WRAP_CONTENT, rowHeight));
         }
 
-        if (firstPreviewChannel != null) {
+        String lastChannelUrl = getPreferences(MODE_PRIVATE)
+                .getString("last_channel_url", "");
+        Channel lastChannel = null;
+
+        if (!lastChannelUrl.isEmpty()) {
+            for (Channel candidate : channelMap.values()) {
+                if (candidate.url.equals(lastChannelUrl)) {
+                    lastChannel = candidate;
+                    break;
+                }
+            }
+        }
+
+        if (lastChannel != null) {
+            playGuidePreview(lastChannel);
+        } else if (firstPreviewChannel != null) {
             playGuidePreview(firstPreviewChannel);
         }
 
@@ -1300,7 +1329,13 @@ public class MainActivity extends Activity {
     }
 
     private void playChannel(Channel channel) {
+        getPreferences(MODE_PRIVATE).edit()
+                .putString("last_channel_url", channel.url)
+                .putString("last_channel_name", channel.name)
+                .apply();
+
         releaseGuidePreviewPlayer();
+
         Intent intent = new Intent(this, PlayerActivity.class);
         intent.putExtra("channel_name", channel.name);
         intent.putExtra("stream_url", channel.url);
