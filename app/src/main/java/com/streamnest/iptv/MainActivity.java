@@ -440,6 +440,8 @@ public class MainActivity extends Activity {
                 failure = e.getMessage() == null ? "Could not load series." : e.getMessage();
             }
 
+            java.util.Collections.sort(loaded, (a, b) ->
+                    a.group.compareToIgnoreCase(b.group));
             final String error = failure;
             runOnUiThread(() -> {
                 status.setText(error == null
