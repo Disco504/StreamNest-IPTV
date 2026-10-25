@@ -197,6 +197,478 @@ public class MainActivity extends Activity {
         }
     }
 
+
+    private void showMovies() {
+        String base = getPreferences(MODE_PRIVATE).getString("xtream_server", "");
+        String user = getPreferences(MODE_PRIVATE).getString("xtream_username", "");
+        String pass = getPreferences(MODE_PRIVATE).getString("xtream_password", "");
+
+        if (base.isEmpty() || user.isEmpty() || pass.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Movies")
+                    .setMessage("Connect your Xtream Codes account in LIVE TV first.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+
+        releaseGuidePreview();
+        showingLiveTv = false;
+        showingTvGuide = false;
+
+        screen = new LinearLayout(this);
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.setBackgroundColor(NAVY);
+        screen.setPadding(dp(12), dp(8), dp(12), dp(8));
+
+        TextView heading = label("MOVIES", 24);
+        heading.setTextColor(Color.rgb(95, 190, 255));
+        heading.setTypeface(null, Typeface.BOLD);
+        screen.addView(heading);
+
+        TextView status = label("Loading movies...", 16);
+        screen.addView(status);
+
+        ScrollView listScroll = new ScrollView(this);
+        LinearLayout movieList = new LinearLayout(this);
+        movieList.setOrientation(LinearLayout.VERTICAL);
+        listScroll.addView(movieList);
+        screen.addView(listScroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        TextView back = label("BACK TO HOME", 16);
+        back.setFocusable(true);
+        back.setClickable(true);
+        back.setPadding(dp(8), dp(12), dp(8), dp(12));
+        back.setOnClickListener(v -> showHomeScreen());
+        screen.addView(back);
+        setContentView(screen);
+
+        new Thread(() -> {
+            ArrayList<Channel> loaded = new ArrayList<>();
+            String failure = null;
+            try {
+                String api = base + "/player_api.php?username="
+                        + apiEncode(user) + "&password=" + apiEncode(pass);
+
+                JSONArray categories = getXtreamArray(api + "&action=get_vod_categories");
+                Map<String, String> categoryNames = new HashMap<>();
+                for (int i = 0; i < categories.length(); i++) {
+                    JSONObject item = categories.getJSONObject(i);
+                    categoryNames.put(item.optString("category_id", ""),
+                            item.optString("category_name", "Uncategorized"));
+                }
+
+                JSONArray streams = getXtreamArray(api + "&action=get_vod_streams");
+                for (int i = 0; i < streams.length(); i++) {
+                    JSONObject item = streams.getJSONObject(i);
+                    String id = item.optString("stream_id", "");
+                    if (id.isEmpty()) continue;
+
+                    String extension = item.optString("container_extension", "mp4");
+                    String categoryId = item.optString("category_id", "");
+                    String group = categoryNames.get(categoryId);
+                    if (group == null || group.isEmpty()) group = "Uncategorized";
+
+                    String url = base + "/movie/" + Uri.encode(user) + "/"
+                            + Uri.encode(pass) + "/" + Uri.encode(id) + "."
+                            + Uri.encode(extension);
+
+                    loaded.add(new Channel(
+                            item.optString("name", "Untitled movie"),
+                            url,
+                            group,
+                            "",
+                            item.optString("stream_icon", "")));
+                }
+            } catch (Exception e) {
+                failure = e.getMessage() == null ? "Could not load movies." : e.getMessage();
+            }
+
+            final String error = failure;
+            runOnUiThread(() -> {
+                status.setText(error == null
+                        ? (loaded.size() + " movies") : "Unable to load movies: " + error);
+                movieList.removeAllViews();
+
+                if (error != null) {
+                    TextView retry = label("Check your Xtream login and connection.", 14);
+                    movieList.addView(retry);
+                    return;
+                }
+                if (loaded.isEmpty()) {
+                    movieList.addView(label("No movies were returned by your provider.", 16));
+                    return;
+                }
+
+                String lastGroup[] = {""};
+                for (Channel movie : loaded) {
+                    if (!movie.group.equals(lastGroup[0])) {
+                        lastGroup[0] = movie.group;
+                        TextView category = label(movie.group, 18);
+                        category.setTextColor(Color.rgb(95, 190, 255));
+                        category.setTypeface(null, Typeface.BOLD);
+                        category.setPadding(dp(4), dp(12), dp(4), dp(6));
+                        movieList.addView(category);
+                    }
+
+                    LinearLayout row = new LinearLayout(this);
+                    row.setOrientation(LinearLayout.HORIZONTAL);
+                    row.setGravity(Gravity.CENTER_VERTICAL);
+                    row.setFocusable(true);
+                    row.setClickable(true);
+                    row.setBackgroundColor(PANEL);
+                    row.setPadding(dp(8), dp(6), dp(8), dp(6));
+
+                    android.widget.ImageView poster = new android.widget.ImageView(this);
+                    poster.setLayoutParams(new LinearLayout.LayoutParams(dp(64), dp(88)));
+                    poster.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+                    if (!movie.logoUrl.isEmpty()) loadChannelLogo(poster, movie.logoUrl);
+                    row.addView(poster);
+
+                    TextView name = label(movie.name, 16);
+                    name.setPadding(dp(12), dp(8), dp(8), dp(8));
+                    row.addView(name, new LinearLayout.LayoutParams(
+                            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                    row.setOnFocusChangeListener((v, focused) ->
+                            v.setBackgroundColor(focused ? BLUE : PANEL));
+                    row.setOnClickListener(v -> playVodItem(movie));
+
+                    LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT);
+                    rowParams.setMargins(0, dp(3), 0, dp(3));
+                    movieList.addView(row, rowParams);
+                }
+                if (movieList.getChildCount() > 0) movieList.getChildAt(1).requestFocus();
+            });
+        }).start();
+    }
+
+    private void playVodItem(Channel item) {
+        if (item == null || item.url == null || item.url.trim().isEmpty()) return;
+        releaseGuidePreviewPlayer();
+        Intent intent = new Intent(this, PlayerActivity.class);
+        intent.putExtra("channel_name", item.name);
+        intent.putExtra("stream_url", item.url);
+        startActivity(intent);
+    }
+
+
+    private void showSeries() {
+        String base = getPreferences(MODE_PRIVATE).getString("xtream_server", "");
+        String user = getPreferences(MODE_PRIVATE).getString("xtream_username", "");
+        String pass = getPreferences(MODE_PRIVATE).getString("xtream_password", "");
+
+        if (base.isEmpty() || user.isEmpty() || pass.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("TV Series")
+                    .setMessage("Connect your Xtream Codes account in LIVE TV first.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+
+        releaseGuidePreview();
+        showingLiveTv = false;
+        showingTvGuide = false;
+
+        screen = new LinearLayout(this);
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.setBackgroundColor(NAVY);
+        screen.setPadding(dp(12), dp(8), dp(12), dp(8));
+
+        TextView heading = label("TV SERIES", 24);
+        heading.setTextColor(Color.rgb(95, 190, 255));
+        heading.setTypeface(null, Typeface.BOLD);
+        screen.addView(heading);
+
+        TextView status = label("Loading series...", 16);
+        screen.addView(status);
+
+        ScrollView listScroll = new ScrollView(this);
+        LinearLayout seriesList = new LinearLayout(this);
+        seriesList.setOrientation(LinearLayout.VERTICAL);
+        listScroll.addView(seriesList);
+        screen.addView(listScroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        TextView back = label("BACK TO HOME", 16);
+        back.setFocusable(true);
+        back.setClickable(true);
+        back.setPadding(dp(8), dp(12), dp(8), dp(12));
+        back.setOnClickListener(v -> showHomeScreen());
+        screen.addView(back);
+        setContentView(screen);
+
+        new Thread(() -> {
+            ArrayList<Channel> loaded = new ArrayList<>();
+            String failure = null;
+            try {
+                String api = base + "/player_api.php?username="
+                        + apiEncode(user) + "&password=" + apiEncode(pass);
+
+                JSONArray categories = getXtreamArray(api + "&action=get_series_categories");
+                Map<String, String> categoryNames = new HashMap<>();
+                for (int i = 0; i < categories.length(); i++) {
+                    JSONObject item = categories.getJSONObject(i);
+                    categoryNames.put(item.optString("category_id", ""),
+                            item.optString("category_name", "Uncategorized"));
+                }
+
+                JSONArray streams = getXtreamArray(api + "&action=get_series");
+                for (int i = 0; i < streams.length(); i++) {
+                    JSONObject item = streams.getJSONObject(i);
+                    String id = item.optString("series_id", "");
+                    if (id.isEmpty()) continue;
+
+                    String categoryId = item.optString("category_id", "");
+                    String group = categoryNames.get(categoryId);
+                    if (group == null || group.isEmpty()) group = "Uncategorized";
+
+                    loaded.add(new Channel(
+                            item.optString("name", "Untitled series"),
+                            id,
+                            group,
+                            "",
+                            item.optString("cover", "")));
+                }
+            } catch (Exception e) {
+                failure = e.getMessage() == null ? "Could not load series." : e.getMessage();
+            }
+
+            final String error = failure;
+            runOnUiThread(() -> {
+                status.setText(error == null
+                        ? (loaded.size() + " series") : "Unable to load series: " + error);
+                seriesList.removeAllViews();
+
+                if (error != null) {
+                    seriesList.addView(label("Check your Xtream login and connection.", 14));
+                    return;
+                }
+                if (loaded.isEmpty()) {
+                    seriesList.addView(label("No series were returned by your provider.", 16));
+                    return;
+                }
+
+                String[] lastGroup = {""};
+                for (Channel series : loaded) {
+                    if (!series.group.equals(lastGroup[0])) {
+                        lastGroup[0] = series.group;
+                        TextView category = label(series.group, 18);
+                        category.setTextColor(Color.rgb(95, 190, 255));
+                        category.setTypeface(null, Typeface.BOLD);
+                        category.setPadding(dp(4), dp(12), dp(4), dp(6));
+                        seriesList.addView(category);
+                    }
+
+                    LinearLayout row = new LinearLayout(this);
+                    row.setOrientation(LinearLayout.HORIZONTAL);
+                    row.setGravity(Gravity.CENTER_VERTICAL);
+                    row.setFocusable(true);
+                    row.setClickable(true);
+                    row.setBackgroundColor(PANEL);
+                    row.setPadding(dp(8), dp(6), dp(8), dp(6));
+
+                    android.widget.ImageView poster = new android.widget.ImageView(this);
+                    poster.setLayoutParams(new LinearLayout.LayoutParams(dp(64), dp(88)));
+                    poster.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+                    if (!series.logoUrl.isEmpty()) loadChannelLogo(poster, series.logoUrl);
+                    row.addView(poster);
+
+                    TextView name = label(series.name, 16);
+                    name.setPadding(dp(12), dp(8), dp(8), dp(8));
+                    row.addView(name, new LinearLayout.LayoutParams(
+                            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                    row.setOnFocusChangeListener((v, focused) ->
+                            v.setBackgroundColor(focused ? BLUE : PANEL));
+                    row.setOnClickListener(v -> showSeriesEpisodes(series, base, user, pass));
+
+                    LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT);
+                    rowParams.setMargins(0, dp(3), 0, dp(3));
+                    seriesList.addView(row, rowParams);
+                }
+                if (seriesList.getChildCount() > 0) seriesList.getChildAt(1).requestFocus();
+            });
+        }).start();
+    }
+
+    private void showSeriesEpisodes(Channel series, String base, String user, String pass) {
+        releaseGuidePreview();
+        showingLiveTv = false;
+        showingTvGuide = false;
+
+        screen = new LinearLayout(this);
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.setBackgroundColor(NAVY);
+        screen.setPadding(dp(12), dp(8), dp(12), dp(8));
+
+        TextView heading = label(series.name, 22);
+        heading.setTextColor(Color.rgb(95, 190, 255));
+        heading.setTypeface(null, Typeface.BOLD);
+        screen.addView(heading);
+
+        TextView status = label("Loading seasons and episodes...", 15);
+        screen.addView(status);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(list);
+        screen.addView(scroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        TextView back = label("BACK TO SERIES", 16);
+        back.setFocusable(true);
+        back.setClickable(true);
+        back.setPadding(dp(8), dp(12), dp(8), dp(12));
+        back.setOnClickListener(v -> showSeries());
+        screen.addView(back);
+        setContentView(screen);
+
+        new Thread(() -> {
+            String failure = null;
+            ArrayList<String> seasonLabels = new ArrayList<>();
+            ArrayList<Channel> episodes = new ArrayList<>();
+
+            try {
+                String api = base + "/player_api.php?username="
+                        + apiEncode(user) + "&password=" + apiEncode(pass)
+                        + "&action=get_series_info&series_id=" + apiEncode(series.url);
+                JSONObject info = new JSONObject(getSeriesInfoText(api));
+
+                JSONArray episodeGroups = info.optJSONArray("episodes");
+                JSONObject episodeObject = info.optJSONObject("episodes");
+
+                if (episodeGroups != null) {
+                    for (int i = 0; i < episodeGroups.length(); i++) {
+                        Object value = episodeGroups.opt(i);
+                        if (value instanceof JSONObject) {
+                            JSONObject ep = (JSONObject) value;
+                            addSeriesEpisode(ep, series, episodes);
+                        }
+                    }
+                } else if (episodeObject != null) {
+                    java.util.Iterator<String> keys = episodeObject.keys();
+                    while (keys.hasNext()) {
+                        JSONArray group = episodeObject.optJSONArray(keys.next());
+                        if (group == null) continue;
+                        for (int i = 0; i < group.length(); i++) {
+                            JSONObject ep = group.optJSONObject(i);
+                            if (ep != null) addSeriesEpisode(ep, series, episodes);
+                        }
+                    }
+                }
+
+                JSONArray seasons = info.optJSONArray("seasons");
+                if (seasons != null) {
+                    for (int i = 0; i < seasons.length(); i++) {
+                        JSONObject season = seasons.optJSONObject(i);
+                        if (season != null) {
+                            seasonLabels.add(season.optString("name",
+                                    "Season " + season.optString("season_number", String.valueOf(i + 1))));
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                failure = e.getMessage() == null ? "Could not load episodes." : e.getMessage();
+            }
+
+            final String error = failure;
+            runOnUiThread(() -> {
+                list.removeAllViews();
+                if (error != null) {
+                    status.setText("Unable to load episodes: " + error);
+                    list.addView(label("Check your provider connection and try again.", 14));
+                    return;
+                }
+
+                status.setText(episodes.size() + " episodes");
+                if (episodes.isEmpty()) {
+                    list.addView(label("No episodes were returned for this series.", 16));
+                    return;
+                }
+
+                String currentSeason = "";
+                for (Channel episode : episodes) {
+                    String season = episode.group == null ? "" : episode.group;
+                    if (!season.equals(currentSeason)) {
+                        currentSeason = season;
+                        TextView seasonTitle = label(
+                                season.isEmpty() ? "Episodes" : season, 18);
+                        seasonTitle.setTextColor(Color.rgb(95, 190, 255));
+                        seasonTitle.setTypeface(null, Typeface.BOLD);
+                        seasonTitle.setPadding(dp(4), dp(12), dp(4), dp(6));
+                        list.addView(seasonTitle);
+                    }
+
+                    TextView row = label(episode.name, 16);
+                    row.setFocusable(true);
+                    row.setClickable(true);
+                    row.setPadding(dp(12), dp(12), dp(8), dp(12));
+                    row.setBackgroundColor(PANEL);
+                    row.setOnFocusChangeListener((v, focused) ->
+                            v.setBackgroundColor(focused ? BLUE : PANEL));
+                    row.setOnClickListener(v -> playVodItem(episode));
+
+                    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT);
+                    params.setMargins(0, dp(3), 0, dp(3));
+                    list.addView(row, params);
+                }
+                if (list.getChildCount() > 0) list.getChildAt(1).requestFocus();
+            });
+        }).start();
+    }
+
+    private String getSeriesInfoText(String urlText) throws Exception {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(urlText).openConnection();
+            connection.setConnectTimeout(15000);
+            connection.setReadTimeout(25000);
+            connection.setRequestProperty("User-Agent", "StreamNestIPTV/1.0");
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) {
+                throw new java.io.IOException("Provider returned HTTP " + status);
+            }
+            try (InputStream input = connection.getInputStream();
+                 java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream()) {
+                byte[] buffer = new byte[8192];
+                int count;
+                while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                return new String(output.toByteArray(), StandardCharsets.UTF_8);
+            }
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+    }
+
+    private void addSeriesEpisode(JSONObject ep, Channel series, ArrayList<Channel> episodes) {
+        String id = ep.optString("id", "");
+        if (id.isEmpty()) id = ep.optString("episode_id", "");
+        if (id.isEmpty()) return;
+
+        String extension = ep.optString("container_extension", "mp4");
+        String season = ep.optString("season", "");
+        String episodeNumber = ep.optString("episode_num", "");
+        String title = ep.optString("title", "Episode " + (episodes.size() + 1));
+        String name = episodeNumber.isEmpty() ? title : "Episode " + episodeNumber + " — " + title;
+
+        String url = getPreferences(MODE_PRIVATE).getString("xtream_server", "")
+                + "/series/" + Uri.encode(getPreferences(MODE_PRIVATE)
+                .getString("xtream_username", "")) + "/"
+                + Uri.encode(getPreferences(MODE_PRIVATE).getString("xtream_password", ""))
+                + "/" + Uri.encode(id) + "." + Uri.encode(extension);
+
+        episodes.add(new Channel(name, url,
+                season.isEmpty() ? "Episodes" : "Season " + season, "", ""));
+    }
+
     private void showHomeScreen() {
         releaseGuidePreview();
         showingLiveTv = false;
@@ -255,6 +727,10 @@ public class MainActivity extends Activity {
                 showSettingsDialog();
             } else if ("TV GUIDE".equals(title)) {
                 showTvGuide();
+            } else if ("MOVIES".equals(title)) {
+                showMovies();
+            } else if ("TV SERIES".equals(title)) {
+                showSeries();
             } else {
                 Toast.makeText(this, title + " — coming next",
                         Toast.LENGTH_SHORT).show();
