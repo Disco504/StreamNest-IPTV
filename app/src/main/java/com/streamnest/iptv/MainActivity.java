@@ -304,6 +304,12 @@ public class MainActivity extends Activity {
                     return;
                 }
 
+                loaded.sort((a, b) -> {
+                    int groupOrder = a.group.compareToIgnoreCase(b.group);
+                    if (groupOrder != 0) return groupOrder;
+                    return a.name.compareToIgnoreCase(b.name);
+                });
+
                 String lastGroup[] = {""};
                 for (Channel movie : loaded) {
                     if (!movie.group.equals(lastGroup[0])) {
