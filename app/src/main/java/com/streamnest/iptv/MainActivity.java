@@ -304,7 +304,7 @@ public class MainActivity extends Activity {
                     return;
                 }
 
-                loaded.sort((a, b) -> {
+                java.util.Collections.sort(loaded, (a, b) -> {
                     int groupOrder = a.group.compareToIgnoreCase(b.group);
                     if (groupOrder != 0) return groupOrder;
                     return a.name.compareToIgnoreCase(b.name);
@@ -1778,7 +1778,7 @@ if (categoryPrograms == null) {
             }
 
             if (programs.isEmpty()) {
-            TextView noInfo = label("No programme info", 12);
+            TextView noInfo = label("No Information", 12);
             noInfo.setGravity(android.view.Gravity.CENTER);
             noInfo.setBackgroundColor(Color.DKGRAY);
             row.addView(noInfo, new LinearLayout.LayoutParams(
