@@ -61,6 +61,7 @@ public class MainActivity extends Activity {
 
     private LinearLayout screen;
     private LinearLayout categoryPanel;
+    private TextView phoneCategoryButton;
     private LinearLayout channelPanel;
     private ArrayList<Channel> channels = new ArrayList<>();
     private Set<String> favorites = new LinkedHashSet<>();
@@ -1200,6 +1201,22 @@ public class MainActivity extends Activity {
         title.setTypeface(null, Typeface.BOLD);
         screen.addView(title);
 
+        boolean phoneLayout =
+                getResources().getConfiguration().screenWidthDp < 600;
+
+        phoneCategoryButton = null;
+        if (phoneLayout) {
+            phoneCategoryButton = label(
+                    "Choose Category: " + selectedCategory + "  ▼", 17);
+            phoneCategoryButton.setTextColor(WHITE);
+            phoneCategoryButton.setBackgroundColor(PANEL);
+            phoneCategoryButton.setPadding(dp(12), dp(12), dp(12), dp(12));
+            phoneCategoryButton.setFocusable(true);
+            phoneCategoryButton.setClickable(true);
+            phoneCategoryButton.setOnClickListener(v -> showPhoneCategoryPicker());
+            screen.addView(phoneCategoryButton);
+        }
+
         LinearLayout panels = new LinearLayout(this);
         panels.setOrientation(LinearLayout.HORIZONTAL);
 
@@ -1210,7 +1227,8 @@ public class MainActivity extends Activity {
         ScrollView categoryScroll = new ScrollView(this);
         categoryScroll.addView(categoryPanel);
         panels.addView(categoryScroll, new LinearLayout.LayoutParams(
-                dp(165), LinearLayout.LayoutParams.MATCH_PARENT));
+                phoneLayout ? 0 : dp(165),
+                LinearLayout.LayoutParams.MATCH_PARENT));
 
         channelPanel = new LinearLayout(this);
         channelPanel.setOrientation(LinearLayout.VERTICAL);
@@ -1232,6 +1250,36 @@ public class MainActivity extends Activity {
         back.setClickable(true);
         back.setOnClickListener(v -> onCreateHomeAgain());
         screen.addView(back);
+    }
+
+    private void showPhoneCategoryPicker() {
+        ArrayList<String> names = new ArrayList<>();
+        names.add("All Channels");
+        names.add("Favorites");
+
+        TreeSet<String> groups = new TreeSet<>();
+        for (Channel channel : channels) {
+            groups.add(channel.group);
+        }
+        names.addAll(groups);
+
+        String[] options = names.toArray(new String[0]);
+        int selected = names.indexOf(selectedCategory);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Choose Category")
+                .setSingleChoiceItems(options, selected, (dialog, which) -> {
+                    selectedCategory = options[which];
+                    if (phoneCategoryButton != null) {
+                        phoneCategoryButton.setText(
+                                "Choose Category: " + selectedCategory + "  ▼");
+                    }
+                    renderCategories();
+                    renderChannels();
+                    dialog.dismiss();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void onCreateHomeAgain() {
