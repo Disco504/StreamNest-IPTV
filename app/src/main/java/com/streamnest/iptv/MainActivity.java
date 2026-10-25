@@ -43,12 +43,15 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.TreeSet;
 
 public class MainActivity extends Activity {
+    private final ExecutorService logoExecutor = Executors.newFixedThreadPool(4);
 
     private static final int NAVY = Color.rgb(15, 20, 35);
     private static final int PANEL = Color.rgb(27, 36, 54);
@@ -1919,7 +1922,7 @@ if (categoryPrograms == null) {
     private void loadChannelLogo(
             android.widget.ImageView imageView, String logoUrl) {
         imageView.setTag(logoUrl);
-        new Thread(() -> {
+        logoExecutor.execute(() -> {
             java.net.HttpURLConnection connection = null;
             try {
                 java.net.URL url = new java.net.URL(logoUrl);
@@ -1952,7 +1955,7 @@ if (categoryPrograms == null) {
                     connection.disconnect();
                 }
             }
-        }).start();
+        });
     }
 
     private void playGuidePreview(Channel channel) {
