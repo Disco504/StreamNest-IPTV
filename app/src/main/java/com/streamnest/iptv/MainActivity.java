@@ -1207,7 +1207,7 @@ public class MainActivity extends Activity {
         phoneCategoryButton = null;
         if (phoneLayout) {
             phoneCategoryButton = label(
-                    "Choose Category: " + selectedCategory + "  ▼", 17);
+                    "▼  CATEGORIES: " + selectedCategory, 17);
             phoneCategoryButton.setTextColor(WHITE);
             phoneCategoryButton.setBackgroundColor(PANEL);
             phoneCategoryButton.setPadding(dp(12), dp(12), dp(12), dp(12));
@@ -1272,7 +1272,7 @@ public class MainActivity extends Activity {
                     selectedCategory = options[which];
                     if (phoneCategoryButton != null) {
                         phoneCategoryButton.setText(
-                                "Choose Category: " + selectedCategory + "  ▼");
+                                "▼  CATEGORIES: " + selectedCategory);
                     }
                     renderCategories();
                     renderChannels();
