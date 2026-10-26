@@ -1046,8 +1046,8 @@ public class MainActivity extends Activity {
                 } else {
                     channels = loaded;
                     selectedCategory = "All Channels";
-                    if (launchAfterLoad && !launchLastPlayedChannel()) {
-                        showLiveTv();
+                    if (launchAfterLoad) {
+                        showTvGuide();
                     }
                     Toast.makeText(this,
                             "Loaded " + channels.size()
@@ -1156,8 +1156,8 @@ public class MainActivity extends Activity {
                     } else {
                         channels = loaded;
                         selectedCategory = "All Channels";
-                        if (launchAfterLoad && !launchLastPlayedChannel()) {
-                            showLiveTv();
+                        if (launchAfterLoad) {
+                            showTvGuide();
                         }
                         Toast.makeText(this,
                                 "Loaded " + channels.size() + " channels",
