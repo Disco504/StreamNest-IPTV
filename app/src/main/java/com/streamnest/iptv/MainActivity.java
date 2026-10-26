@@ -1951,8 +1951,6 @@ if (categoryPrograms == null) {
 
         if (lastChannel != null) {
             playGuidePreview(lastChannel);
-        } else if (firstPreviewChannel != null) {
-            playGuidePreview(firstPreviewChannel);
         }
 
         android.widget.FrameLayout gridFrame =
