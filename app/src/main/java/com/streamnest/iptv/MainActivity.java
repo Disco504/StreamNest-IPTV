@@ -1201,8 +1201,7 @@ public class MainActivity extends Activity {
         title.setTypeface(null, Typeface.BOLD);
         screen.addView(title);
 
-        boolean phoneLayout =
-                getResources().getConfiguration().screenWidthDp < 600;
+        boolean phoneLayout = getResources().getConfiguration().smallestScreenWidthDp < 600;
 
         phoneCategoryButton = null;
         if (phoneLayout) {
@@ -1501,9 +1500,7 @@ public class MainActivity extends Activity {
 
         LinearLayout results = new LinearLayout(this);
         results.setOrientation(LinearLayout.VERTICAL);
-        ScrollView programScroll = new ScrollView(this);
-        programScroll.addView(results);
-        guideContent.addView(programScroll, new LinearLayout.LayoutParams(
+        guideContent.addView(results, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
 
         screen.addView(guideContent, new LinearLayout.LayoutParams(
@@ -1749,7 +1746,7 @@ if (categoryPrograms == null) {
             tickParams.setMargins(dp(1), 0, dp(1), 0);
             timeHeader.addView(tick, tickParams);
         }
-        grid.addView(timeHeader);
+        // Time ruler is displayed separately above the scrolling channel rows.
 
         Map<String, ArrayList<EpgProgram>> byChannel = new java.util.TreeMap<>();
         Map<String, Channel> rowChannels = new java.util.TreeMap<>();
@@ -1932,7 +1929,7 @@ if (categoryPrograms == null) {
                 new android.widget.FrameLayout.LayoutParams(
                         dp(2), android.view.ViewGroup.LayoutParams.MATCH_PARENT);
         markerParams.leftMargin = channelWidth + dp(1);
-        markerParams.topMargin = dp(42);
+        markerParams.topMargin = 0;
         gridFrame.addView(currentTimeMarker, markerParams);
 
         final android.os.Handler clockHandler =
@@ -1967,12 +1964,38 @@ if (categoryPrograms == null) {
                     }
                 });
 
+        HorizontalScrollView headerScroll = new HorizontalScrollView(this);
+        headerScroll.setHorizontalScrollBarEnabled(false);
+        headerScroll.addView(timeHeader);
+
         HorizontalScrollView horizontalScroll = new HorizontalScrollView(this);
         horizontalScroll.setHorizontalScrollBarEnabled(true);
         horizontalScroll.addView(gridFrame);
-        results.addView(horizontalScroll, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        headerScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
+            if (horizontalScroll.getScrollX() != x) {
+                horizontalScroll.scrollTo(x, 0);
+            }
+        });
+        horizontalScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
+            if (headerScroll.getScrollX() != x) {
+                headerScroll.scrollTo(x, 0);
+            }
+        });
+
+        ScrollView rowVerticalScroll = new ScrollView(this);
+        rowVerticalScroll.setFillViewport(false);
+        rowVerticalScroll.addView(horizontalScroll);
+
+        LinearLayout timeline = new LinearLayout(this);
+        timeline.setOrientation(LinearLayout.VERTICAL);
+        timeline.addView(headerScroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(42)));
+        timeline.addView(rowVerticalScroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        results.addView(timeline, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
     }
 
     private void loadChannelLogo(
