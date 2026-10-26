@@ -1715,9 +1715,10 @@ if (categoryPrograms == null) {
         final long gridStart =
                 (System.currentTimeMillis() / slotMillis) * slotMillis;
         final long gridEnd = gridStart + 24L * 60L * 60L * 1000L;
-        final int pixelsPerMinute = 2;
+        final int pixelsPerMinute = Math.max(2,
+                (getResources().getConfiguration().screenWidthDp - 144) / 120);
         final int channelWidth = dp(120);
-        final int slotWidth = dp(60);
+        final int slotWidth = dp(30 * pixelsPerMinute);
         final int rowHeight = dp(76);
 
         SimpleDateFormat clock =
@@ -1743,7 +1744,6 @@ if (categoryPrograms == null) {
             tick.setBackgroundColor(BLUE);
             LinearLayout.LayoutParams tickParams =
                     new LinearLayout.LayoutParams(slotWidth, dp(42));
-            tickParams.setMargins(dp(1), 0, dp(1), 0);
             timeHeader.addView(tick, tickParams);
         }
         // Time ruler is displayed separately above the scrolling channel rows.
@@ -1823,15 +1823,21 @@ if (categoryPrograms == null) {
             }
 
             if (programs.isEmpty()) {
-            TextView noInfo = label("No Information", 12);
-            noInfo.setGravity(android.view.Gravity.CENTER);
-            noInfo.setBackgroundColor(Color.DKGRAY);
-            row.addView(noInfo, new LinearLayout.LayoutParams(
-                    dp(24 * 60 * pixelsPerMinute), rowHeight));
-            grid.addView(row, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, rowHeight));
-            continue;
-        }
+                for (long t = gridStart; t < gridEnd; t += slotMillis) {
+                    TextView noInfo = label(
+                            "No Information\n" + clock.format(new Date(t)), 12);
+                    noInfo.setGravity(android.view.Gravity.CENTER);
+                    noInfo.setPadding(dp(4), dp(3), dp(4), dp(3));
+                    noInfo.setBackgroundColor(PANEL);
+                    LinearLayout.LayoutParams noInfoParams =
+                            new LinearLayout.LayoutParams(
+                                    dp(30 * pixelsPerMinute), rowHeight);
+                    row.addView(noInfo, noInfoParams);
+                }
+                grid.addView(row, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT, rowHeight));
+                continue;
+            }
 
         long cursor = gridStart;
             for (EpgProgram program : programs) {
@@ -1840,25 +1846,38 @@ if (categoryPrograms == null) {
                 if (stopTime <= startTime) continue;
 
                 if (startTime > cursor) {
-                    int gapMinutes = (int) ((startTime - cursor) / 60000L);
-                    if (gapMinutes > 0) {
-                        android.view.View gap = new android.view.View(this);
-                        row.addView(gap, new LinearLayout.LayoutParams(
-                                Math.max(1, dp(gapMinutes * pixelsPerMinute)),
-                                rowHeight));
+                    long gapCursor = cursor;
+                    while (gapCursor < startTime) {
+                        long gapStop = Math.min(startTime, gapCursor + slotMillis);
+                        int gapMinutes = Math.max(1, (int) Math.ceil(
+                                (gapStop - gapCursor) / 60000.0));
+                        TextView gap = label(
+                                "No Information\n"
+                                        + clock.format(new Date(gapCursor)), 12);
+                        gap.setGravity(android.view.Gravity.CENTER);
+                        gap.setPadding(dp(4), dp(3), dp(4), dp(3));
+                        gap.setBackgroundColor(PANEL);
+                        gap.setMaxLines(3);
+                        gap.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                        LinearLayout.LayoutParams gapParams =
+                                new LinearLayout.LayoutParams(
+                                        Math.max(1, dp(gapMinutes * pixelsPerMinute)),
+                                        rowHeight);
+                        row.addView(gap, gapParams);
+                        gapCursor = gapStop;
                     }
                 }
 
                 long durationMillis = stopTime - startTime;
-                int durationMinutes =
-                        Math.max(1, (int) (durationMillis / 60000L));
+                int durationMinutes = Math.max(1, (int) Math.ceil(durationMillis / 60000.0));
                 int brickWidth = Math.max(1, dp(
                         durationMinutes * pixelsPerMinute));
 
                 String title = program.title.isEmpty()
                         ? "(Untitled programme)" : program.title;
                 TextView brick = label(
-                        title + "\n" + clock.format(new Date(startTime)),
+                        title + "\n" + clock.format(new Date(startTime))
+                                + " - " + clock.format(new Date(stopTime)),
                         12);
                 brick.setGravity(android.view.Gravity.CENTER_VERTICAL);
                 brick.setPadding(dp(5), dp(4), dp(5), dp(4));
@@ -1888,10 +1907,29 @@ if (categoryPrograms == null) {
 
                 LinearLayout.LayoutParams brickParams =
                         new LinearLayout.LayoutParams(brickWidth, rowHeight);
-                brickParams.setMargins(dp(1), dp(1), dp(1), dp(1));
                 row.addView(brick, brickParams);
 
                 cursor = Math.max(cursor, stopTime);
+            }
+
+            while (cursor < gridEnd) {
+                long gapStop = Math.min(gridEnd, cursor + slotMillis);
+                int gapMinutes = Math.max(1, (int) Math.ceil(
+                        (gapStop - cursor) / 60000.0));
+                TextView gap = label(
+                        "No Information\n" + clock.format(new Date(cursor)), 12);
+                gap.setGravity(android.view.Gravity.CENTER);
+                gap.setPadding(dp(4), dp(3), dp(4), dp(3));
+                gap.setBackgroundColor(PANEL);
+                gap.setMaxLines(3);
+                gap.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                LinearLayout.LayoutParams gapParams =
+                        new LinearLayout.LayoutParams(
+                                Math.max(1, dp(gapMinutes * pixelsPerMinute)),
+                                rowHeight);
+
+                row.addView(gap, gapParams);
+                cursor = gapStop;
             }
 
             grid.addView(row, new LinearLayout.LayoutParams(
@@ -1928,7 +1966,7 @@ if (categoryPrograms == null) {
         android.widget.FrameLayout.LayoutParams markerParams =
                 new android.widget.FrameLayout.LayoutParams(
                         dp(2), android.view.ViewGroup.LayoutParams.MATCH_PARENT);
-        markerParams.leftMargin = channelWidth + dp(1);
+        markerParams.leftMargin = channelWidth;
         markerParams.topMargin = 0;
         gridFrame.addView(currentTimeMarker, markerParams);
 
@@ -1941,8 +1979,7 @@ if (categoryPrograms == null) {
                 long now = System.currentTimeMillis();
                 int minutes = (int) ((now - gridStart) / 60000L);
                 int markerX = channelWidth
-                        + dp(Math.max(0, minutes * pixelsPerMinute))
-                        + dp((Math.max(0, minutes) / 30) * 2);
+                        + dp(Math.max(0, minutes) * pixelsPerMinute);
                 android.widget.FrameLayout.LayoutParams params =
                         (android.widget.FrameLayout.LayoutParams)
                                 currentTimeMarker.getLayoutParams();
