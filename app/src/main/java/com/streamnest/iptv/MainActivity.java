@@ -1977,7 +1977,7 @@ if (categoryPrograms == null) {
                 long now = System.currentTimeMillis();
                 int minutes = (int) ((now - gridStart) / 60000L);
                 int markerX = channelWidth
-                        + dp(Math.max(0, minutes) * pixelsPerMinute);
+                        + (int) ((long) Math.max(0, minutes) * slotWidth / 30L);
                 android.widget.FrameLayout.LayoutParams params =
                         (android.widget.FrameLayout.LayoutParams)
                                 currentTimeMarker.getLayoutParams();
