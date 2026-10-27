@@ -1749,12 +1749,7 @@ addHomeSection(homeMenu, "TV GUIDE",
             Map<String, Channel> channelMap, LinearLayout results) {
         results.removeAllViews();
 
-        TextView heading = label(category + " — TV GUIDE", 18);
-        heading.setPadding(dp(12), dp(12), dp(12), dp(8));
-        heading.setBackgroundColor(BLUE);
-        results.addView(heading, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
+
 
         ArrayList<EpgProgram> categoryPrograms = grouped.get(category);
 if (categoryPrograms == null) {
@@ -1783,7 +1778,7 @@ if (categoryPrograms == null) {
         TextView channelHeader = label("CHANNEL", 13);
         channelHeader.setGravity(android.view.Gravity.CENTER_VERTICAL);
         channelHeader.setPadding(dp(6), dp(6), dp(6), dp(6));
-        channelHeader.setBackgroundColor(BLUE);
+        channelHeader.setBackgroundColor(PANEL);
         timeHeader.addView(channelHeader, new LinearLayout.LayoutParams(
                 channelWidth, dp(42)));
 
@@ -1791,7 +1786,7 @@ if (categoryPrograms == null) {
             TextView tick = label(clock.format(new Date(time)), 12);
             tick.setGravity(android.view.Gravity.CENTER);
             tick.setPadding(dp(2), dp(4), dp(2), dp(4));
-            tick.setBackgroundColor(BLUE);
+            tick.setBackgroundColor(PANEL);
             LinearLayout.LayoutParams tickParams =
                     new LinearLayout.LayoutParams(slotWidth, dp(42));
             timeHeader.addView(tick, tickParams);
@@ -2025,12 +2020,15 @@ if (categoryPrograms == null) {
 
         android.view.View currentTimeMarker = new android.view.View(this);
         currentTimeMarker.setBackgroundColor(Color.RED);
+        currentTimeMarker.setElevation(dp(8));
+        currentTimeMarker.setVisibility(View.VISIBLE);
         android.widget.FrameLayout.LayoutParams markerParams =
                 new android.widget.FrameLayout.LayoutParams(
-                        dp(2), android.view.ViewGroup.LayoutParams.MATCH_PARENT);
+                        dp(3), android.view.ViewGroup.LayoutParams.MATCH_PARENT);
         markerParams.leftMargin = channelWidth;
         markerParams.topMargin = 0;
         gridFrame.addView(currentTimeMarker, markerParams);
+        currentTimeMarker.bringToFront();
 
         final android.os.Handler clockHandler =
                 new android.os.Handler(android.os.Looper.getMainLooper());
@@ -2041,12 +2039,16 @@ if (categoryPrograms == null) {
                 long now = System.currentTimeMillis();
                 int minutes = (int) ((now - gridStart) / 60000L);
                 int markerX = channelWidth
-                        + (int) ((long) Math.max(0, minutes) * slotWidth / 30L);
+                        + dp(Math.max(0, minutes) * pixelsPerMinute);
                 android.widget.FrameLayout.LayoutParams params =
                         (android.widget.FrameLayout.LayoutParams)
                                 currentTimeMarker.getLayoutParams();
                 params.leftMargin = markerX;
+                if (gridFrame.getHeight() > 0) {
+                    params.height = gridFrame.getHeight();
+                }
                 currentTimeMarker.setLayoutParams(params);
+                currentTimeMarker.bringToFront();
                 clockHandler.postDelayed(this, 30000L);
             }
         };
