@@ -684,6 +684,10 @@ public class MainActivity extends Activity {
 
     private void showHomeScreen() {
         releaseGuidePreview();
+        if (getResources().getConfiguration().smallestScreenWidthDp < 600) {
+            setRequestedOrientation(
+                    android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        }
         showingLiveTv = false;
         showingTvGuide = false;
         screen = new LinearLayout(this);
@@ -1448,6 +1452,13 @@ addHomeSection(homeMenu, "TV GUIDE",
             return;
         }
 
+        boolean phoneGuideLayout =
+                getResources().getConfiguration().smallestScreenWidthDp < 600;
+        if (phoneGuideLayout) {
+            setRequestedOrientation(
+                    android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        }
+
         final Map<String, Channel> channelMap = new HashMap<>();
         TextView status = new TextView(this);
         for (Channel channel : channels) {
@@ -1459,6 +1470,8 @@ addHomeSection(homeMenu, "TV GUIDE",
         screen.removeAllViews();
         screen.setOrientation(LinearLayout.VERTICAL);
 
+        int previewHeight = phoneGuideLayout ? dp(180) : dp(300);
+
         LinearLayout previewRow = new LinearLayout(this);
         previewRow.setOrientation(LinearLayout.HORIZONTAL);
         previewRow.setBackgroundColor(PANEL);
@@ -1468,7 +1481,7 @@ addHomeSection(homeMenu, "TV GUIDE",
         previewPlayerView.setFocusable(false);
         previewPlayerView.setBackgroundColor(Color.BLACK);
         previewRow.addView(previewPlayerView, new LinearLayout.LayoutParams(
-                0, dp(300), 1f));
+                0, previewHeight, phoneGuideLayout ? 1.2f : 1f));
 
         LinearLayout previewInfo = new LinearLayout(this);
         previewInfo.setOrientation(LinearLayout.VERTICAL);
@@ -1480,10 +1493,10 @@ addHomeSection(homeMenu, "TV GUIDE",
                 "Programme information unavailable", 13);
         previewInfo.addView(guidePreviewProgramInfoView);
         previewRow.addView(previewInfo, new LinearLayout.LayoutParams(
-                0, dp(300), 1f));
+                0, previewHeight, phoneGuideLayout ? 0.8f : 1f));
 
         screen.addView(previewRow, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(300)));
+                LinearLayout.LayoutParams.MATCH_PARENT, previewHeight));
 
         LinearLayout guideContent = new LinearLayout(this);
         guideContent.setOrientation(LinearLayout.HORIZONTAL);
