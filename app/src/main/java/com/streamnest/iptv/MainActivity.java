@@ -1470,7 +1470,7 @@ addHomeSection(homeMenu, "TV GUIDE",
         screen.removeAllViews();
         screen.setOrientation(LinearLayout.VERTICAL);
 
-        int previewHeight = phoneGuideLayout ? dp(180) : dp(300);
+        int previewHeight = phoneGuideLayout ? dp(110) : dp(300);
 
         LinearLayout previewRow = new LinearLayout(this);
         previewRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -1769,7 +1769,7 @@ if (categoryPrograms == null) {
                 (getResources().getConfiguration().screenWidthDp - 144) / 120);
         final int channelWidth = dp(120);
         final int slotWidth = dp(30 * pixelsPerMinute);
-        final int rowHeight = dp(76);
+        final int rowHeight = dp(getResources().getConfiguration().screenWidthDp < 600 ? 54 : 76);
 
         SimpleDateFormat clock =
                 new SimpleDateFormat("h:mm a", Locale.getDefault());
