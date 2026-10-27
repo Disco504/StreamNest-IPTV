@@ -1461,6 +1461,7 @@ addHomeSection(homeMenu, "TV GUIDE",
 
         LinearLayout previewRow = new LinearLayout(this);
         previewRow.setOrientation(LinearLayout.HORIZONTAL);
+        previewRow.setBackgroundColor(PANEL);
 
         previewPlayerView = new PlayerView(this);
         previewPlayerView.setUseController(false);
@@ -1471,6 +1472,7 @@ addHomeSection(homeMenu, "TV GUIDE",
 
         LinearLayout previewInfo = new LinearLayout(this);
         previewInfo.setOrientation(LinearLayout.VERTICAL);
+        previewInfo.setBackgroundColor(PANEL);
         previewInfo.setPadding(dp(10), dp(8), dp(8), dp(8));
         guidePreviewChannelNameView = label("Now Playing", 16);
         previewInfo.addView(guidePreviewChannelNameView);
