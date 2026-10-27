@@ -1505,6 +1505,23 @@ addHomeSection(homeMenu, "TV GUIDE",
         screen.addView(guideContent, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
+        if (getResources().getConfiguration().screenWidthDp < 600) {
+            android.widget.Button categoriesButton =
+                    new android.widget.Button(this);
+            categoriesButton.setText("CATEGORIES");
+            categoriesButton.setOnClickListener(v -> {
+                if (guideCategoryScrollView != null) {
+                    int visibility = guideCategoryScrollView.getVisibility();
+                    guideCategoryScrollView.setVisibility(
+                            visibility == android.view.View.VISIBLE
+                                    ? android.view.View.GONE
+                                    : android.view.View.VISIBLE);
+                }
+            });
+            screen.addView(categoriesButton, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, dp(48)));
+        }
+
         Thread worker = new Thread(() -> {
             HttpURLConnection connection = null;
             try {
