@@ -1049,6 +1049,7 @@ addHomeSection(homeMenu, "TV GUIDE",
                     selectedCategory = "All Channels";
                     if (launchAfterLoad) {
                         showTvGuide();
+                        launchLastPlayedChannel();
                     }
                     Toast.makeText(this,
                             "Loaded " + channels.size()
@@ -1159,6 +1160,7 @@ addHomeSection(homeMenu, "TV GUIDE",
                         selectedCategory = "All Channels";
                         if (launchAfterLoad) {
                             showTvGuide();
+                            launchLastPlayedChannel();
                         }
                         Toast.makeText(this,
                                 "Loaded " + channels.size() + " channels",
