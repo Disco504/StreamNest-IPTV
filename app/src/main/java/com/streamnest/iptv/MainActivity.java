@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 
 import org.xmlpull.v1.XmlPullParser;
 import java.io.InputStream;
+import java.util.zip.GZIPInputStream;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Comparator;
@@ -1455,7 +1456,7 @@ public class MainActivity extends Activity {
         TextView status = new TextView(this);
         for (Channel channel : channels) {
             if (channel.tvgId != null && !channel.tvgId.trim().isEmpty()) {
-                channelMap.put(channel.tvgId.trim(), channel);
+                channelMap.put(normalizeEpgId(channel.tvgId), channel);
             }
         }
 
@@ -1514,9 +1515,16 @@ public class MainActivity extends Activity {
                 connection.setConnectTimeout(15000);
                 connection.setReadTimeout(20000);
                 connection.setRequestProperty("User-Agent", "StreamNestIPTV/1.0");
+                connection.setRequestProperty("Accept-Encoding", "gzip");
 
                 ArrayList<EpgProgram> programs = new ArrayList<>();
-                try (InputStream input = connection.getInputStream()) {
+                InputStream rawInput = connection.getInputStream();
+                String contentEncoding = connection.getContentEncoding();
+                boolean gzip = (contentEncoding != null
+                        && contentEncoding.toLowerCase(Locale.US).contains("gzip"))
+                        || url.getPath().toLowerCase(Locale.US).endsWith(".gz");
+                try (InputStream input = gzip
+                        ? new GZIPInputStream(rawInput) : rawInput) {
                     XmlPullParser parser = Xml.newPullParser();
                     parser.setInput(input, "UTF-8");
 
@@ -1527,7 +1535,7 @@ public class MainActivity extends Activity {
                     int event = parser.getEventType();
 
                     while (event != XmlPullParser.END_DOCUMENT
-                            && programs.size() < 20000) {
+                            && programs.size() < 100000) {
                         if (event == XmlPullParser.START_TAG
                                 && "programme".equals(parser.getName())) {
                             currentChannel = parser.getAttributeValue(null, "channel");
@@ -1563,6 +1571,7 @@ public class MainActivity extends Activity {
                 final String message = e.getMessage() == null
                         ? e.getClass().getSimpleName() : e.getMessage();
                 android.util.Log.e("StreamNest", "Could not load the EPG: " + message);
+                runOnUiThread(() -> status.setText("Could not load EPG: " + message));
             } finally {
                 if (connection != null) {
                     connection.disconnect();
@@ -1570,6 +1579,10 @@ public class MainActivity extends Activity {
             }
         });
         worker.start();
+    }
+
+    private String normalizeEpgId(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.US);
     }
 
     private long parseXmltvTime(String value) {
@@ -1612,7 +1625,7 @@ public class MainActivity extends Activity {
         }
 
         for (EpgProgram program : programs) {
-            Channel channel = channelMap.get(program.channelId);
+            Channel channel = channelMap.get(normalizeEpgId(program.channelId));
             if (channel == null) continue;
             matched++;
 
@@ -1651,8 +1664,17 @@ public class MainActivity extends Activity {
             totalVisible += list.size();
         }
 
-        status.setText("Guide loaded: " + totalVisible + " listings across "
-                + grouped.size() + " categories. Select a category on the left.");
+        if (matched == 0) {
+            status.setText("No EPG programmes matched playlist channel IDs. "
+                    + programs.size() + " programmes were parsed. Check the EPG URL "
+                    + "and channel IDs.");
+        } else if (totalVisible == 0) {
+            status.setText("Matched " + matched + " EPG programmes, but none are "
+                    + "current or upcoming.");
+        } else {
+            status.setText("Guide loaded: " + totalVisible + " listings across "
+                    + grouped.size() + " categories. Select a category on the left.");
+        }
 
         TreeSet<String> categories = new TreeSet<>(grouped.keySet());
 
@@ -1768,7 +1790,7 @@ if (categoryPrograms == null) {
 
         // Add EPG programmes where a matching channel ID exists.
         for (EpgProgram program : categoryPrograms) {
-            Channel channel = channelMap.get(program.channelId);
+            Channel channel = channelMap.get(normalizeEpgId(program.channelId));
             if (channel == null) continue;
 
             String name = channel.name;
@@ -1798,6 +1820,8 @@ if (categoryPrograms == null) {
             channelCell.setBackgroundColor(PANEL);
             channelCell.setFocusable(true);
             channelCell.setClickable(true);
+            channelCell.setOnFocusChangeListener((v, focused) ->
+                    v.setBackgroundColor(focused ? BLUE : PANEL));
             channelCell.setOnClickListener(v -> playGuidePreview(rowChannel));
 
             android.widget.ImageView logoView =
@@ -1829,6 +1853,10 @@ if (categoryPrograms == null) {
                     noInfo.setGravity(android.view.Gravity.CENTER);
                     noInfo.setPadding(dp(4), dp(3), dp(4), dp(3));
                     noInfo.setBackgroundColor(PANEL);
+                    noInfo.setFocusable(true);
+                    noInfo.setClickable(true);
+                    noInfo.setOnFocusChangeListener((v, focused) ->
+                            v.setBackgroundColor(focused ? BLUE : PANEL));
                     LinearLayout.LayoutParams noInfoParams =
                             new LinearLayout.LayoutParams(
                                     dp(30 * pixelsPerMinute), rowHeight);
@@ -1857,6 +1885,10 @@ if (categoryPrograms == null) {
                         gap.setGravity(android.view.Gravity.CENTER);
                         gap.setPadding(dp(4), dp(3), dp(4), dp(3));
                         gap.setBackgroundColor(PANEL);
+                        gap.setFocusable(true);
+                        gap.setClickable(true);
+                        gap.setOnFocusChangeListener((v, focused) ->
+                                v.setBackgroundColor(focused ? BLUE : PANEL));
                         gap.setMaxLines(3);
                         gap.setEllipsize(android.text.TextUtils.TruncateAt.END);
                         LinearLayout.LayoutParams gapParams =
@@ -1890,7 +1922,7 @@ if (categoryPrograms == null) {
                     v.setBackgroundColor(focused ? BLUE : PANEL);
                 });
 
-                Channel channel = channelMap.get(program.channelId);
+                Channel channel = channelMap.get(normalizeEpgId(program.channelId));
                 if (channel != null) {
                     if (firstPreviewChannel == null) {
                         firstPreviewChannel = channel;
@@ -1921,6 +1953,10 @@ if (categoryPrograms == null) {
                 gap.setGravity(android.view.Gravity.CENTER);
                 gap.setPadding(dp(4), dp(3), dp(4), dp(3));
                 gap.setBackgroundColor(PANEL);
+                gap.setFocusable(true);
+                gap.setClickable(true);
+                gap.setOnFocusChangeListener((v, focused) ->
+                        v.setBackgroundColor(focused ? BLUE : PANEL));
                 gap.setMaxLines(3);
                 gap.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 LinearLayout.LayoutParams gapParams =
@@ -2087,7 +2123,7 @@ if (categoryPrograms == null) {
         long now = System.currentTimeMillis();
         for (EpgProgram program : guidePrograms) {
             if (channel.tvgId != null
-                    && channel.tvgId.trim().equals(program.channelId)
+                    && normalizeEpgId(channel.tvgId).equals(normalizeEpgId(program.channelId))
                     && program.startMillis <= now
                     && program.stopMillis > now) {
                 currentProgram = program.title;
