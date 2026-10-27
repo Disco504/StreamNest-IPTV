@@ -1214,7 +1214,12 @@ addHomeSection(homeMenu, "TV GUIDE",
             phoneCategoryButton.setFocusable(true);
             phoneCategoryButton.setClickable(true);
             phoneCategoryButton.setOnClickListener(v -> showPhoneCategoryPicker());
-            screen.addView(phoneCategoryButton);
+            LinearLayout.LayoutParams categoryButtonParams =
+                    new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT);
+            categoryButtonParams.gravity = android.view.Gravity.START;
+            screen.addView(phoneCategoryButton, categoryButtonParams);
         }
 
         LinearLayout panels = new LinearLayout(this);
