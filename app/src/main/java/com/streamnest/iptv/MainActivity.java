@@ -1467,7 +1467,7 @@ addHomeSection(homeMenu, "TV GUIDE",
         previewPlayerView.setFocusable(false);
         previewPlayerView.setBackgroundColor(Color.BLACK);
         previewRow.addView(previewPlayerView, new LinearLayout.LayoutParams(
-                0, dp(210), 1f));
+                0, dp(300), 1f));
 
         LinearLayout previewInfo = new LinearLayout(this);
         previewInfo.setOrientation(LinearLayout.VERTICAL);
@@ -1478,10 +1478,10 @@ addHomeSection(homeMenu, "TV GUIDE",
                 "Programme information unavailable", 13);
         previewInfo.addView(guidePreviewProgramInfoView);
         previewRow.addView(previewInfo, new LinearLayout.LayoutParams(
-                0, dp(210), 1f));
+                0, dp(300), 1f));
 
         screen.addView(previewRow, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(210)));
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(300)));
 
         LinearLayout guideContent = new LinearLayout(this);
         guideContent.setOrientation(LinearLayout.HORIZONTAL);
