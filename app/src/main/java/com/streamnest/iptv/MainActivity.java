@@ -703,9 +703,7 @@ public class MainActivity extends Activity {
         homeMenu.setOrientation(LinearLayout.VERTICAL);
         homeScroll.addView(homeMenu);
 
-        addHomeSection(homeMenu, "LIVE TV",
-                "Browse channel categories and watch live");
-        addHomeSection(homeMenu, "TV GUIDE",
+addHomeSection(homeMenu, "TV GUIDE",
                 "Browse programs and schedules");
         addHomeSection(homeMenu, "MOVIES",
                 "Browse your video-on-demand library");
@@ -734,9 +732,7 @@ public class MainActivity extends Activity {
                 v.setBackgroundColor(focused ? BLUE : PANEL));
 
         item.setOnClickListener(v -> {
-            if ("LIVE TV".equals(title)) {
-                showConnectionDialog();
-            } else if ("SETTINGS".equals(title)) {
+            if ("SETTINGS".equals(title)) {
                 showSettingsDialog();
             } else if ("TV GUIDE".equals(title)) {
                 showTvGuide();
