@@ -774,10 +774,12 @@ addHomeSection(homeMenu, "TV GUIDE",
     private void showSettingsDialog() {
         android.content.SharedPreferences prefs =
                 getPreferences(MODE_PRIVATE);
+
         String[] options = {
                 "Launch Live TV on app boot",
                 "Launch Live TV after playlist change"
         };
+
         boolean[] checked = {
                 prefs.getBoolean("launch_live_tv_on_boot", true),
                 prefs.getBoolean("launch_live_tv_on_change", true)
@@ -792,6 +794,8 @@ addHomeSection(homeMenu, "TV GUIDE",
                                     : "launch_live_tv_on_change";
                             prefs.edit().putBoolean(key, isChecked).apply();
                         })
+                .setNeutralButton("Add / Change Playlist",
+                        (dialog, which) -> showConnectionDialog())
                 .setPositiveButton("XMLTV EPG URL",
                         (dialog, which) -> showEpgDialog())
                 .setNegativeButton("Done", null)
