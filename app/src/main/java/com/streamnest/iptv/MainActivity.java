@@ -1494,7 +1494,7 @@ addHomeSection(homeMenu, "TV GUIDE",
         screen.removeAllViews();
         screen.setOrientation(LinearLayout.VERTICAL);
 
-        int previewHeight = phoneGuideLayout ? dp(110) : dp(300);
+        int previewHeight = phoneGuideLayout ? dp(110) : dp(250);
 
         LinearLayout previewRow = new LinearLayout(this);
         previewRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -1792,16 +1792,22 @@ if (categoryPrograms == null) {
                 (getResources().getConfiguration().screenWidthDp - 144) / 120);
         final int channelWidth = dp(120);
         final int slotWidth = dp(30 * pixelsPerMinute);
-        final int rowHeight = dp(isPhoneLayout() ? 54 : 76);
+        final int rowHeight = dp(isPhoneLayout() ? 54 : 56);
 
         SimpleDateFormat clock =
                 new SimpleDateFormat("h:mm a", Locale.getDefault());
 
         LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
+        grid.setDividerDrawable(
+                new android.graphics.drawable.ColorDrawable(0xFF3A3A3A));
+        grid.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
 
         LinearLayout timeHeader = new LinearLayout(this);
         timeHeader.setOrientation(LinearLayout.HORIZONTAL);
+        timeHeader.setDividerDrawable(
+                new android.graphics.drawable.ColorDrawable(0xFF3A3A3A));
+        timeHeader.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
 
         TextView channelHeader = label("CHANNEL", 13);
         channelHeader.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -1860,6 +1866,9 @@ if (categoryPrograms == null) {
 
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setDividerDrawable(
+                    new android.graphics.drawable.ColorDrawable(0xFF3A3A3A));
+            row.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
 
             Channel rowChannel = rowChannels.get(entry.getKey());
         if (rowChannel == null) continue;
