@@ -52,6 +52,19 @@ import java.util.Set;
 import java.util.TreeSet;
 
 public class MainActivity extends Activity {
+    private boolean isTelevisionDevice() {
+        int uiMode = getResources().getConfiguration().uiMode
+                & android.content.res.Configuration.UI_MODE_TYPE_MASK;
+        return getPackageManager().hasSystemFeature(
+                android.content.pm.PackageManager.FEATURE_LEANBACK)
+                || uiMode == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION;
+    }
+
+    private boolean isPhoneLayout() {
+        return !isTelevisionDevice()
+                && getResources().getConfiguration().smallestScreenWidthDp < 600;
+    }
+
     private final ExecutorService logoExecutor = Executors.newFixedThreadPool(4);
 
     private static final int NAVY = Color.rgb(15, 20, 35);
@@ -684,7 +697,7 @@ public class MainActivity extends Activity {
 
     private void showHomeScreen() {
         releaseGuidePreview();
-        if (getResources().getConfiguration().smallestScreenWidthDp < 600) {
+        if (isPhoneLayout()) {
             setRequestedOrientation(
                     android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         }
@@ -1204,7 +1217,7 @@ addHomeSection(homeMenu, "TV GUIDE",
         title.setTypeface(null, Typeface.BOLD);
         screen.addView(title);
 
-        boolean phoneLayout = getResources().getConfiguration().smallestScreenWidthDp < 600;
+        boolean phoneLayout = isPhoneLayout();
 
         phoneCategoryButton = null;
         if (phoneLayout) {
@@ -1460,7 +1473,7 @@ addHomeSection(homeMenu, "TV GUIDE",
         }
 
         boolean phoneGuideLayout =
-                getResources().getConfiguration().smallestScreenWidthDp < 600;
+                isPhoneLayout();
         if (phoneGuideLayout) {
             setRequestedOrientation(
                     android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
@@ -1529,7 +1542,7 @@ addHomeSection(homeMenu, "TV GUIDE",
         screen.addView(guideContent, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        if (getResources().getConfiguration().screenWidthDp < 600) {
+        if (isPhoneLayout()) {
             android.widget.Button categoriesButton =
                     new android.widget.Button(this);
             categoriesButton.setText("CATEGORIES");
@@ -1775,7 +1788,7 @@ if (categoryPrograms == null) {
                 (getResources().getConfiguration().screenWidthDp - 144) / 120);
         final int channelWidth = dp(120);
         final int slotWidth = dp(30 * pixelsPerMinute);
-        final int rowHeight = dp(getResources().getConfiguration().screenWidthDp < 600 ? 54 : 76);
+        final int rowHeight = dp(isPhoneLayout() ? 54 : 76);
 
         SimpleDateFormat clock =
                 new SimpleDateFormat("h:mm a", Locale.getDefault());
