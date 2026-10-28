@@ -720,7 +720,9 @@ public class MainActivity extends Activity {
         homeMenu.setOrientation(LinearLayout.VERTICAL);
         homeScroll.addView(homeMenu);
 
-addHomeSection(homeMenu, "TV GUIDE",
+addHomeSection(homeMenu, "SEARCH",
+                "Find live TV channels");
+        addHomeSection(homeMenu, "TV GUIDE",
                 "Browse programs and schedules");
         addHomeSection(homeMenu, "MOVIES",
                 "Browse your video-on-demand library");
@@ -739,6 +741,59 @@ addHomeSection(homeMenu, "TV GUIDE",
 
     }
 
+    private void showSearchDialog() {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("Enter a channel name");
+
+        new AlertDialog.Builder(this)
+                .setTitle("Search Channels")
+                .setView(input)
+                .setPositiveButton("Search", (dialog, which) -> {
+                    String query = input.getText().toString().trim()
+                            .toLowerCase(java.util.Locale.ROOT);
+                    if (query.isEmpty()) {
+                        Toast.makeText(this, "Enter a search term.",
+                                Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    ArrayList<Channel> matches = new ArrayList<>();
+                    for (Channel channel : channels) {
+                        if (channel.name != null && channel.name
+                                .toLowerCase(java.util.Locale.ROOT)
+                                .contains(query)) {
+                            matches.add(channel);
+                        }
+                    }
+
+                    if (matches.isEmpty()) {
+                        new AlertDialog.Builder(this)
+                                .setTitle("Search Results")
+                                .setMessage("No matching channels found.")
+                                .setPositiveButton("OK", null)
+                                .show();
+                        return;
+                    }
+
+                    String[] names = new String[matches.size()];
+                    for (int i = 0; i < matches.size(); i++) {
+                        names[i] = matches.get(i).name;
+                    }
+
+                    new AlertDialog.Builder(this)
+                            .setTitle("Search Results")
+                            .setItems(names, (resultDialog, index) -> {
+                                showLiveTv();
+                                playChannel(matches.get(index));
+                            })
+                            .setNegativeButton("Close", null)
+                            .show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     private void addHomeSection(LinearLayout menu, String title,
                                 String subtitle) {
         TextView item = label(title + "\n" + subtitle, 16);
@@ -751,6 +806,8 @@ addHomeSection(homeMenu, "TV GUIDE",
         item.setOnClickListener(v -> {
             if ("SETTINGS".equals(title)) {
                 showSettingsDialog();
+            } else if ("SEARCH".equals(title)) {
+                showSearchDialog();
             } else if ("TV GUIDE".equals(title)) {
                 showTvGuide();
             } else if ("MOVIES".equals(title)) {
@@ -1412,6 +1469,31 @@ addHomeSection(homeMenu, "TV GUIDE",
                     v.setBackgroundColor(focused ? BLUE : PANEL));
 
             row.setOnClickListener(v -> playChannel(channel));
+
+            row.setOnLongClickListener(v -> {
+                boolean wasFavorite = favorites.contains(channel.url);
+
+                if (wasFavorite) {
+                    favorites.remove(channel.url);
+                } else {
+                    favorites.add(channel.url);
+                }
+
+                getPreferences(MODE_PRIVATE).edit()
+                        .putStringSet("favorite_urls",
+                                new LinkedHashSet<>(favorites))
+                        .apply();
+
+                Toast.makeText(this,
+                        wasFavorite
+                                ? "Removed from Favorites"
+                                : "Added to Favorites",
+                        Toast.LENGTH_SHORT).show();
+
+                renderCategories();
+                renderChannels();
+                return true;
+            });
 
             star.setOnClickListener(v -> {
                 if (favorites.contains(channel.url)) {
