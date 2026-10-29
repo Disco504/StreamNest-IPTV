@@ -1910,13 +1910,13 @@ if (categoryPrograms == null) {
         LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
         grid.setDividerDrawable(
-                new android.graphics.drawable.ColorDrawable(0xFF3A3A3A));
+                new android.graphics.drawable.ColorDrawable(0xFF777777));
         grid.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
 
         LinearLayout timeHeader = new LinearLayout(this);
         timeHeader.setOrientation(LinearLayout.HORIZONTAL);
         timeHeader.setDividerDrawable(
-                new android.graphics.drawable.ColorDrawable(0xFF3A3A3A));
+                new android.graphics.drawable.ColorDrawable(0xFF777777));
         timeHeader.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
 
         TextView channelHeader = label("CHANNEL", 13);
@@ -1977,7 +1977,7 @@ if (categoryPrograms == null) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setDividerDrawable(
-                    new android.graphics.drawable.ColorDrawable(0xFF3A3A3A));
+                    new android.graphics.drawable.ColorDrawable(0xFF777777));
             row.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
 
             Channel rowChannel = rowChannels.get(entry.getKey());
@@ -2017,27 +2017,58 @@ if (categoryPrograms == null) {
             }
 
             if (programs.isEmpty()) {
-                for (long t = gridStart; t < gridEnd; t += slotMillis) {
-                    TextView noInfo = label(
-                            "No Information\n" + clock.format(new Date(t)), 12);
-                    noInfo.setGravity(android.view.Gravity.CENTER);
-                    noInfo.setPadding(dp(4), dp(3), dp(4), dp(3));
-                    noInfo.setBackgroundColor(PANEL);
-                    noInfo.setFocusable(true);
-                    noInfo.setClickable(true);
-                    noInfo.setOnFocusChangeListener((v, focused) ->
-                            v.setBackgroundColor(focused ? BLUE : PANEL));
-                    LinearLayout.LayoutParams noInfoParams =
-                            new LinearLayout.LayoutParams(
-                                    dp(30 * pixelsPerMinute), rowHeight);
-                    row.addView(noInfo, noInfoParams);
-                }
+                View noInfoRow = new View(this) {
+                    private final android.graphics.Paint linePaint =
+                            new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+                    private final android.graphics.Paint textPaint =
+                            new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+
+                    {
+                        linePaint.setColor(0xFF777777);
+                        linePaint.setStrokeWidth(Math.max(1, dp(1)));
+                        textPaint.setColor(Color.WHITE);
+                        textPaint.setTextSize(dp(10));
+                        textPaint.setTextAlign(android.graphics.Paint.Align.CENTER);
+                    }
+
+                    @Override
+                    protected void onDraw(android.graphics.Canvas canvas) {
+                        super.onDraw(canvas);
+                        float cellWidth = dp(30 * pixelsPerMinute);
+
+                        for (int i = 0; i < 48; i++) {
+                            float left = i * cellWidth;
+                            float right = left + cellWidth;
+                            canvas.drawLine(left, 0, left, getHeight(), linePaint);
+
+                            canvas.save();
+                            canvas.clipRect(left, 0, right, getHeight());
+                            float center = (left + right) / 2;
+                            canvas.drawText("No", center, dp(15), textPaint);
+                            canvas.drawText("Information", center, dp(28), textPaint);
+                            long time = gridStart + i * slotMillis;
+                            canvas.drawText(clock.format(new Date(time)),
+                                    center, dp(43), textPaint);
+                            canvas.restore();
+                        }
+
+                        canvas.drawLine(getWidth() - dp(1), 0,
+                                getWidth() - dp(1), getHeight(), linePaint);
+                        canvas.drawLine(0, getHeight() - dp(1),
+                                getWidth(), getHeight() - dp(1), linePaint);
+                    }
+                };
+                noInfoRow.setBackgroundColor(PANEL);
+                noInfoRow.setFocusable(false);
+                noInfoRow.setClickable(false);
+                row.addView(noInfoRow, new LinearLayout.LayoutParams(
+                        dp(24 * 60 * pixelsPerMinute), rowHeight));
                 grid.addView(row, new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT, rowHeight));
                 continue;
             }
 
-        long cursor = gridStart;
+            long cursor = gridStart;
             for (EpgProgram program : programs) {
                 long startTime = Math.max(program.startMillis, gridStart);
                 long stopTime = Math.min(program.stopMillis, gridEnd);
