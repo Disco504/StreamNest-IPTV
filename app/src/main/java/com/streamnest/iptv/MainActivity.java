@@ -1902,7 +1902,7 @@ if (categoryPrograms == null) {
                 (getResources().getConfiguration().screenWidthDp - 144) / 120);
         final int channelWidth = dp(120);
         final int slotWidth = dp(30 * pixelsPerMinute);
-        final int rowHeight = dp(isPhoneLayout() ? 54 : 56);
+        final int rowHeight = dp(isPhoneLayout() ? 54 : 44);
 
         SimpleDateFormat clock =
                 new SimpleDateFormat("h:mm a", Locale.getDefault());
@@ -2027,7 +2027,7 @@ if (categoryPrograms == null) {
                         linePaint.setColor(0xFF777777);
                         linePaint.setStrokeWidth(Math.max(1, dp(1)));
                         textPaint.setColor(Color.WHITE);
-                        textPaint.setTextSize(dp(10));
+                        textPaint.setTextSize(dp(11));
                         textPaint.setTextAlign(android.graphics.Paint.Align.CENTER);
                     }
 
@@ -2044,11 +2044,10 @@ if (categoryPrograms == null) {
                             canvas.save();
                             canvas.clipRect(left, 0, right, getHeight());
                             float center = (left + right) / 2;
-                            canvas.drawText("No", center, dp(15), textPaint);
-                            canvas.drawText("Information", center, dp(28), textPaint);
+                            canvas.drawText("No Information", center, dp(17), textPaint);
                             long time = gridStart + i * slotMillis;
                             canvas.drawText(clock.format(new Date(time)),
-                                    center, dp(43), textPaint);
+                                    center, dp(35), textPaint);
                             canvas.restore();
                         }
 
@@ -2085,7 +2084,11 @@ if (categoryPrograms == null) {
                                         + clock.format(new Date(gapCursor)), 12);
                         gap.setGravity(android.view.Gravity.CENTER);
                         gap.setPadding(dp(4), dp(3), dp(4), dp(3));
-                        gap.setBackgroundColor(PANEL);
+                        android.graphics.drawable.GradientDrawable gapBackground =
+                        new android.graphics.drawable.GradientDrawable();
+                gapBackground.setColor(PANEL);
+                gapBackground.setStroke(dp(1), 0xFF777777);
+                gap.setBackground(gapBackground);
                         gap.setFocusable(true);
                         gap.setClickable(true);
                         gap.setOnFocusChangeListener((v, focused) ->
@@ -2109,18 +2112,31 @@ if (categoryPrograms == null) {
                 String title = program.title.isEmpty()
                         ? "(Untitled programme)" : program.title;
                 TextView brick = label(
-                        title + "\n" + clock.format(new Date(startTime))
+                        title + "  |  " + clock.format(new Date(startTime))
                                 + " - " + clock.format(new Date(stopTime)),
-                        12);
+                        14);
                 brick.setGravity(android.view.Gravity.CENTER_VERTICAL);
-                brick.setPadding(dp(5), dp(4), dp(5), dp(4));
-                brick.setBackgroundColor(PANEL);
+                brick.setPadding(dp(5), 0, dp(5), 0);
+                brick.setSingleLine(true);
+                brick.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+                brick.setMarqueeRepeatLimit(-1);
                 brick.setFocusable(true);
                 brick.setClickable(true);
-                brick.setMaxLines(3);
-                brick.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
+                android.graphics.drawable.GradientDrawable normalBrick =
+                        new android.graphics.drawable.GradientDrawable();
+                normalBrick.setColor(PANEL);
+                normalBrick.setStroke(dp(1), 0xFF777777);
+
+                android.graphics.drawable.GradientDrawable focusedBrick =
+                        new android.graphics.drawable.GradientDrawable();
+                focusedBrick.setColor(BLUE);
+                focusedBrick.setStroke(dp(1), 0xFFFFFFFF);
+
+                brick.setBackground(normalBrick);
                 brick.setOnFocusChangeListener((v, focused) -> {
-                    v.setBackgroundColor(focused ? BLUE : PANEL);
+                    v.setBackground(focused ? focusedBrick : normalBrick);
+                    v.setSelected(focused);
                 });
 
                 Channel channel = channelMap.get(normalizeEpgId(program.channelId));
@@ -2153,7 +2169,11 @@ if (categoryPrograms == null) {
                         "No Information\n" + clock.format(new Date(cursor)), 12);
                 gap.setGravity(android.view.Gravity.CENTER);
                 gap.setPadding(dp(4), dp(3), dp(4), dp(3));
-                gap.setBackgroundColor(PANEL);
+                android.graphics.drawable.GradientDrawable gapBackground =
+                        new android.graphics.drawable.GradientDrawable();
+                gapBackground.setColor(PANEL);
+                gapBackground.setStroke(dp(1), 0xFF777777);
+                gap.setBackground(gapBackground);
                 gap.setFocusable(true);
                 gap.setClickable(true);
                 gap.setOnFocusChangeListener((v, focused) ->
