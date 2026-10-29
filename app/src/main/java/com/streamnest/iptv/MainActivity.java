@@ -1850,7 +1850,35 @@ addHomeSection(homeMenu, "SEARCH",
         }
 
         if (categoryList.getChildCount() > 0) {
-            categoryList.getChildAt(0).performClick();
+            String lastUrl = getPreferences(MODE_PRIVATE)
+                    .getString("last_channel_url", "");
+            String preferredCategory = null;
+
+            for (Channel channel : channels) {
+                if (channel.url != null && channel.url.equals(lastUrl)) {
+                    preferredCategory = channel.group;
+                    if (preferredCategory == null
+                            || preferredCategory.trim().isEmpty()) {
+                        preferredCategory = "Uncategorized";
+                    }
+                    break;
+                }
+            }
+
+            android.view.View selectedCategoryView =
+                    categoryList.getChildAt(0);
+            if (preferredCategory != null) {
+                for (int i = 0; i < categoryList.getChildCount(); i++) {
+                    android.view.View child = categoryList.getChildAt(i);
+                    if (child instanceof TextView
+                            && ((TextView) child).getText().toString()
+                                    .startsWith(preferredCategory + " (")) {
+                        selectedCategoryView = child;
+                        break;
+                    }
+                }
+            }
+            selectedCategoryView.performClick();
         }
     }
 
@@ -2119,16 +2147,27 @@ if (categoryPrograms == null) {
         Channel lastChannel = null;
 
         if (!lastChannelUrl.isEmpty()) {
-            for (Channel candidate : channelMap.values()) {
-                if (candidate.url.equals(lastChannelUrl)) {
+            for (Channel candidate : channels) {
+                if (lastChannelUrl.equals(candidate.url)) {
                     lastChannel = candidate;
                     break;
                 }
             }
         }
 
+        Channel previewChannel = firstPreviewChannel;
         if (lastChannel != null) {
-            playGuidePreview(lastChannel);
+            String lastCategory = lastChannel.group;
+            if (lastCategory == null || lastCategory.trim().isEmpty()) {
+                lastCategory = "Uncategorized";
+            }
+            if (category.equals(lastCategory)) {
+                previewChannel = lastChannel;
+            }
+        }
+
+        if (previewChannel != null) {
+            playGuidePreview(previewChannel);
         }
 
         android.widget.FrameLayout gridFrame =
