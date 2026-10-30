@@ -1225,51 +1225,179 @@ addHomeSection(homeMenu, "SEARCH",
     private void showSearchDialog() {
         EditText input = new EditText(this);
         input.setSingleLine(true);
-        input.setHint("Enter a channel name");
+        input.setHint("Search channels, movies, or TV series");
 
         new AlertDialog.Builder(this)
-                .setTitle("Search Channels")
+                .setTitle("Search StreamNest")
                 .setView(input)
                 .setPositiveButton("Search", (dialog, which) -> {
                     String query = input.getText().toString().trim()
                             .toLowerCase(java.util.Locale.ROOT);
+
                     if (query.isEmpty()) {
                         Toast.makeText(this, "Enter a search term.",
                                 Toast.LENGTH_SHORT).show();
                         return;
                     }
 
-                    ArrayList<Channel> matches = new ArrayList<>();
-                    for (Channel channel : channels) {
+                    ArrayList<Channel> liveMatches = new ArrayList<>();
+                    for (Channel channel : new ArrayList<>(channels)) {
                         if (channel.name != null && channel.name
                                 .toLowerCase(java.util.Locale.ROOT)
                                 .contains(query)) {
-                            matches.add(channel);
+                            liveMatches.add(channel);
                         }
                     }
 
-                    if (matches.isEmpty()) {
-                        new AlertDialog.Builder(this)
-                                .setTitle("Search Results")
-                                .setMessage("No matching channels found.")
-                                .setPositiveButton("OK", null)
-                                .show();
-                        return;
-                    }
+                    String base = getPreferences(MODE_PRIVATE)
+                            .getString("xtream_server", "");
+                    String user = getPreferences(MODE_PRIVATE)
+                            .getString("xtream_username", "");
+                    String pass = getPreferences(MODE_PRIVATE)
+                            .getString("xtream_password", "");
 
-                    String[] names = new String[matches.size()];
-                    for (int i = 0; i < matches.size(); i++) {
-                        names[i] = matches.get(i).name;
-                    }
+                    AlertDialog loadingDialog = new AlertDialog.Builder(this)
+                            .setTitle("Searching")
+                            .setMessage("Searching Live TV, Movies, and TV Series...")
+                            .setCancelable(false)
+                            .create();
+                    loadingDialog.show();
 
-                    new AlertDialog.Builder(this)
-                            .setTitle("Search Results")
-                            .setItems(names, (resultDialog, index) -> {
-                                showLiveTv();
-                                playChannel(matches.get(index));
-                            })
-                            .setNegativeButton("Close", null)
-                            .show();
+                    new Thread(() -> {
+                        ArrayList<Channel> results = new ArrayList<>();
+                        ArrayList<String> types = new ArrayList<>();
+                        ArrayList<String> names = new ArrayList<>();
+                        StringBuilder errors = new StringBuilder();
+
+                        for (Channel channel : liveMatches) {
+                            results.add(channel);
+                            types.add("LIVE TV");
+                            names.add("[LIVE TV] " + channel.name);
+                        }
+
+                        if (!base.isEmpty() && !user.isEmpty()
+                                && !pass.isEmpty()) {
+                            String api = base + "/player_api.php?username="
+                                    + Uri.encode(user) + "&password="
+                                    + Uri.encode(pass);
+
+                            try {
+                                JSONArray movies = getXtreamArray(
+                                        api + "&action=get_vod_streams");
+
+                                int movieCount = 0;
+                                for (int i = 0; i < movies.length(); i++) {
+                                    JSONObject item = movies.getJSONObject(i);
+                                    String id = item.optString("stream_id", "");
+                                    String name = item.optString("name", "Untitled movie");
+
+                                    if (id.isEmpty() || !name
+                                            .toLowerCase(java.util.Locale.ROOT)
+                                            .contains(query)) {
+                                        continue;
+                                    }
+
+                                    String extension = item.optString(
+                                            "container_extension", "mp4");
+                                    String url = base + "/movie/"
+                                            + Uri.encode(user) + "/"
+                                            + Uri.encode(pass) + "/"
+                                            + Uri.encode(id) + "."
+                                            + Uri.encode(extension);
+
+                                    Channel movie = new Channel(
+                                            name, url,
+                                            item.optString("category_name", "Movies"),
+                                            "",
+                                            item.optString("stream_icon", ""));
+
+                                    results.add(movie);
+                                    types.add("MOVIE");
+                                    names.add("[MOVIE] " + name);
+                                    movieCount++;
+
+                                    if (movieCount >= 100) break;
+                                }
+                            } catch (Exception e) {
+                                errors.append("Movies: ")
+                                        .append(e.getMessage()).append("\n");
+                            }
+
+                            try {
+                                JSONArray seriesList = getXtreamArray(
+                                        api + "&action=get_series");
+
+                                int seriesCount = 0;
+                                for (int i = 0; i < seriesList.length(); i++) {
+                                    JSONObject item = seriesList.getJSONObject(i);
+                                    String id = item.optString("series_id", "");
+                                    String name = item.optString("name", "Untitled series");
+
+                                    if (id.isEmpty() || !name
+                                            .toLowerCase(java.util.Locale.ROOT)
+                                            .contains(query)) {
+                                        continue;
+                                    }
+
+                                    Channel series = new Channel(
+                                            name, id,
+                                            item.optString("category_name", "TV Series"),
+                                            "",
+                                            item.optString("cover", ""));
+
+                                    results.add(series);
+                                    types.add("TV SERIES");
+                                    names.add("[TV SERIES] " + name);
+                                    seriesCount++;
+
+                                    if (seriesCount >= 100) break;
+                                }
+                            } catch (Exception e) {
+                                errors.append("TV Series: ")
+                                        .append(e.getMessage()).append("\n");
+                            }
+                        }
+
+                        runOnUiThread(() -> {
+                            loadingDialog.dismiss();
+
+                            if (names.isEmpty()) {
+                                String message = "No matching content found.";
+                                if (base.isEmpty() || user.isEmpty() || pass.isEmpty()) {
+                                    message += "\nConnect your Xtream account to search movies and TV series.";
+                                } else if (errors.length() > 0) {
+                                    message += "\n" + errors;
+                                }
+
+                                new AlertDialog.Builder(this)
+                                        .setTitle("Search Results")
+                                        .setMessage(message)
+                                        .setPositiveButton("OK", null)
+                                        .show();
+                                return;
+                            }
+
+                            new AlertDialog.Builder(this)
+                                    .setTitle("Search Results (" + names.size() + ")")
+                                    .setItems(names.toArray(new String[0]),
+                                            (resultDialog, index) -> {
+                                                Channel selected = results.get(index);
+                                                String type = types.get(index);
+
+                                                if ("LIVE TV".equals(type)) {
+                                                    showLiveTv();
+                                                    playChannel(selected);
+                                                } else if ("MOVIE".equals(type)) {
+                                                    playVodItem(selected);
+                                                } else {
+                                                    showSeriesEpisodes(
+                                                            selected, base, user, pass);
+                                                }
+                                            })
+                                    .setNegativeButton("Close", null)
+                                    .show();
+                        });
+                    }).start();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
