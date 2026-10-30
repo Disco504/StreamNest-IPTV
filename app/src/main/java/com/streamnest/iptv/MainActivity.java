@@ -414,8 +414,7 @@ public class MainActivity extends Activity {
                     }
                 }
 
-                java.util.Collections.sort(categories,
-                        (a, b) -> a[1].compareToIgnoreCase(b[1]));
+
 
                 int previewCount = Math.min(categories.size(), 5);
                 for (int c = 0; c < previewCount; c++) {
@@ -841,8 +840,7 @@ public class MainActivity extends Activity {
                     String name = item.optString("category_name", "Uncategorized");
                     if (!id.isEmpty()) categories.add(new String[]{id, name});
                 }
-                java.util.Collections.sort(categories,
-                        (a, b) -> a[1].compareToIgnoreCase(b[1]));
+
             } catch (Exception e) {
                 failure = e.getMessage() == null
                         ? "Could not load series categories." : e.getMessage();
