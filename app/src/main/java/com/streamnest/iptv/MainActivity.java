@@ -503,7 +503,6 @@ public class MainActivity extends Activity {
         releaseGuidePreview();
         showingLiveTv = false;
         showingTvGuide = false;
-
         screen = new LinearLayout(this);
         screen.setOrientation(LinearLayout.VERTICAL);
         screen.setBackgroundColor(NAVY);
@@ -514,14 +513,13 @@ public class MainActivity extends Activity {
         heading.setTypeface(null, Typeface.BOLD);
         screen.addView(heading);
 
-        TextView status = label("Loading series...", 16);
+        TextView status = label("Loading categories...", 16);
         screen.addView(status);
-
-        ScrollView listScroll = new ScrollView(this);
-        LinearLayout seriesList = new LinearLayout(this);
-        seriesList.setOrientation(LinearLayout.VERTICAL);
-        listScroll.addView(seriesList);
-        screen.addView(listScroll, new LinearLayout.LayoutParams(
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout categoryList = new LinearLayout(this);
+        categoryList.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(categoryList);
+        screen.addView(scroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         TextView back = label("BACK TO HOME", 16);
@@ -533,69 +531,138 @@ public class MainActivity extends Activity {
         setContentView(screen);
 
         new Thread(() -> {
+            ArrayList<String[]> categories = new ArrayList<>();
+            String failure = null;
+            try {
+                String api = base + "/player_api.php?username="
+                        + apiEncode(user) + "&password=" + apiEncode(pass);
+                JSONArray result = getXtreamArray(
+                        api + "&action=get_series_categories");
+                for (int i = 0; i < result.length(); i++) {
+                    JSONObject item = result.getJSONObject(i);
+                    String id = item.optString("category_id", "");
+                    String name = item.optString("category_name", "Uncategorized");
+                    if (!id.isEmpty()) categories.add(new String[]{id, name});
+                }
+                java.util.Collections.sort(categories,
+                        (a, b) -> a[1].compareToIgnoreCase(b[1]));
+            } catch (Exception e) {
+                failure = e.getMessage() == null
+                        ? "Could not load series categories." : e.getMessage();
+            }
+            final String error = failure;
+            runOnUiThread(() -> {
+                categoryList.removeAllViews();
+                if (error != null) {
+                    status.setText("Unable to load categories: " + error);
+                    return;
+                }
+                status.setText(categories.size() + " categories");
+                if (categories.isEmpty()) {
+                    categoryList.addView(label(
+                            "No TV series categories were returned.", 16));
+                    return;
+                }
+                for (String[] category : categories) {
+                    TextView item = label(category[1] + "  \u25B6", 18);
+                    item.setTextColor(Color.WHITE);
+                    item.setBackgroundColor(PANEL);
+                    item.setFocusable(true);
+                    item.setClickable(true);
+                    item.setPadding(dp(12), dp(14), dp(12), dp(14));
+                    item.setOnFocusChangeListener((v, focused) ->
+                            v.setBackgroundColor(focused ? BLUE : PANEL));
+                    item.setOnClickListener(v -> showSeriesInCategory(
+                            category[0], category[1], base, user, pass));
+                    LinearLayout.LayoutParams params =
+                            new LinearLayout.LayoutParams(
+                                    LinearLayout.LayoutParams.MATCH_PARENT,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT);
+                    params.setMargins(0, dp(3), 0, dp(3));
+                    categoryList.addView(item, params);
+                }
+                if (categoryList.getChildCount() > 0) {
+                    categoryList.getChildAt(0).requestFocus();
+                }
+            });
+        }).start();
+    }
+
+    private void showSeriesInCategory(
+            String categoryId, String categoryName,
+            String base, String user, String pass) {
+        releaseGuidePreview();
+        showingLiveTv = false;
+        showingTvGuide = false;
+        screen = new LinearLayout(this);
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.setBackgroundColor(NAVY);
+        screen.setPadding(dp(12), dp(8), dp(12), dp(8));
+
+        TextView heading = label(categoryName, 22);
+        heading.setTextColor(Color.rgb(95, 190, 255));
+        heading.setTypeface(null, Typeface.BOLD);
+        screen.addView(heading);
+        TextView status = label("Loading shows...", 16);
+        screen.addView(status);
+        ScrollView listScroll = new ScrollView(this);
+        LinearLayout seriesList = new LinearLayout(this);
+        seriesList.setOrientation(LinearLayout.VERTICAL);
+        listScroll.addView(seriesList);
+        screen.addView(listScroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        TextView back = label("BACK TO CATEGORIES", 16);
+        back.setFocusable(true);
+        back.setClickable(true);
+        back.setPadding(dp(8), dp(12), dp(8), dp(12));
+        back.setOnClickListener(v -> showSeries());
+        screen.addView(back);
+        setContentView(screen);
+
+        new Thread(() -> {
             ArrayList<Channel> loaded = new ArrayList<>();
             String failure = null;
             try {
                 String api = base + "/player_api.php?username="
                         + apiEncode(user) + "&password=" + apiEncode(pass);
-
-                JSONArray categories = getXtreamArray(api + "&action=get_series_categories");
-                Map<String, String> categoryNames = new HashMap<>();
-                for (int i = 0; i < categories.length(); i++) {
-                    JSONObject item = categories.getJSONObject(i);
-                    categoryNames.put(item.optString("category_id", ""),
-                            item.optString("category_name", "Uncategorized"));
-                }
-
-                JSONArray streams = getXtreamArray(api + "&action=get_series");
+                JSONArray streams = getXtreamArray(
+                        api + "&action=get_series&category_id="
+                                + apiEncode(categoryId));
                 for (int i = 0; i < streams.length(); i++) {
                     JSONObject item = streams.getJSONObject(i);
                     String id = item.optString("series_id", "");
                     if (id.isEmpty()) continue;
-
-                    String categoryId = item.optString("category_id", "");
-                    String group = categoryNames.get(categoryId);
-                    if (group == null || group.isEmpty()) group = "Uncategorized";
-
                     loaded.add(new Channel(
                             item.optString("name", "Untitled series"),
                             id,
-                            group,
+                            categoryName,
                             "",
                             item.optString("cover", "")));
                 }
+                java.util.Collections.sort(loaded,
+                        (a, b) -> a.name.compareToIgnoreCase(b.name));
             } catch (Exception e) {
-                failure = e.getMessage() == null ? "Could not load series." : e.getMessage();
+                failure = e.getMessage() == null
+                        ? "Could not load shows." : e.getMessage();
             }
-
-            java.util.Collections.sort(loaded, (a, b) ->
-                    a.group.compareToIgnoreCase(b.group));
             final String error = failure;
             runOnUiThread(() -> {
                 status.setText(error == null
-                        ? (loaded.size() + " series") : "Unable to load series: " + error);
+                        ? loaded.size() + " shows"
+                        : "Unable to load shows: " + error);
                 seriesList.removeAllViews();
-
                 if (error != null) {
-                    seriesList.addView(label("Check your Xtream login and connection.", 14));
+                    seriesList.addView(label(
+                            "Check your Xtream login and connection.", 14));
                     return;
                 }
                 if (loaded.isEmpty()) {
-                    seriesList.addView(label("No series were returned by your provider.", 16));
+                    seriesList.addView(label(
+                            "No shows were returned in this category.", 16));
                     return;
                 }
-
-                String[] lastGroup = {""};
                 for (Channel series : loaded) {
-                    if (!series.group.equals(lastGroup[0])) {
-                        lastGroup[0] = series.group;
-                        TextView category = label(series.group, 18);
-                        category.setTextColor(Color.rgb(95, 190, 255));
-                        category.setTypeface(null, Typeface.BOLD);
-                        category.setPadding(dp(4), dp(12), dp(4), dp(6));
-                        seriesList.addView(category);
-                    }
-
                     LinearLayout row = new LinearLayout(this);
                     row.setOrientation(LinearLayout.HORIZONTAL);
                     row.setGravity(Gravity.CENTER_VERTICAL);
@@ -604,27 +671,36 @@ public class MainActivity extends Activity {
                     row.setBackgroundColor(PANEL);
                     row.setPadding(dp(8), dp(6), dp(8), dp(6));
 
-                    android.widget.ImageView poster = new android.widget.ImageView(this);
-                    poster.setLayoutParams(new LinearLayout.LayoutParams(dp(64), dp(88)));
-                    poster.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
-                    if (!series.logoUrl.isEmpty()) loadChannelLogo(poster, series.logoUrl);
+                    android.widget.ImageView poster =
+                            new android.widget.ImageView(this);
+                    poster.setLayoutParams(
+                            new LinearLayout.LayoutParams(dp(64), dp(88)));
+                    poster.setScaleType(
+                            android.widget.ImageView.ScaleType.CENTER_CROP);
+                    if (!series.logoUrl.isEmpty()) {
+                        loadChannelLogo(poster, series.logoUrl);
+                    }
                     row.addView(poster);
-
                     TextView name = label(series.name, 16);
                     name.setPadding(dp(12), dp(8), dp(8), dp(8));
                     row.addView(name, new LinearLayout.LayoutParams(
                             0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
                     row.setOnFocusChangeListener((v, focused) ->
                             v.setBackgroundColor(focused ? BLUE : PANEL));
-                    row.setOnClickListener(v -> showSeriesEpisodes(series, base, user, pass));
+                    row.setOnClickListener(v ->
+                            showSeriesEpisodes(series, base, user, pass));
 
-                    LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT);
+                    LinearLayout.LayoutParams rowParams =
+                            new LinearLayout.LayoutParams(
+                                    LinearLayout.LayoutParams.MATCH_PARENT,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT);
                     rowParams.setMargins(0, dp(3), 0, dp(3));
                     seriesList.addView(row, rowParams);
                 }
-                if (seriesList.getChildCount() > 0) seriesList.getChildAt(1).requestFocus();
+                if (seriesList.getChildCount() > 0) {
+                    seriesList.getChildAt(0).requestFocus();
+                }
             });
         }).start();
     }
