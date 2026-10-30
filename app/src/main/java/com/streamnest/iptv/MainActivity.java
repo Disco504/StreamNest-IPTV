@@ -239,7 +239,119 @@ public class MainActivity extends Activity {
         screen.setBackgroundColor(NAVY);
         screen.setPadding(dp(12), dp(8), dp(12), dp(8));
 
-        TextView heading = label("MOVIES", 24);
+        TextView heading = label("MOVIE CATEGORIES", 24);
+        heading.setTextColor(Color.rgb(95, 190, 255));
+        heading.setTypeface(null, Typeface.BOLD);
+        screen.addView(heading);
+
+        TextView status = label("Loading categories...", 16);
+        screen.addView(status);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout categoryList = new LinearLayout(this);
+        categoryList.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(categoryList);
+        screen.addView(scroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        TextView back = label("BACK TO HOME", 16);
+        back.setFocusable(true);
+        back.setClickable(true);
+        back.setPadding(dp(8), dp(12), dp(8), dp(12));
+        back.setOnClickListener(v -> showHomeScreen());
+        screen.addView(back);
+        setContentView(screen);
+
+        new Thread(() -> {
+            ArrayList<String[]> categories = new ArrayList<>();
+            String failure = null;
+
+            try {
+                String api = base + "/player_api.php?username="
+                        + apiEncode(user) + "&password=" + apiEncode(pass);
+
+                JSONArray result = getXtreamArray(
+                        api + "&action=get_vod_categories");
+
+                for (int i = 0; i < result.length(); i++) {
+                    JSONObject item = result.getJSONObject(i);
+                    String id = item.optString("category_id", "");
+                    String name = item.optString("category_name", "Uncategorized");
+
+                    if (!id.isEmpty()) {
+                        categories.add(new String[]{id, name});
+                    }
+                }
+
+                java.util.Collections.sort(categories,
+                        (a, b) -> a[1].compareToIgnoreCase(b[1]));
+
+            } catch (Exception e) {
+                failure = e.getMessage() == null
+                        ? "Could not load movie categories." : e.getMessage();
+            }
+
+            final String error = failure;
+            runOnUiThread(() -> {
+                categoryList.removeAllViews();
+
+                if (error != null) {
+                    status.setText("Unable to load categories: " + error);
+                    return;
+                }
+
+                status.setText(categories.size() + " categories");
+
+                if (categories.isEmpty()) {
+                    categoryList.addView(label(
+                            "No movie categories were returned by your provider.", 16));
+                    return;
+                }
+
+                for (String[] category : categories) {
+                    TextView item = label(category[1] + "  \u25B6", 18);
+                    item.setTextColor(Color.WHITE);
+                    item.setBackgroundColor(PANEL);
+                    item.setFocusable(true);
+                    item.setClickable(true);
+                    item.setPadding(dp(12), dp(14), dp(12), dp(14));
+
+                    LinearLayout.LayoutParams params =
+                            new LinearLayout.LayoutParams(
+                                    LinearLayout.LayoutParams.MATCH_PARENT,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT);
+                    params.setMargins(0, dp(3), 0, dp(3));
+
+                    item.setOnFocusChangeListener((v, focused) ->
+                            v.setBackgroundColor(focused ? BLUE : PANEL));
+                    item.setOnClickListener(v ->
+                            showMoviesInCategory(
+                                    category[0], category[1], base, user, pass));
+
+                    categoryList.addView(item, params);
+                }
+
+                if (categoryList.getChildCount() > 0) {
+                    categoryList.getChildAt(0).requestFocus();
+                }
+            });
+        }).start();
+    }
+
+    private void showMoviesInCategory(
+            String categoryId, String categoryName,
+            String base, String user, String pass) {
+
+        releaseGuidePreview();
+        showingLiveTv = false;
+        showingTvGuide = false;
+
+        screen = new LinearLayout(this);
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.setBackgroundColor(NAVY);
+        screen.setPadding(dp(12), dp(8), dp(12), dp(8));
+
+        TextView heading = label(categoryName, 22);
         heading.setTextColor(Color.rgb(95, 190, 255));
         heading.setTypeface(null, Typeface.BOLD);
         screen.addView(heading);
@@ -254,39 +366,32 @@ public class MainActivity extends Activity {
         screen.addView(listScroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        TextView back = label("BACK TO HOME", 16);
+        TextView back = label("BACK TO CATEGORIES", 16);
         back.setFocusable(true);
         back.setClickable(true);
         back.setPadding(dp(8), dp(12), dp(8), dp(12));
-        back.setOnClickListener(v -> showHomeScreen());
+        back.setOnClickListener(v -> showMovies());
         screen.addView(back);
         setContentView(screen);
 
         new Thread(() -> {
             ArrayList<Channel> loaded = new ArrayList<>();
             String failure = null;
+
             try {
                 String api = base + "/player_api.php?username="
                         + apiEncode(user) + "&password=" + apiEncode(pass);
 
-                JSONArray categories = getXtreamArray(api + "&action=get_vod_categories");
-                Map<String, String> categoryNames = new HashMap<>();
-                for (int i = 0; i < categories.length(); i++) {
-                    JSONObject item = categories.getJSONObject(i);
-                    categoryNames.put(item.optString("category_id", ""),
-                            item.optString("category_name", "Uncategorized"));
-                }
+                JSONArray streams = getXtreamArray(
+                        api + "&action=get_vod_streams&category_id="
+                                + apiEncode(categoryId));
 
-                JSONArray streams = getXtreamArray(api + "&action=get_vod_streams");
                 for (int i = 0; i < streams.length(); i++) {
                     JSONObject item = streams.getJSONObject(i);
                     String id = item.optString("stream_id", "");
                     if (id.isEmpty()) continue;
 
                     String extension = item.optString("container_extension", "mp4");
-                    String categoryId = item.optString("category_id", "");
-                    String group = categoryNames.get(categoryId);
-                    if (group == null || group.isEmpty()) group = "Uncategorized";
 
                     String url = base + "/movie/" + Uri.encode(user) + "/"
                             + Uri.encode(pass) + "/" + Uri.encode(id) + "."
@@ -295,47 +400,38 @@ public class MainActivity extends Activity {
                     loaded.add(new Channel(
                             item.optString("name", "Untitled movie"),
                             url,
-                            group,
+                            categoryName,
                             "",
                             item.optString("stream_icon", "")));
                 }
+
+                java.util.Collections.sort(loaded,
+                        (a, b) -> a.name.compareToIgnoreCase(b.name));
+
             } catch (Exception e) {
-                failure = e.getMessage() == null ? "Could not load movies." : e.getMessage();
+                failure = e.getMessage() == null
+                        ? "Could not load movies." : e.getMessage();
             }
 
             final String error = failure;
             runOnUiThread(() -> {
                 status.setText(error == null
-                        ? (loaded.size() + " movies") : "Unable to load movies: " + error);
+                        ? loaded.size() + " movies" : "Unable to load movies: " + error);
                 movieList.removeAllViews();
 
                 if (error != null) {
-                    TextView retry = label("Check your Xtream login and connection.", 14);
-                    movieList.addView(retry);
+                    movieList.addView(label(
+                            "Check your Xtream login and connection.", 14));
                     return;
                 }
+
                 if (loaded.isEmpty()) {
-                    movieList.addView(label("No movies were returned by your provider.", 16));
+                    movieList.addView(label(
+                            "No movies were returned in this category.", 16));
                     return;
                 }
 
-                java.util.Collections.sort(loaded, (a, b) -> {
-                    int groupOrder = a.group.compareToIgnoreCase(b.group);
-                    if (groupOrder != 0) return groupOrder;
-                    return a.name.compareToIgnoreCase(b.name);
-                });
-
-                String lastGroup[] = {""};
                 for (Channel movie : loaded) {
-                    if (!movie.group.equals(lastGroup[0])) {
-                        lastGroup[0] = movie.group;
-                        TextView category = label(movie.group, 18);
-                        category.setTextColor(Color.rgb(95, 190, 255));
-                        category.setTypeface(null, Typeface.BOLD);
-                        category.setPadding(dp(4), dp(12), dp(4), dp(6));
-                        movieList.addView(category);
-                    }
-
                     LinearLayout row = new LinearLayout(this);
                     row.setOrientation(LinearLayout.HORIZONTAL);
                     row.setGravity(Gravity.CENTER_VERTICAL);
@@ -344,27 +440,38 @@ public class MainActivity extends Activity {
                     row.setBackgroundColor(PANEL);
                     row.setPadding(dp(8), dp(6), dp(8), dp(6));
 
-                    android.widget.ImageView poster = new android.widget.ImageView(this);
-                    poster.setLayoutParams(new LinearLayout.LayoutParams(dp(64), dp(88)));
-                    poster.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
-                    if (!movie.logoUrl.isEmpty()) loadChannelLogo(poster, movie.logoUrl);
+                    android.widget.ImageView poster =
+                            new android.widget.ImageView(this);
+                    poster.setLayoutParams(
+                            new LinearLayout.LayoutParams(dp(64), dp(88)));
+                    poster.setScaleType(
+                            android.widget.ImageView.ScaleType.CENTER_CROP);
+
+                    if (!movie.logoUrl.isEmpty()) {
+                        loadChannelLogo(poster, movie.logoUrl);
+                    }
                     row.addView(poster);
 
                     TextView name = label(movie.name, 16);
                     name.setPadding(dp(12), dp(8), dp(8), dp(8));
                     row.addView(name, new LinearLayout.LayoutParams(
                             0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
                     row.setOnFocusChangeListener((v, focused) ->
                             v.setBackgroundColor(focused ? BLUE : PANEL));
                     row.setOnClickListener(v -> playVodItem(movie));
 
-                    LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT);
+                    LinearLayout.LayoutParams rowParams =
+                            new LinearLayout.LayoutParams(
+                                    LinearLayout.LayoutParams.MATCH_PARENT,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT);
                     rowParams.setMargins(0, dp(3), 0, dp(3));
                     movieList.addView(row, rowParams);
                 }
-                if (movieList.getChildCount() > 0) movieList.getChildAt(1).requestFocus();
+
+                if (movieList.getChildCount() > 0) {
+                    movieList.getChildAt(0).requestFocus();
+                }
             });
         }).start();
     }
