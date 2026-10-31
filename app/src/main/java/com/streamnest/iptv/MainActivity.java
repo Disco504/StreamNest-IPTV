@@ -693,8 +693,6 @@ public class MainActivity extends Activity {
                     featuredHandler.postDelayed(featuredRotation, 8000);
                 }
 
-                addMovieCategoryBrowser(content, loadedCategories, base, user, pass);
-
                 for (int i = 0; i < loadedRows.size(); i++) {
                     ArrayList<Channel> movies = loadedRows.get(i);
                     if (!movies.isEmpty()) {
@@ -703,6 +701,8 @@ public class MainActivity extends Activity {
                                 movies, base, user, pass);
                     }
                 }
+
+                addMovieCategoryBrowser(content, loadedCategories, base, user, pass);
             });
         }).start();
     }
@@ -823,46 +823,42 @@ public class MainActivity extends Activity {
                     return;
                 }
 
+                int screenWidthDp = getResources().getConfiguration().screenWidthDp;
+                int columns = screenWidthDp < 600
+                        ? 2 : Math.max(4, Math.min(6, screenWidthDp / 170));
+
+                LinearLayout gridRow = null;
+                int column = 0;
+
                 for (Channel movie : loaded) {
-                    LinearLayout row = new LinearLayout(this);
-                    row.setOrientation(LinearLayout.HORIZONTAL);
-                    row.setGravity(Gravity.CENTER_VERTICAL);
-                    row.setFocusable(true);
-                    row.setClickable(true);
-                    row.setBackgroundColor(PANEL);
-                    row.setPadding(dp(8), dp(6), dp(8), dp(6));
+                    if (column == 0) {
+                        gridRow = new LinearLayout(this);
+                        gridRow.setOrientation(LinearLayout.HORIZONTAL);
+                        gridRow.setGravity(Gravity.TOP);
 
-                    android.widget.ImageView poster =
-                            new android.widget.ImageView(this);
-                    poster.setLayoutParams(
-                            new LinearLayout.LayoutParams(dp(64), dp(88)));
-                    poster.setScaleType(
-                            android.widget.ImageView.ScaleType.CENTER_CROP);
-
-                    if (!movie.logoUrl.isEmpty()) {
-                        loadChannelLogo(poster, movie.logoUrl);
+                        movieList.addView(gridRow,
+                                new LinearLayout.LayoutParams(
+                                        LinearLayout.LayoutParams.MATCH_PARENT,
+                                        LinearLayout.LayoutParams.WRAP_CONTENT));
                     }
-                    row.addView(poster);
 
-                    TextView name = label(movie.name, 16);
-                    name.setPadding(dp(12), dp(8), dp(8), dp(8));
-                    row.addView(name, new LinearLayout.LayoutParams(
-                            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-                    row.setOnFocusChangeListener((v, focused) ->
-                            v.setBackgroundColor(focused ? BLUE : PANEL));
-                    row.setOnClickListener(v -> playVodItem(movie));
-
-                    LinearLayout.LayoutParams rowParams =
+                    LinearLayout card = createMoviePosterCard(movie);
+                    LinearLayout.LayoutParams cardParams =
                             new LinearLayout.LayoutParams(
-                                    LinearLayout.LayoutParams.MATCH_PARENT,
-                                    LinearLayout.LayoutParams.WRAP_CONTENT);
-                    rowParams.setMargins(0, dp(3), 0, dp(3));
-                    movieList.addView(row, rowParams);
+                                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                    cardParams.setMargins(dp(4), dp(5), dp(4), dp(8));
+                    gridRow.addView(card, cardParams);
+
+                    column++;
+                    if (column >= columns) column = 0;
                 }
 
                 if (movieList.getChildCount() > 0) {
-                    movieList.getChildAt(0).requestFocus();
+                    LinearLayout firstRow =
+                            (LinearLayout) movieList.getChildAt(0);
+                    if (firstRow.getChildCount() > 0) {
+                        firstRow.getChildAt(0).requestFocus();
+                    }
                 }
             });
         }).start();
