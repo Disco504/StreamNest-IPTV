@@ -334,6 +334,68 @@ public class MainActivity extends Activity {
         parent.addView(section);
     }
 
+    private void addMovieCategoryBrowser(
+            LinearLayout parent, ArrayList<String[]> categories,
+            String base, String user, String pass) {
+
+        TextView title = label("BROWSE ALL CATEGORIES", 19);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(WHITE);
+        title.setPadding(0, dp(14), 0, dp(8));
+        parent.addView(title);
+
+        ArrayList<String[]> ordered = new ArrayList<>();
+        ordered.add(new String[]{"__ALL_MOVIES__", "ALL MOVIES"});
+
+        String[] releases = null;
+        for (String[] category : categories) {
+            if (category[1].toLowerCase().contains("new release")) {
+                releases = category;
+                break;
+            }
+        }
+
+        if (releases != null) ordered.add(releases);
+
+        for (String[] category : categories) {
+            if (category != releases) ordered.add(category);
+        }
+
+        for (int i = 0; i < ordered.size(); i += 2) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+
+            for (int j = 0; j < 2; j++) {
+                int index = i + j;
+                if (index < ordered.size()) {
+                    String[] category = ordered.get(index);
+                    TextView button = label(category[1], 15);
+                    button.setTextColor(WHITE);
+                    button.setFocusable(true);
+                    button.setClickable(true);
+                    button.setMinHeight(dp(48));
+                    button.setPadding(dp(10), dp(10), dp(10), dp(10));
+                    button.setBackgroundColor(PANEL);
+                    button.setOnFocusChangeListener((v, focused) ->
+                            v.setBackgroundColor(focused ? BLUE : PANEL));
+                    button.setOnClickListener(v ->
+                            showMoviesInCategory(category[0], category[1],
+                                    base, user, pass));
+
+                    LinearLayout.LayoutParams params =
+                            new LinearLayout.LayoutParams(0,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                    params.setMargins(dp(3), dp(3), dp(3), dp(3));
+                    row.addView(button, params);
+                } else {
+                    row.addView(new android.view.View(this),
+                            new LinearLayout.LayoutParams(0, dp(48), 1f));
+                }
+            }
+            parent.addView(row);
+        }
+    }
+
     private void showMovies() {
         stopFeaturedRotation();
 
@@ -416,6 +478,15 @@ public class MainActivity extends Activity {
 
 
 
+                for (int i = 0; i < categories.size(); i++) {
+                    if (categories.get(i)[1].toLowerCase()
+                            .contains("new release")) {
+                        String[] item = categories.remove(i);
+                        categories.add(0, item);
+                        break;
+                    }
+                }
+
                 int previewCount = Math.min(categories.size(), 5);
                 for (int c = 0; c < previewCount; c++) {
                     String[] category = categories.get(c);
@@ -442,8 +513,7 @@ public class MainActivity extends Activity {
                                 item.optString("stream_icon", "")));
                     }
 
-                    java.util.Collections.sort(loaded,
-                            (a, b) -> a.name.compareToIgnoreCase(b.name));
+
                     categoryMovies.add(loaded);
 
                     for (int i = 0; i < Math.min(loaded.size(), 8); i++) {
@@ -579,6 +649,29 @@ public class MainActivity extends Activity {
                         }
                     });
                     actions.addView(info);
+                    previous.setId(android.view.View.generateViewId());
+                                        watch.setId(android.view.View.generateViewId());
+                                        next.setId(android.view.View.generateViewId());
+                                        info.setId(android.view.View.generateViewId());
+
+                                        TextView[] actionButtons = {
+                                                previous, watch, next, info
+                                        };
+                                        for (TextView button : actionButtons) {
+                                            button.setFocusable(true);
+                                            button.setClickable(true);
+                                            button.setBackgroundColor(PANEL);
+                                            button.setOnFocusChangeListener((v, focused) ->
+                                                    v.setBackgroundColor(focused ? BLUE : PANEL));
+                                        }
+
+                                        previous.setNextFocusRightId(watch.getId());
+                                        watch.setNextFocusLeftId(previous.getId());
+                                        watch.setNextFocusRightId(next.getId());
+                                        next.setNextFocusLeftId(watch.getId());
+                                        next.setNextFocusRightId(info.getId());
+                                        info.setNextFocusLeftId(next.getId());
+
                     details.addView(actions);
 
                     hero.addView(details, new LinearLayout.LayoutParams(
@@ -599,6 +692,8 @@ public class MainActivity extends Activity {
                     };
                     featuredHandler.postDelayed(featuredRotation, 8000);
                 }
+
+                addMovieCategoryBrowser(content, loadedCategories, base, user, pass);
 
                 for (int i = 0; i < loadedRows.size(); i++) {
                     ArrayList<Channel> movies = loadedRows.get(i);
@@ -678,9 +773,11 @@ public class MainActivity extends Activity {
                 String api = base + "/player_api.php?username="
                         + apiEncode(user) + "&password=" + apiEncode(pass);
 
-                JSONArray streams = getXtreamArray(
-                        api + "&action=get_vod_streams&category_id="
-                                + apiEncode(categoryId));
+                String streamsUrl = api + "&action=get_vod_streams";
+                if (!"__ALL_MOVIES__".equals(categoryId)) {
+                    streamsUrl += "&category_id=" + apiEncode(categoryId);
+                }
+                JSONArray streams = getXtreamArray(streamsUrl);
 
                 for (int i = 0; i < streams.length(); i++) {
                     JSONObject item = streams.getJSONObject(i);
@@ -701,8 +798,7 @@ public class MainActivity extends Activity {
                             item.optString("stream_icon", "")));
                 }
 
-                java.util.Collections.sort(loaded,
-                        (a, b) -> a.name.compareToIgnoreCase(b.name));
+
 
             } catch (Exception e) {
                 failure = e.getMessage() == null
