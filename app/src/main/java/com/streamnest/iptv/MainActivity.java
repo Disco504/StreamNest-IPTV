@@ -85,6 +85,14 @@ public class MainActivity extends Activity {
     private boolean showingLiveTv = false;
     private boolean showingTvGuide = false;
     private ScrollView guideCategoryScrollView;
+    private boolean showingTvVod = false;
+    private ScrollView tvVodMainMenuScroll;
+    private ScrollView tvVodCategoryScroll;
+    private LinearLayout tvVodCategoryList;
+    private LinearLayout tvVodMovieGrid;
+    private TextView tvVodMovieStatus;
+    private String tvVodSelectedCategoryId = "";
+    private String tvVodSelectedCategoryName = "";
 
     private ExoPlayer previewPlayer;
     private PlayerView previewPlayerView;
@@ -183,6 +191,41 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        if (showingTvVod
+                && event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+            if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_LEFT) {
+                if (tvVodCategoryScroll != null
+                        && tvVodCategoryScroll.getVisibility() != View.VISIBLE) {
+                    tvVodCategoryScroll.setVisibility(View.VISIBLE);
+                    focusTvVodSelectedCategory();
+                    return true;
+                }
+                if (tvVodMainMenuScroll != null
+                        && tvVodMainMenuScroll.getVisibility() != View.VISIBLE) {
+                    tvVodMainMenuScroll.setVisibility(View.VISIBLE);
+                    View menu = tvVodMainMenuScroll.getChildAt(0);
+                    if (menu instanceof LinearLayout
+                            && ((LinearLayout) menu).getChildCount() > 0) {
+                        ((LinearLayout) menu).getChildAt(0).requestFocus();
+                    }
+                    return true;
+                }
+            }
+            if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) {
+                if (tvVodMainMenuScroll != null
+                        && tvVodMainMenuScroll.getVisibility() == View.VISIBLE) {
+                    tvVodMainMenuScroll.setVisibility(View.GONE);
+                    focusTvVodSelectedCategory();
+                    return true;
+                }
+                if (tvVodCategoryScroll != null
+                        && tvVodCategoryScroll.getVisibility() == View.VISIBLE) {
+                    tvVodCategoryScroll.setVisibility(View.GONE);
+                    focusFirstTvVodPoster();
+                    return true;
+                }
+            }
+        }
         if (showingTvGuide
                 && event.getAction() == android.view.KeyEvent.ACTION_DOWN
                 && guideCategoryScrollView != null) {
@@ -244,7 +287,10 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (showingLiveTv || showingTvGuide) {
+        if (showingTvVod) {
+            showingTvVod = false;
+            showHomeScreen();
+        } else if (showingLiveTv || showingTvGuide) {
             showHomeScreen();
         } else {
             super.onBackPressed();
@@ -432,6 +478,10 @@ public class MainActivity extends Activity {
     }
 
     private void showMovies() {
+        if (isTelevisionDevice()) {
+            showTvMovies();
+            return;
+        }
         stopFeaturedRotation();
 
         String base = getPreferences(MODE_PRIVATE).getString("xtream_server", "");
@@ -742,6 +792,269 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+
+    private void showTvMovies() {
+        String base = getPreferences(MODE_PRIVATE).getString("xtream_server", "");
+        String user = getPreferences(MODE_PRIVATE).getString("xtream_username", "");
+        String pass = getPreferences(MODE_PRIVATE).getString("xtream_password", "");
+
+        if (base.isEmpty() || user.isEmpty() || pass.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Movies")
+                    .setMessage("Connect your Xtream Codes account in Settings.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+
+        stopFeaturedRotation();
+        releaseGuidePreview();
+        showingLiveTv = false;
+        showingTvGuide = false;
+        showingTvVod = true;
+
+        screen = new LinearLayout(this);
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.setBackgroundColor(NAVY);
+        screen.setPadding(dp(10), dp(8), dp(10), dp(8));
+
+        TextView heading = label("MOVIES", 24);
+        heading.setTextColor(Color.rgb(95, 190, 255));
+        heading.setTypeface(null, Typeface.BOLD);
+        screen.addView(heading);
+
+        tvVodMovieStatus = label("Loading your movie library...", 14);
+        tvVodMovieStatus.setTextColor(MUTED);
+        screen.addView(tvVodMovieStatus);
+
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        screen.addView(body, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        tvVodMainMenuScroll = new ScrollView(this);
+        tvVodMainMenuScroll.setVisibility(View.GONE);
+        LinearLayout mainMenu = new LinearLayout(this);
+        mainMenu.setOrientation(LinearLayout.VERTICAL);
+        mainMenu.setPadding(dp(5), dp(5), dp(5), dp(5));
+        addHomeSection(mainMenu, "SEARCH", "Find live TV channels");
+        addHomeSection(mainMenu, "TV GUIDE", "Browse the TV schedule");
+        addHomeSection(mainMenu, "MOVIES", "Browse movies");
+        addHomeSection(mainMenu, "TV SERIES", "Browse TV series");
+        addHomeSection(mainMenu, "CATCH-UP", "Recently aired programs");
+        addHomeSection(mainMenu, "SETTINGS", "Playlist and app settings");
+        tvVodMainMenuScroll.addView(mainMenu);
+        body.addView(tvVodMainMenuScroll, new LinearLayout.LayoutParams(
+                dp(190), LinearLayout.LayoutParams.MATCH_PARENT));
+
+        tvVodCategoryScroll = new ScrollView(this);
+        tvVodCategoryScroll.setVisibility(View.GONE);
+        tvVodCategoryList = new LinearLayout(this);
+        tvVodCategoryList.setOrientation(LinearLayout.VERTICAL);
+        tvVodCategoryList.setPadding(dp(5), dp(5), dp(5), dp(5));
+        tvVodCategoryScroll.addView(tvVodCategoryList);
+        body.addView(tvVodCategoryScroll, new LinearLayout.LayoutParams(
+                dp(190), LinearLayout.LayoutParams.MATCH_PARENT));
+
+        ScrollView gridScroll = new ScrollView(this);
+        tvVodMovieGrid = new LinearLayout(this);
+        tvVodMovieGrid.setOrientation(LinearLayout.VERTICAL);
+        tvVodMovieGrid.setPadding(dp(5), dp(5), dp(5), dp(5));
+        gridScroll.addView(tvVodMovieGrid);
+        body.addView(gridScroll, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
+
+        setContentView(screen);
+
+        new Thread(() -> {
+            ArrayList<String[]> categories = new ArrayList<>();
+            String failure = null;
+            try {
+                String api = base + "/player_api.php?username="
+                        + apiEncode(user) + "&password=" + apiEncode(pass);
+                JSONArray result = getXtreamArray(
+                        api + "&action=get_vod_categories");
+
+                for (int i = 0; i < result.length(); i++) {
+                    JSONObject item = result.getJSONObject(i);
+                    String id = item.optString("category_id", "");
+                    String name = item.optString("category_name", "Uncategorized");
+                    if (!id.isEmpty()) categories.add(new String[]{id, name});
+                }
+
+                for (int i = 0; i < categories.size(); i++) {
+                    if (categories.get(i)[1].toLowerCase().contains("new release")) {
+                        String[] item = categories.remove(i);
+                        categories.add(0, item);
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                failure = e.getMessage() == null
+                        ? "Could not load movie categories." : e.getMessage();
+            }
+
+            final String error = failure;
+            final ArrayList<String[]> loadedCategories = categories;
+            runOnUiThread(() -> {
+                tvVodCategoryList.removeAllViews();
+
+                if (error != null) {
+                    tvVodMovieStatus.setText("Unable to load categories: " + error);
+                    return;
+                }
+                if (loadedCategories.isEmpty()) {
+                    tvVodMovieStatus.setText("No movie categories were returned.");
+                    return;
+                }
+
+                tvVodCategoryList.addView(createTvVodCategoryItem(
+                        "__ALL_MOVIES__", "ALL MOVIES", base, user, pass));
+
+                for (String[] category : loadedCategories) {
+                    tvVodCategoryList.addView(createTvVodCategoryItem(
+                            category[0], category[1], base, user, pass));
+                }
+
+                String[] first = loadedCategories.get(0);
+                loadTvVodMovieGrid(first[0], first[1], base, user, pass);
+            });
+        }).start();
+    }
+
+    private TextView createTvVodCategoryItem(
+            String id, String name, String base, String user, String pass) {
+        TextView item = label(name, 15);
+        item.setTextColor(WHITE);
+        item.setBackgroundColor(PANEL);
+        item.setFocusable(true);
+        item.setClickable(true);
+        item.setPadding(dp(10), dp(12), dp(8), dp(12));
+        item.setTag(id);
+        item.setOnFocusChangeListener((v, focused) ->
+                v.setBackgroundColor(focused ? BLUE : PANEL));
+        item.setOnClickListener(v -> {
+            tvVodSelectedCategoryId = id;
+            tvVodSelectedCategoryName = name;
+            tvVodMainMenuScroll.setVisibility(View.GONE);
+            tvVodCategoryScroll.setVisibility(View.GONE);
+            loadTvVodMovieGrid(id, name, base, user, pass);
+        });
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, dp(3), 0, dp(3));
+        item.setLayoutParams(params);
+        return item;
+    }
+
+    private void loadTvVodMovieGrid(
+            String categoryId, String categoryName,
+            String base, String user, String pass) {
+        tvVodSelectedCategoryId = categoryId;
+        tvVodSelectedCategoryName = categoryName;
+        tvVodMovieStatus.setText("Loading " + categoryName + "...");
+        tvVodMovieGrid.removeAllViews();
+
+        new Thread(() -> {
+            ArrayList<Channel> loaded = new ArrayList<>();
+            String failure = null;
+            try {
+                String api = base + "/player_api.php?username="
+                        + apiEncode(user) + "&password=" + apiEncode(pass);
+                String streamsUrl = api + "&action=get_vod_streams";
+                if (!"__ALL_MOVIES__".equals(categoryId)) {
+                    streamsUrl += "&category_id=" + apiEncode(categoryId);
+                }
+                JSONArray streams = getXtreamArray(streamsUrl);
+
+                for (int i = 0; i < streams.length(); i++) {
+                    JSONObject item = streams.getJSONObject(i);
+                    String id = item.optString("stream_id", "");
+                    if (id.isEmpty()) continue;
+                    String extension = item.optString("container_extension", "mp4");
+                    String url = base + "/movie/" + Uri.encode(user) + "/"
+                            + Uri.encode(pass) + "/" + Uri.encode(id) + "."
+                            + Uri.encode(extension);
+                    loaded.add(new Channel(
+                            item.optString("name", "Untitled movie"),
+                            url, categoryName, "",
+                            item.optString("stream_icon", "")));
+                }
+            } catch (Exception e) {
+                failure = e.getMessage() == null
+                        ? "Could not load movies." : e.getMessage();
+            }
+
+            final String error = failure;
+            runOnUiThread(() -> {
+                tvVodMovieGrid.removeAllViews();
+                if (error != null) {
+                    tvVodMovieStatus.setText("Unable to load movies: " + error);
+                    return;
+                }
+                tvVodMovieStatus.setText(loaded.size() + " movies");
+
+                if (loaded.isEmpty()) {
+                    tvVodMovieGrid.addView(label(
+                            "No movies were returned in this category.", 16));
+                    return;
+                }
+
+                int width = getResources().getConfiguration().screenWidthDp;
+                int columns = Math.max(3, Math.min(7, width / 170));
+                LinearLayout gridRow = null;
+                int column = 0;
+
+                for (Channel movie : loaded) {
+                    if (column == 0) {
+                        gridRow = new LinearLayout(this);
+                        gridRow.setOrientation(LinearLayout.HORIZONTAL);
+                        gridRow.setGravity(Gravity.TOP);
+                        tvVodMovieGrid.addView(gridRow,
+                                new LinearLayout.LayoutParams(
+                                        LinearLayout.LayoutParams.MATCH_PARENT,
+                                        LinearLayout.LayoutParams.WRAP_CONTENT));
+                    }
+
+                    LinearLayout card = createMoviePosterCard(movie);
+                    LinearLayout.LayoutParams cardParams =
+                            new LinearLayout.LayoutParams(
+                                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                    cardParams.setMargins(dp(4), dp(5), dp(4), dp(8));
+                    gridRow.addView(card, cardParams);
+
+                    column++;
+                    if (column >= columns) column = 0;
+                }
+                focusFirstTvVodPoster();
+            });
+        }).start();
+    }
+
+    private void focusTvVodSelectedCategory() {
+        if (tvVodCategoryList == null) return;
+        for (int i = 0; i < tvVodCategoryList.getChildCount(); i++) {
+            View child = tvVodCategoryList.getChildAt(i);
+            if (tvVodSelectedCategoryId.equals(String.valueOf(child.getTag()))) {
+                child.requestFocus();
+                return;
+            }
+        }
+        if (tvVodCategoryList.getChildCount() > 0) {
+            tvVodCategoryList.getChildAt(0).requestFocus();
+        }
+    }
+
+    private void focusFirstTvVodPoster() {
+        if (tvVodMovieGrid == null || tvVodMovieGrid.getChildCount() == 0) return;
+        View firstRow = tvVodMovieGrid.getChildAt(0);
+        if (firstRow instanceof LinearLayout
+                && ((LinearLayout) firstRow).getChildCount() > 0) {
+            ((LinearLayout) firstRow).getChildAt(0).requestFocus();
+        }
+    }
+
     private void updateFeaturedMovie() {
         if (featuredMovies.isEmpty()
                 || featuredMoviePoster == null
@@ -910,6 +1223,7 @@ public class MainActivity extends Activity {
 
 
     private void showSeries() {
+        showingTvVod = false;
         String base = getPreferences(MODE_PRIVATE).getString("xtream_server", "");
         String user = getPreferences(MODE_PRIVATE).getString("xtream_username", "");
         String pass = getPreferences(MODE_PRIVATE).getString("xtream_password", "");
@@ -1301,6 +1615,7 @@ public class MainActivity extends Activity {
     }
 
     private void showHomeScreen() {
+        showingTvVod = false;
         stopFeaturedRotation();
         releaseGuidePreview();
         if (isPhoneLayout()) {
@@ -2279,6 +2594,7 @@ addHomeSection(homeMenu, "SEARCH",
     }
 
     private void showTvGuide() {
+        showingTvVod = false;
         showingTvGuide = true;
         String epgUrl = getPreferences(MODE_PRIVATE).getString("epg_url", "");
         if (epgUrl.trim().isEmpty()) {
