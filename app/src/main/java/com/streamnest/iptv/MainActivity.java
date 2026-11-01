@@ -2422,22 +2422,47 @@ addHomeSection(homeMenu, "SEARCH",
         return value == null ? "" : value.trim().toLowerCase(Locale.US);
     }
 
+    private static final ThreadLocal<SimpleDateFormat> XMLTV_TIME_WITH_ZONE =
+            new ThreadLocal<SimpleDateFormat>() {
+                @Override
+                protected SimpleDateFormat initialValue() {
+                    SimpleDateFormat format =
+                            new SimpleDateFormat("yyyyMMddHHmmss Z", Locale.US);
+                    format.setLenient(false);
+                    return format;
+                }
+            };
+
+    private static final ThreadLocal<SimpleDateFormat> XMLTV_TIME_DEFAULT_ZONE =
+            new ThreadLocal<SimpleDateFormat>() {
+                @Override
+                protected SimpleDateFormat initialValue() {
+                    SimpleDateFormat format =
+                            new SimpleDateFormat("yyyyMMddHHmmss", Locale.US);
+                    format.setLenient(false);
+                    return format;
+                }
+            };
+
     private long parseXmltvTime(String value) {
         if (value == null || value.trim().isEmpty()) {
             return 0;
         }
-        String[] patterns = {"yyyyMMddHHmmss Z", "yyyyMMddHHmmss"};
-        for (String pattern : patterns) {
-            try {
-                SimpleDateFormat format = new SimpleDateFormat(pattern, Locale.US);
-                format.setLenient(false);
-                Date date = format.parse(value.trim());
-                if (date != null) {
-                    return date.getTime();
-                }
-            } catch (ParseException ignored) {
-            }
+
+        String timestamp = value.trim();
+
+        try {
+            Date date = XMLTV_TIME_WITH_ZONE.get().parse(timestamp);
+            if (date != null) return date.getTime();
+        } catch (ParseException ignored) {
         }
+
+        try {
+            Date date = XMLTV_TIME_DEFAULT_ZONE.get().parse(timestamp);
+            if (date != null) return date.getTime();
+        } catch (ParseException ignored) {
+        }
+
         return 0;
     }
 
@@ -2451,14 +2476,19 @@ addHomeSection(homeMenu, "SEARCH",
         long horizon = now + 24L * 60L * 60L * 1000L;
         int matched = 0;
         Map<String, ArrayList<EpgProgram>> grouped = new HashMap<>();
+        Map<String, Integer> categoryCounts = new HashMap<>();
+
         for (Channel channel : channels) {
             String category = channel.group;
             if (category == null || category.trim().isEmpty()) {
                 category = "Uncategorized";
             }
+
             if (!grouped.containsKey(category)) {
-                grouped.put(category, new ArrayList<>());
+                grouped.put(category, new ArrayList<EpgProgram>());
             }
+            Integer count = categoryCounts.get(category);
+            categoryCounts.put(category, count == null ? 1 : count + 1);
         }
 
         for (EpgProgram program : programs) {
@@ -2516,16 +2546,8 @@ addHomeSection(homeMenu, "SEARCH",
         TreeSet<String> categories = new TreeSet<>(grouped.keySet());
 
         for (String category : categories) {
-            int channelCount = 0;
-            for (Channel channel : channels) {
-                String channelCategory = channel.group;
-                if (channelCategory == null || channelCategory.trim().isEmpty()) {
-                    channelCategory = "Uncategorized";
-                }
-                if (category.equals(channelCategory)) {
-                    channelCount++;
-                }
-            }
+            Integer savedCount = categoryCounts.get(category);
+            int channelCount = savedCount == null ? 0 : savedCount;
             TextView item = label(category + " (" + channelCount + ")", 15);
             item.setPadding(dp(10), dp(14), dp(8), dp(14));
             item.setBackgroundColor(PANEL);
