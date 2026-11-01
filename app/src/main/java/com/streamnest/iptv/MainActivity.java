@@ -2315,7 +2315,10 @@ addHomeSection(homeMenu, "SEARCH",
         categoryList.setOrientation(LinearLayout.VERTICAL);
         guideCategoryScrollView = new ScrollView(this);
         guideCategoryScrollView.addView(categoryList);
-        guideCategoryScrollView.setVisibility(android.view.View.GONE);
+        guideCategoryScrollView.setVisibility(
+                phoneGuideLayout
+                        ? android.view.View.GONE
+                        : android.view.View.VISIBLE);
         guideContent.addView(guideCategoryScrollView,
                 new LinearLayout.LayoutParams(dp(240),
                         LinearLayout.LayoutParams.MATCH_PARENT));
@@ -2692,6 +2695,10 @@ if (categoryPrograms == null) {
         }
 
         Channel firstPreviewChannel = null;
+        String preferredChannelUrl = getPreferences(MODE_PRIVATE)
+                .getString("last_channel_url", "");
+        View lastWatchedRow = null;
+
         for (Map.Entry<String, ArrayList<EpgProgram>> entry : byChannel.entrySet()) {
             ArrayList<EpgProgram> programs = entry.getValue();
             Collections.sort(programs, Comparator.comparingLong(
@@ -2706,6 +2713,10 @@ if (categoryPrograms == null) {
             Channel rowChannel = rowChannels.get(entry.getKey());
         if (rowChannel == null) continue;
         if (firstPreviewChannel == null) firstPreviewChannel = rowChannel;
+        if (rowChannel.url != null
+                && rowChannel.url.equals(preferredChannelUrl)) {
+            lastWatchedRow = row;
+        }
             LinearLayout channelCell = new LinearLayout(this);
             channelCell.setOrientation(LinearLayout.HORIZONTAL);
             channelCell.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -3023,6 +3034,13 @@ if (categoryPrograms == null) {
         ScrollView rowVerticalScroll = new ScrollView(this);
         rowVerticalScroll.setFillViewport(false);
         rowVerticalScroll.addView(horizontalScroll);
+
+        final View targetLastWatchedRow = lastWatchedRow;
+        if (!isPhoneLayout() && targetLastWatchedRow != null) {
+            rowVerticalScroll.post(() ->
+                    rowVerticalScroll.smoothScrollTo(
+                            0, targetLastWatchedRow.getTop()));
+        }
 
         LinearLayout timeline = new LinearLayout(this);
         timeline.setOrientation(LinearLayout.VERTICAL);
