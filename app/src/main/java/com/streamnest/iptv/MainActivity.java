@@ -90,6 +90,7 @@ public class MainActivity extends Activity {
     private PlayerView previewPlayerView;
     private String previewChannelUrl;
     private Channel guidePreviewChannel;
+    private final ArrayList<View> guideChannelNameCells = new ArrayList<>();
 
     private final Handler featuredHandler = new Handler(Looper.getMainLooper());
     private Runnable featuredRotation;
@@ -2607,6 +2608,7 @@ addHomeSection(homeMenu, "SEARCH",
             Map<String, ArrayList<EpgProgram>> grouped,
             Map<String, Channel> channelMap, LinearLayout results) {
         results.removeAllViews();
+        guideChannelNameCells.clear();
 
 
 
@@ -2708,11 +2710,13 @@ if (categoryPrograms == null) {
             channelCell.setOrientation(LinearLayout.HORIZONTAL);
             channelCell.setGravity(android.view.Gravity.CENTER_VERTICAL);
             channelCell.setPadding(dp(5), dp(3), dp(5), dp(3));
-            channelCell.setBackgroundColor(PANEL);
             channelCell.setFocusable(true);
             channelCell.setClickable(true);
+            channelCell.setTag(rowChannel.url);
             channelCell.setOnFocusChangeListener((v, focused) ->
-                    v.setBackgroundColor(focused ? BLUE : PANEL));
+                    updateGuideChannelNameCell(v, rowChannel, focused));
+            guideChannelNameCells.add(channelCell);
+            updateGuideChannelNameCell(channelCell, rowChannel, false);
             channelCell.setOnClickListener(v -> playGuidePreview(rowChannel));
 
             android.widget.ImageView logoView =
@@ -2927,20 +2931,22 @@ if (categoryPrograms == null) {
             }
         }
 
-        Channel previewChannel = firstPreviewChannel;
-        if (lastChannel != null) {
-            String lastCategory = lastChannel.group;
-            if (lastCategory == null || lastCategory.trim().isEmpty()) {
-                lastCategory = "Uncategorized";
+        if (guidePreviewChannel == null) {
+            Channel previewChannel = firstPreviewChannel;
+            if (lastChannel != null) {
+                String lastCategory = lastChannel.group;
+                if (lastCategory == null || lastCategory.trim().isEmpty()) {
+                    lastCategory = "Uncategorized";
+                }
+                if (category.equals(lastCategory)) {
+                    previewChannel = lastChannel;
+                }
             }
-            if (category.equals(lastCategory)) {
-                previewChannel = lastChannel;
+            if (previewChannel != null) {
+                playGuidePreview(previewChannel);
             }
         }
-
-        if (previewChannel != null) {
-            playGuidePreview(previewChannel);
-        }
+        refreshGuideChannelNameBorders();
 
         android.widget.FrameLayout gridFrame =
                 new android.widget.FrameLayout(this);
@@ -3068,12 +3074,54 @@ if (categoryPrograms == null) {
         });
     }
 
+    private void updateGuideChannelNameCell(
+            View cell, Channel channel, boolean focused) {
+        if (cell == null || channel == null) return;
+
+        boolean playing = guidePreviewChannel != null
+                && guidePreviewChannel.url != null
+                && guidePreviewChannel.url.equals(channel.url);
+
+        android.graphics.drawable.GradientDrawable background =
+                new android.graphics.drawable.GradientDrawable();
+        background.setColor(focused ? BLUE : PANEL);
+
+        if (playing) {
+            background.setStroke(dp(2), BLUE);
+        }
+        cell.setBackground(background);
+    }
+
+    private void refreshGuideChannelNameBorders() {
+        for (View cell : guideChannelNameCells) {
+            Object value = cell.getTag();
+            boolean playing = guidePreviewChannel != null
+                    && guidePreviewChannel.url != null
+                    && value instanceof String
+                    && guidePreviewChannel.url.equals(value);
+
+            android.graphics.drawable.GradientDrawable background =
+                    new android.graphics.drawable.GradientDrawable();
+            background.setColor(cell.hasFocus() ? BLUE : PANEL);
+
+            if (playing) {
+                background.setStroke(dp(2), BLUE);
+            }
+            cell.setBackground(background);
+        }
+    }
+
     private void playGuidePreview(Channel channel) {
         if (channel.url == null || channel.url.trim().isEmpty()
                 || previewPlayerView == null) {
             return;
         }
         guidePreviewChannel = channel;
+        getPreferences(MODE_PRIVATE).edit()
+                .putString("last_channel_url", channel.url)
+                .putString("last_channel_name", channel.name)
+                .apply();
+        refreshGuideChannelNameBorders();
 
         if (guidePreviewChannelNameView != null) {
             guidePreviewChannelNameView.setText(channel.name);
