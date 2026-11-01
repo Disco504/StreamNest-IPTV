@@ -189,6 +189,40 @@ public class MainActivity extends Activity {
             if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_LEFT
                     && guideCategoryScrollView.getVisibility() != android.view.View.VISIBLE) {
                 guideCategoryScrollView.setVisibility(android.view.View.VISIBLE);
+
+                Channel selectedChannel = guidePreviewChannel;
+                if (selectedChannel == null) {
+                    String lastUrl = getPreferences(MODE_PRIVATE)
+                            .getString("last_channel_url", "");
+                    for (Channel channel : channels) {
+                        if (channel.url != null && channel.url.equals(lastUrl)) {
+                            selectedChannel = channel;
+                            break;
+                        }
+                    }
+                }
+
+                if (selectedChannel != null) {
+                    String selectedGroup = selectedChannel.group;
+                    if (selectedGroup == null || selectedGroup.trim().isEmpty()) {
+                        selectedGroup = "Uncategorized";
+                    }
+
+                    View list = guideCategoryScrollView.getChildAt(0);
+                    if (list instanceof LinearLayout) {
+                        LinearLayout items = (LinearLayout) list;
+                        for (int i = 0; i < items.getChildCount(); i++) {
+                            View child = items.getChildAt(i);
+                            if (child instanceof TextView
+                                    && ((TextView) child).getText().toString()
+                                            .startsWith(selectedGroup + " (")) {
+                                child.performClick();
+                                child.requestFocus();
+                                break;
+                            }
+                        }
+                    }
+                }
                 return true;
             }
             if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_RIGHT
@@ -2470,6 +2504,20 @@ addHomeSection(homeMenu, "SEARCH",
         return 0;
     }
 
+    private void updateGuideCategoryItemStyle(View view) {
+        boolean selected = view.isSelected();
+        boolean focused = view.hasFocus();
+
+        android.graphics.drawable.GradientDrawable background =
+                new android.graphics.drawable.GradientDrawable();
+        background.setColor(focused ? BLUE : PANEL);
+        background.setCornerRadius(dp(4));
+        background.setStroke(
+                dp(selected ? 3 : 1),
+                selected ? BLUE : 0xFF777777);
+        view.setBackground(background);
+    }
+
     private void renderGuidePrograms(List<EpgProgram> programs,
             Map<String, Channel> channelMap, TextView status,
             LinearLayout categoryList, LinearLayout results) {
@@ -2479,7 +2527,7 @@ addHomeSection(homeMenu, "SEARCH",
         long now = System.currentTimeMillis();
         long horizon = now + 24L * 60L * 60L * 1000L;
         int matched = 0;
-        Map<String, ArrayList<EpgProgram>> grouped = new HashMap<>();
+        Map<String, ArrayList<EpgProgram>> grouped = new java.util.LinkedHashMap<>();
         Map<String, Integer> categoryCounts = new HashMap<>();
 
         for (Channel channel : channels) {
@@ -2547,25 +2595,27 @@ addHomeSection(homeMenu, "SEARCH",
                     + grouped.size() + " categories. Select a category on the left.");
         }
 
-        TreeSet<String> categories = new TreeSet<>(grouped.keySet());
+        java.util.List<String> categories = new ArrayList<>(grouped.keySet());
 
         for (String category : categories) {
             Integer savedCount = categoryCounts.get(category);
             int channelCount = savedCount == null ? 0 : savedCount;
             TextView item = label(category + " (" + channelCount + ")", 15);
             item.setPadding(dp(10), dp(14), dp(8), dp(14));
-            item.setBackgroundColor(PANEL);
             item.setFocusable(true);
             item.setClickable(true);
+            item.setSelected(false);
             item.setOnFocusChangeListener((v, focused) ->
-                    v.setBackgroundColor(focused ? BLUE : PANEL));
+                    updateGuideCategoryItemStyle(v));
             item.setOnClickListener(v -> {
                 for (int i = 0; i < categoryList.getChildCount(); i++) {
                     android.view.View child = categoryList.getChildAt(i);
-                    child.setBackgroundColor(child == item ? BLUE : PANEL);
+                    child.setSelected(child == item);
+                    updateGuideCategoryItemStyle(child);
                 }
                 renderGuideCategoryPrograms(category, grouped, channelMap, results);
             });
+            updateGuideCategoryItemStyle(item);
 
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -2575,18 +2625,25 @@ addHomeSection(homeMenu, "SEARCH",
         }
 
         if (categoryList.getChildCount() > 0) {
-            String lastUrl = getPreferences(MODE_PRIVATE)
-                    .getString("last_channel_url", "");
             String preferredCategory = null;
+            Channel preferredChannel = guidePreviewChannel;
 
-            for (Channel channel : channels) {
-                if (channel.url != null && channel.url.equals(lastUrl)) {
-                    preferredCategory = channel.group;
-                    if (preferredCategory == null
-                            || preferredCategory.trim().isEmpty()) {
-                        preferredCategory = "Uncategorized";
+            if (preferredChannel == null) {
+                String lastUrl = getPreferences(MODE_PRIVATE)
+                        .getString("last_channel_url", "");
+                for (Channel channel : channels) {
+                    if (channel.url != null && channel.url.equals(lastUrl)) {
+                        preferredChannel = channel;
+                        break;
                     }
-                    break;
+                }
+            }
+
+            if (preferredChannel != null) {
+                preferredCategory = preferredChannel.group;
+                if (preferredCategory == null
+                        || preferredCategory.trim().isEmpty()) {
+                    preferredCategory = "Uncategorized";
                 }
             }
 
