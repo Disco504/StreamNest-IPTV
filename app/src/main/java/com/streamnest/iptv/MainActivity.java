@@ -3126,51 +3126,20 @@ if (categoryPrograms == null) {
             }
 
             if (programs.isEmpty()) {
-                View noInfoRow = new View(this) {
-                    private final android.graphics.Paint linePaint =
-                            new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-                    private final android.graphics.Paint textPaint =
-                            new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+                for (int i = 0; i < 48; i++) {
+                    long time = gridStart + i * slotMillis;
+                    TextView cell = label(
+                            "No Information\n" + clock.format(new Date(time)), 11);
+                    cell.setGravity(android.view.Gravity.CENTER);
+                    cell.setPadding(dp(3), dp(2), dp(3), dp(2));
+                    cell.setMaxLines(2);
+                    cell.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    configureGuideNoInfoBrick(cell, rowChannel);
 
-                    {
-                        linePaint.setColor(0xFF777777);
-                        linePaint.setStrokeWidth(Math.max(1, dp(1)));
-                        textPaint.setColor(Color.WHITE);
-                        textPaint.setTextSize(dp(11));
-                        textPaint.setTextAlign(android.graphics.Paint.Align.CENTER);
-                    }
+                    row.addView(cell, new LinearLayout.LayoutParams(
+                            Math.max(1, dp(30 * pixelsPerMinute)), rowHeight));
+                }
 
-                    @Override
-                    protected void onDraw(android.graphics.Canvas canvas) {
-                        super.onDraw(canvas);
-                        float cellWidth = dp(30 * pixelsPerMinute);
-
-                        for (int i = 0; i < 48; i++) {
-                            float left = i * cellWidth;
-                            float right = left + cellWidth;
-                            canvas.drawLine(left, 0, left, getHeight(), linePaint);
-
-                            canvas.save();
-                            canvas.clipRect(left, 0, right, getHeight());
-                            float center = (left + right) / 2;
-                            canvas.drawText("No Information", center, dp(17), textPaint);
-                            long time = gridStart + i * slotMillis;
-                            canvas.drawText(clock.format(new Date(time)),
-                                    center, dp(35), textPaint);
-                            canvas.restore();
-                        }
-
-                        canvas.drawLine(getWidth() - dp(1), 0,
-                                getWidth() - dp(1), getHeight(), linePaint);
-                        canvas.drawLine(0, getHeight() - dp(1),
-                                getWidth(), getHeight() - dp(1), linePaint);
-                    }
-                };
-                noInfoRow.setBackgroundColor(PANEL);
-                noInfoRow.setFocusable(false);
-                noInfoRow.setClickable(false);
-                row.addView(noInfoRow, new LinearLayout.LayoutParams(
-                        dp(24 * 60 * pixelsPerMinute), rowHeight));
                 grid.addView(row, new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT, rowHeight));
                 continue;
@@ -3198,10 +3167,7 @@ if (categoryPrograms == null) {
                 gapBackground.setColor(PANEL);
                 gapBackground.setStroke(dp(1), 0xFF777777);
                 gap.setBackground(gapBackground);
-                        gap.setFocusable(true);
-                        gap.setClickable(true);
-                        gap.setOnFocusChangeListener((v, focused) ->
-                                v.setBackgroundColor(focused ? BLUE : PANEL));
+                        configureGuideNoInfoBrick(gap, rowChannel);
                         gap.setMaxLines(3);
                         gap.setEllipsize(android.text.TextUtils.TruncateAt.END);
                         LinearLayout.LayoutParams gapParams =
@@ -3283,10 +3249,7 @@ if (categoryPrograms == null) {
                 gapBackground.setColor(PANEL);
                 gapBackground.setStroke(dp(1), 0xFF777777);
                 gap.setBackground(gapBackground);
-                gap.setFocusable(true);
-                gap.setClickable(true);
-                gap.setOnFocusChangeListener((v, focused) ->
-                        v.setBackgroundColor(focused ? BLUE : PANEL));
+                configureGuideNoInfoBrick(gap, rowChannel);
                 gap.setMaxLines(3);
                 gap.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 LinearLayout.LayoutParams gapParams =
@@ -3500,6 +3463,35 @@ if (categoryPrograms == null) {
             }
             cell.setBackground(background);
         }
+    }
+
+    private void configureGuideNoInfoBrick(TextView brick, Channel channel) {
+        android.graphics.drawable.GradientDrawable normal =
+                new android.graphics.drawable.GradientDrawable();
+        normal.setColor(PANEL);
+        normal.setStroke(dp(1), 0xFF777777);
+
+        android.graphics.drawable.GradientDrawable focused =
+                new android.graphics.drawable.GradientDrawable();
+        focused.setColor(BLUE);
+        focused.setStroke(dp(1), Color.WHITE);
+
+        brick.setBackground(normal);
+        brick.setFocusable(true);
+        brick.setClickable(true);
+        brick.setOnFocusChangeListener((v, hasFocus) ->
+                v.setBackground(hasFocus ? focused : normal));
+
+        brick.setOnClickListener(v -> {
+            if (channel == null || channel.url == null) return;
+
+            if (guidePreviewChannel != null
+                    && channel.url.equals(guidePreviewChannel.url)) {
+                playChannel(channel);
+            } else {
+                playGuidePreview(channel);
+            }
+        });
     }
 
     private void playGuidePreview(Channel channel) {
