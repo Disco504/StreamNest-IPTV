@@ -1324,12 +1324,56 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+    private LinearLayout createSeriesPosterCard(
+            Channel series, String base, String user, String pass) {
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER_HORIZONTAL);
+        card.setFocusable(true);
+        card.setClickable(true);
+        card.setBackgroundColor(PANEL);
+        card.setPadding(dp(4), dp(4), dp(4), dp(6));
+
+        android.widget.ImageView poster = new android.widget.ImageView(this);
+        poster.setLayoutParams(new LinearLayout.LayoutParams(
+                dp(116), dp(164)));
+        poster.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        poster.setBackgroundColor(Color.rgb(35, 45, 62));
+
+        if (series.logoUrl != null && !series.logoUrl.isEmpty()) {
+            loadChannelLogo(poster, series.logoUrl);
+        }
+
+        card.addView(poster);
+
+        TextView name = label(series.name, 13);
+        name.setMaxLines(2);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        name.setGravity(Gravity.CENTER);
+        name.setPadding(dp(3), dp(6), dp(3), dp(2));
+
+        card.addView(name, new LinearLayout.LayoutParams(
+                dp(116), dp(48)));
+
+        card.setOnFocusChangeListener((v, focused) ->
+                v.setBackgroundColor(focused ? BLUE : PANEL));
+
+        card.setOnClickListener(v ->
+                showSeriesEpisodes(series, base, user, pass));
+
+        return card;
+    }
+
     private void showSeriesInCategory(
             String categoryId, String categoryName,
             String base, String user, String pass) {
+
+        stopFeaturedRotation();
         releaseGuidePreview();
         showingLiveTv = false;
         showingTvGuide = false;
+
         screen = new LinearLayout(this);
         screen.setOrientation(LinearLayout.VERTICAL);
         screen.setBackgroundColor(NAVY);
@@ -1339,12 +1383,15 @@ public class MainActivity extends Activity {
         heading.setTextColor(Color.rgb(95, 190, 255));
         heading.setTypeface(null, Typeface.BOLD);
         screen.addView(heading);
+
         TextView status = label("Loading shows...", 16);
         screen.addView(status);
+
         ScrollView listScroll = new ScrollView(this);
         LinearLayout seriesList = new LinearLayout(this);
         seriesList.setOrientation(LinearLayout.VERTICAL);
         listScroll.addView(seriesList);
+
         screen.addView(listScroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
@@ -1354,21 +1401,26 @@ public class MainActivity extends Activity {
         back.setPadding(dp(8), dp(12), dp(8), dp(12));
         back.setOnClickListener(v -> showSeries());
         screen.addView(back);
+
         setContentView(screen);
 
         new Thread(() -> {
             ArrayList<Channel> loaded = new ArrayList<>();
             String failure = null;
+
             try {
                 String api = base + "/player_api.php?username="
                         + apiEncode(user) + "&password=" + apiEncode(pass);
+
                 JSONArray streams = getXtreamArray(
                         api + "&action=get_series&category_id="
                                 + apiEncode(categoryId));
+
                 for (int i = 0; i < streams.length(); i++) {
                     JSONObject item = streams.getJSONObject(i);
                     String id = item.optString("series_id", "");
                     if (id.isEmpty()) continue;
+
                     loaded.add(new Channel(
                             item.optString("name", "Untitled series"),
                             id,
@@ -1376,66 +1428,79 @@ public class MainActivity extends Activity {
                             "",
                             item.optString("cover", "")));
                 }
-                java.util.Collections.sort(loaded,
-                        (a, b) -> a.name.compareToIgnoreCase(b.name));
+
             } catch (Exception e) {
                 failure = e.getMessage() == null
                         ? "Could not load shows." : e.getMessage();
             }
+
             final String error = failure;
+
             runOnUiThread(() -> {
                 status.setText(error == null
                         ? loaded.size() + " shows"
                         : "Unable to load shows: " + error);
+
                 seriesList.removeAllViews();
+
                 if (error != null) {
                     seriesList.addView(label(
                             "Check your Xtream login and connection.", 14));
                     return;
                 }
+
                 if (loaded.isEmpty()) {
                     seriesList.addView(label(
                             "No shows were returned in this category.", 16));
                     return;
                 }
+
+                int screenWidthDp =
+                        getResources().getConfiguration().screenWidthDp;
+
+                int columns = screenWidthDp < 600
+                        ? 2 : Math.max(4, Math.min(6, screenWidthDp / 170));
+
+                LinearLayout gridRow = null;
+                int column = 0;
+
                 for (Channel series : loaded) {
-                    LinearLayout row = new LinearLayout(this);
-                    row.setOrientation(LinearLayout.HORIZONTAL);
-                    row.setGravity(Gravity.CENTER_VERTICAL);
-                    row.setFocusable(true);
-                    row.setClickable(true);
-                    row.setBackgroundColor(PANEL);
-                    row.setPadding(dp(8), dp(6), dp(8), dp(6));
+                    if (column == 0) {
+                        gridRow = new LinearLayout(this);
+                        gridRow.setOrientation(LinearLayout.HORIZONTAL);
+                        gridRow.setGravity(Gravity.TOP);
 
-                    android.widget.ImageView poster =
-                            new android.widget.ImageView(this);
-                    poster.setLayoutParams(
-                            new LinearLayout.LayoutParams(dp(64), dp(88)));
-                    poster.setScaleType(
-                            android.widget.ImageView.ScaleType.CENTER_CROP);
-                    if (!series.logoUrl.isEmpty()) {
-                        loadChannelLogo(poster, series.logoUrl);
+                        seriesList.addView(gridRow,
+                                new LinearLayout.LayoutParams(
+                                        LinearLayout.LayoutParams.MATCH_PARENT,
+                                        LinearLayout.LayoutParams.WRAP_CONTENT));
                     }
-                    row.addView(poster);
-                    TextView name = label(series.name, 16);
-                    name.setPadding(dp(12), dp(8), dp(8), dp(8));
-                    row.addView(name, new LinearLayout.LayoutParams(
-                            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-                    row.setOnFocusChangeListener((v, focused) ->
-                            v.setBackgroundColor(focused ? BLUE : PANEL));
-                    row.setOnClickListener(v ->
-                            showSeriesEpisodes(series, base, user, pass));
+                    LinearLayout card = createSeriesPosterCard(
+                            series, base, user, pass);
 
-                    LinearLayout.LayoutParams rowParams =
+                    LinearLayout.LayoutParams cardParams =
                             new LinearLayout.LayoutParams(
-                                    LinearLayout.LayoutParams.MATCH_PARENT,
-                                    LinearLayout.LayoutParams.WRAP_CONTENT);
-                    rowParams.setMargins(0, dp(3), 0, dp(3));
-                    seriesList.addView(row, rowParams);
+                                    0,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                                    1f);
+
+                    cardParams.setMargins(
+                            dp(4), dp(5), dp(4), dp(8));
+
+                    gridRow.addView(card, cardParams);
+
+                    column++;
+                    if (column >= columns) column = 0;
                 }
+
                 if (seriesList.getChildCount() > 0) {
-                    seriesList.getChildAt(0).requestFocus();
+                    LinearLayout firstRow =
+                            (LinearLayout) seriesList.getChildAt(0);
+
+                    if (firstRow.getChildCount() > 0) {
+                        firstRow.getChildAt(0).requestFocus();
+                    }
                 }
             });
         }).start();
