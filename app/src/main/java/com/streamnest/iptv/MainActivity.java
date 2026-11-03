@@ -197,109 +197,136 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean isAtLeftEdgeOfPosterRow(View focused, LinearLayout grid) {
+        if (focused == null || grid == null || focused.getParent() == null) return false;
+        android.view.ViewParent parent = focused.getParent();
+        if (!(parent instanceof LinearLayout) || parent.getParent() != grid) return false;
+
+        LinearLayout row = (LinearLayout) parent;
+        return row.indexOfChild(focused) == 0;
+    }
+
     @Override
     public boolean dispatchKeyEvent(android.view.KeyEvent event) {
-        if (showingTvSeries
-                && event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
-            if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_LEFT
-                    && tvSeriesCategoryScroll != null
-                    && tvSeriesCategoryScroll.getVisibility() != View.VISIBLE) {
-                tvSeriesCategoryScroll.setVisibility(View.VISIBLE);
-                focusTvSeriesSelectedCategory();
-                return true;
-            }
-            if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_RIGHT
-                    && tvSeriesCategoryScroll != null
-                    && tvSeriesCategoryScroll.getVisibility() == View.VISIBLE) {
-                tvSeriesCategoryScroll.setVisibility(View.GONE);
-                focusFirstTvSeriesPoster();
-                return true;
-            }
-        }
+        if (event.getAction() == android.view.KeyEvent.ACTION_DOWN
+                && isTelevisionDevice()) {
+            int key = event.getKeyCode();
+            View focused = getCurrentFocus();
 
-        if (showingTvVod
-                && event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
-            if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_LEFT) {
-                if (tvVodCategoryScroll != null
-                        && tvVodCategoryScroll.getVisibility() != View.VISIBLE) {
-                    tvVodCategoryScroll.setVisibility(View.VISIBLE);
-                    focusTvVodSelectedCategory();
+            if (key == android.view.KeyEvent.KEYCODE_DPAD_LEFT) {
+
+                if (showingTvSeries
+                        && tvSeriesCategoryScroll != null
+                        && tvSeriesCategoryScroll.getVisibility() != View.VISIBLE
+                        && isAtLeftEdgeOfPosterRow(focused, tvSeriesGrid)) {
+                    tvSeriesCategoryScroll.setVisibility(View.VISIBLE);
+                    focusTvSeriesSelectedCategory();
                     return true;
                 }
-                if (tvVodMainMenuScroll != null
-                        && tvVodMainMenuScroll.getVisibility() != View.VISIBLE) {
-                    tvVodMainMenuScroll.setVisibility(View.VISIBLE);
-                    View menu = tvVodMainMenuScroll.getChildAt(0);
-                    if (menu instanceof LinearLayout
-                            && ((LinearLayout) menu).getChildCount() > 0) {
-                        ((LinearLayout) menu).getChildAt(0).requestFocus();
+
+                if (showingTvVod) {
+                    if (tvVodCategoryScroll != null
+                            && tvVodCategoryScroll.getVisibility() != View.VISIBLE
+                            && isAtLeftEdgeOfPosterRow(focused, tvVodMovieGrid)) {
+                        tvVodCategoryScroll.setVisibility(View.VISIBLE);
+                        focusTvVodSelectedCategory();
+                        return true;
                     }
-                    return true;
-                }
-            }
-            if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) {
-                if (tvVodMainMenuScroll != null
-                        && tvVodMainMenuScroll.getVisibility() == View.VISIBLE) {
-                    tvVodMainMenuScroll.setVisibility(View.GONE);
-                    focusTvVodSelectedCategory();
-                    return true;
-                }
-                if (tvVodCategoryScroll != null
-                        && tvVodCategoryScroll.getVisibility() == View.VISIBLE) {
-                    tvVodCategoryScroll.setVisibility(View.GONE);
-                    focusFirstTvVodPoster();
-                    return true;
-                }
-            }
-        }
-        if (showingTvGuide
-                && event.getAction() == android.view.KeyEvent.ACTION_DOWN
-                && guideCategoryScrollView != null) {
-            if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_LEFT
-                    && guideCategoryScrollView.getVisibility() != android.view.View.VISIBLE) {
-                guideCategoryScrollView.setVisibility(android.view.View.VISIBLE);
 
-                Channel selectedChannel = guidePreviewChannel;
-                if (selectedChannel == null) {
-                    String lastUrl = getPreferences(MODE_PRIVATE)
-                            .getString("last_channel_url", "");
-                    for (Channel channel : channels) {
-                        if (channel.url != null && channel.url.equals(lastUrl)) {
-                            selectedChannel = channel;
-                            break;
+                    if (tvVodCategoryScroll != null
+                            && tvVodCategoryScroll.getVisibility() == View.VISIBLE
+                            && tvVodMainMenuScroll != null
+                            && tvVodMainMenuScroll.getVisibility() != View.VISIBLE
+                            && focused != null
+                            && focused.getParent() == tvVodCategoryList) {
+                        tvVodMainMenuScroll.setVisibility(View.VISIBLE);
+                        View menu = tvVodMainMenuScroll.getChildAt(0);
+                        if (menu instanceof LinearLayout
+                                && ((LinearLayout) menu).getChildCount() > 0) {
+                            ((LinearLayout) menu).getChildAt(0).requestFocus();
                         }
+                        return true;
                     }
                 }
 
-                if (selectedChannel != null) {
-                    String selectedGroup = selectedChannel.group;
-                    if (selectedGroup == null || selectedGroup.trim().isEmpty()) {
-                        selectedGroup = "Uncategorized";
-                    }
+                if (showingTvGuide
+                        && guideCategoryScrollView != null
+                        && guideCategoryScrollView.getVisibility() != View.VISIBLE
+                        && focused != null
+                        && guideChannelNameCells.contains(focused)) {
+                    guideCategoryScrollView.setVisibility(View.VISIBLE);
 
-                    View list = guideCategoryScrollView.getChildAt(0);
-                    if (list instanceof LinearLayout) {
-                        LinearLayout items = (LinearLayout) list;
-                        for (int i = 0; i < items.getChildCount(); i++) {
-                            View child = items.getChildAt(i);
-                            if (child instanceof TextView
-                                    && ((TextView) child).getText().toString()
-                                            .startsWith(selectedGroup + " (")) {
-                                child.performClick();
-                                child.requestFocus();
+                    Channel selectedChannel = guidePreviewChannel;
+                    if (selectedChannel == null) {
+                        String lastUrl = getPreferences(MODE_PRIVATE)
+                                .getString("last_channel_url", "");
+                        for (Channel channel : channels) {
+                            if (channel.url != null && channel.url.equals(lastUrl)) {
+                                selectedChannel = channel;
                                 break;
                             }
                         }
                     }
+
+                    if (selectedChannel != null) {
+                        String selectedGroup = selectedChannel.group;
+                        if (selectedGroup == null || selectedGroup.trim().isEmpty()) {
+                            selectedGroup = "Uncategorized";
+                        }
+
+                        View list = guideCategoryScrollView.getChildAt(0);
+                        if (list instanceof LinearLayout) {
+                            LinearLayout items = (LinearLayout) list;
+                            for (int i = 0; i < items.getChildCount(); i++) {
+                                View child = items.getChildAt(i);
+                                if (child instanceof TextView
+                                        && ((TextView) child).getText().toString()
+                                                .startsWith(selectedGroup + " (")) {
+                                    child.performClick();
+                                    child.requestFocus();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    return true;
                 }
-                return true;
             }
-            if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_RIGHT
-                    && guideCategoryScrollView.getVisibility() == android.view.View.VISIBLE) {
-                guideCategoryScrollView.setVisibility(android.view.View.GONE);
-                return true;
+
+            if (key == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) {
+                if (showingTvSeries
+                        && tvSeriesCategoryScroll != null
+                        && tvSeriesCategoryScroll.getVisibility() == View.VISIBLE) {
+                    tvSeriesCategoryScroll.setVisibility(View.GONE);
+                    focusFirstTvSeriesPoster();
+                    return true;
+                }
+
+                if (showingTvVod) {
+                    if (tvVodMainMenuScroll != null
+                            && tvVodMainMenuScroll.getVisibility() == View.VISIBLE) {
+                        tvVodMainMenuScroll.setVisibility(View.GONE);
+                        focusTvVodSelectedCategory();
+                        return true;
+                    }
+
+                    if (tvVodCategoryScroll != null
+                            && tvVodCategoryScroll.getVisibility() == View.VISIBLE) {
+                        tvVodCategoryScroll.setVisibility(View.GONE);
+                        focusFirstTvVodPoster();
+                        return true;
+                    }
+                }
+
+                if (showingTvGuide
+                        && guideCategoryScrollView != null
+                        && guideCategoryScrollView.getVisibility() == View.VISIBLE) {
+                    guideCategoryScrollView.setVisibility(View.GONE);
+                    return true;
+                }
             }
         }
+
         if (showingTvGuide
                 && event.getKeyCode() == android.view.KeyEvent.KEYCODE_BACK
                 && event.getAction() == android.view.KeyEvent.ACTION_DOWN
@@ -308,6 +335,7 @@ public class MainActivity extends Activity {
             playChannel(guidePreviewChannel);
             return true;
         }
+
         return super.dispatchKeyEvent(event);
     }
 
