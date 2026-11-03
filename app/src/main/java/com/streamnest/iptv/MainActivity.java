@@ -342,7 +342,8 @@ public class MainActivity extends Activity {
                         && guideCategoryScrollView != null
                         && guideCategoryScrollView.getVisibility() != View.VISIBLE
                         && focused != null
-                        && guideChannelNameCells.contains(focused)) {
+                        && !guideChannelNameCells.isEmpty()
+                        && focused == guideChannelNameCells.get(0)) {
                     guideCategoryScrollView.setVisibility(View.VISIBLE);
 
                     Channel selectedChannel = guidePreviewChannel;
