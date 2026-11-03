@@ -3588,7 +3588,7 @@ if (categoryPrograms == null) {
             tick.setPadding(dp(2), dp(4), dp(2), dp(4));
             tick.setBackgroundColor(PANEL);
             LinearLayout.LayoutParams tickParams =
-                    new LinearLayout.LayoutParams(slotWidth * 2, dp(phoneGuideLayout ? 42 : 32));
+                    new LinearLayout.LayoutParams(slotWidth * 2, dp(isPhoneLayout() ? 42 : 32));
             timeHeader.addView(tick, tickParams);
         }
         // Time ruler is displayed separately above the scrolling channel rows.
