@@ -93,6 +93,14 @@ public class MainActivity extends Activity {
     private TextView tvVodMovieStatus;
     private String tvVodSelectedCategoryId = "";
     private String tvVodSelectedCategoryName = "";
+    private boolean showingTvSeries = false;
+    private boolean showingTvSeriesEpisodes = false;
+    private ScrollView tvSeriesCategoryScroll;
+    private LinearLayout tvSeriesCategoryList;
+    private LinearLayout tvSeriesGrid;
+    private TextView tvSeriesStatus;
+    private String tvSeriesSelectedCategoryId = "";
+    private String tvSeriesSelectedCategoryName = "";
 
     private ExoPlayer previewPlayer;
     private PlayerView previewPlayerView;
@@ -191,6 +199,24 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        if (showingTvSeries
+                && event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+            if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_LEFT
+                    && tvSeriesCategoryScroll != null
+                    && tvSeriesCategoryScroll.getVisibility() != View.VISIBLE) {
+                tvSeriesCategoryScroll.setVisibility(View.VISIBLE);
+                focusTvSeriesSelectedCategory();
+                return true;
+            }
+            if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_RIGHT
+                    && tvSeriesCategoryScroll != null
+                    && tvSeriesCategoryScroll.getVisibility() == View.VISIBLE) {
+                tvSeriesCategoryScroll.setVisibility(View.GONE);
+                focusFirstTvSeriesPoster();
+                return true;
+            }
+        }
+
         if (showingTvVod
                 && event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
             if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_DPAD_LEFT) {
@@ -289,6 +315,12 @@ public class MainActivity extends Activity {
     public void onBackPressed() {
         if (showingTvVod) {
             showingTvVod = false;
+            showHomeScreen();
+        } else if (showingTvSeriesEpisodes) {
+            showingTvSeriesEpisodes = false;
+            showSeries();
+        } else if (showingTvSeries) {
+            showingTvSeries = false;
             showHomeScreen();
         } else if (showingLiveTv || showingTvGuide) {
             showHomeScreen();
@@ -1223,6 +1255,14 @@ public class MainActivity extends Activity {
 
 
     private void showSeries() {
+        if (isTelevisionDevice()) {
+            showTvSeries();
+            return;
+        }
+        showPhoneSeries();
+    }
+
+    private void showPhoneSeries() {
         showingTvVod = false;
         String base = getPreferences(MODE_PRIVATE).getString("xtream_server", "");
         String user = getPreferences(MODE_PRIVATE).getString("xtream_username", "");
@@ -1320,6 +1360,251 @@ public class MainActivity extends Activity {
                 if (categoryList.getChildCount() > 0) {
                     categoryList.getChildAt(0).requestFocus();
                 }
+            });
+        }).start();
+    }
+
+    private void showTvSeries() {
+        showingTvSeriesEpisodes = false;
+        String base = getPreferences(MODE_PRIVATE).getString("xtream_server", "");
+        String user = getPreferences(MODE_PRIVATE).getString("xtream_username", "");
+        String pass = getPreferences(MODE_PRIVATE).getString("xtream_password", "");
+
+        if (base.isEmpty() || user.isEmpty() || pass.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("TV Series")
+                    .setMessage("Connect your Xtream Codes account in Settings.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+
+        stopFeaturedRotation();
+        releaseGuidePreview();
+        showingLiveTv = false;
+        showingTvGuide = false;
+        showingTvVod = false;
+        showingTvSeries = true;
+
+        screen = new LinearLayout(this);
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.setBackgroundColor(NAVY);
+        screen.setPadding(dp(10), dp(8), dp(10), dp(8));
+
+        TextView heading = label("TV SERIES", 24);
+        heading.setTextColor(Color.rgb(95, 190, 255));
+        heading.setTypeface(null, Typeface.BOLD);
+        screen.addView(heading);
+
+        tvSeriesStatus = label("Loading your series library...", 14);
+        tvSeriesStatus.setTextColor(MUTED);
+        screen.addView(tvSeriesStatus);
+
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        screen.addView(body, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        tvSeriesCategoryScroll = new ScrollView(this);
+        tvSeriesCategoryScroll.setVisibility(View.GONE);
+
+        tvSeriesCategoryList = new LinearLayout(this);
+        tvSeriesCategoryList.setOrientation(LinearLayout.VERTICAL);
+        tvSeriesCategoryList.setPadding(dp(5), dp(5), dp(5), dp(5));
+        tvSeriesCategoryScroll.addView(tvSeriesCategoryList);
+
+        body.addView(tvSeriesCategoryScroll, new LinearLayout.LayoutParams(
+                dp(190), LinearLayout.LayoutParams.MATCH_PARENT));
+
+        ScrollView gridScroll = new ScrollView(this);
+        tvSeriesGrid = new LinearLayout(this);
+        tvSeriesGrid.setOrientation(LinearLayout.VERTICAL);
+        tvSeriesGrid.setPadding(dp(5), dp(5), dp(5), dp(5));
+        gridScroll.addView(tvSeriesGrid);
+
+        body.addView(gridScroll, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
+
+        setContentView(screen);
+
+        new Thread(() -> {
+            ArrayList<String[]> categories = new ArrayList<>();
+            String failure = null;
+            try {
+                String api = base + "/player_api.php?username="
+                        + apiEncode(user) + "&password=" + apiEncode(pass);
+                JSONArray result = getXtreamArray(
+                        api + "&action=get_series_categories");
+
+                for (int i = 0; i < result.length(); i++) {
+                    JSONObject item = result.getJSONObject(i);
+                    String id = item.optString("category_id", "");
+                    String name = item.optString("category_name", "Uncategorized");
+                    if (!id.isEmpty()) categories.add(new String[]{id, name});
+                }
+            } catch (Exception e) {
+                failure = e.getMessage() == null
+                        ? "Could not load series categories." : e.getMessage();
+            }
+
+            final String error = failure;
+            runOnUiThread(() -> {
+                tvSeriesCategoryList.removeAllViews();
+                if (error != null) {
+                    tvSeriesStatus.setText("Unable to load categories: " + error);
+                    return;
+                }
+                if (categories.isEmpty()) {
+                    tvSeriesStatus.setText("No TV series categories were returned.");
+                    return;
+                }
+
+                for (String[] category : categories) {
+                    tvSeriesCategoryList.addView(createTvSeriesCategoryItem(
+                            category[0], category[1], base, user, pass));
+                }
+
+                String[] selected = categories.get(0);
+                for (String[] category : categories) {
+                    if (category[0].equals(tvSeriesSelectedCategoryId)) {
+                        selected = category;
+                        break;
+                    }
+                }
+                loadTvSeriesGrid(selected[0], selected[1], base, user, pass);
+            });
+        }).start();
+    }
+
+    private TextView createTvSeriesCategoryItem(
+            String id, String name, String base, String user, String pass) {
+        TextView item = label(name, 15);
+        item.setTextColor(WHITE);
+        item.setBackgroundColor(PANEL);
+        item.setFocusable(true);
+        item.setClickable(true);
+        item.setPadding(dp(10), dp(12), dp(8), dp(12));
+        item.setTag(id);
+        item.setOnFocusChangeListener((v, focused) ->
+                v.setBackgroundColor(focused ? BLUE : PANEL));
+        item.setOnClickListener(v -> {
+            tvSeriesSelectedCategoryId = id;
+            tvSeriesSelectedCategoryName = name;
+            tvSeriesCategoryScroll.setVisibility(View.GONE);
+            loadTvSeriesGrid(id, name, base, user, pass);
+        });
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, dp(3), 0, dp(3));
+        item.setLayoutParams(params);
+        return item;
+    }
+
+    private void focusTvSeriesSelectedCategory() {
+        if (tvSeriesCategoryList == null) return;
+        for (int i = 0; i < tvSeriesCategoryList.getChildCount(); i++) {
+            View child = tvSeriesCategoryList.getChildAt(i);
+            if (tvSeriesSelectedCategoryId.equals(String.valueOf(child.getTag()))) {
+                child.requestFocus();
+                return;
+            }
+        }
+        if (tvSeriesCategoryList.getChildCount() > 0) {
+            tvSeriesCategoryList.getChildAt(0).requestFocus();
+        }
+    }
+
+    private void focusFirstTvSeriesPoster() {
+        if (tvSeriesGrid == null || tvSeriesGrid.getChildCount() == 0) return;
+        View firstRow = tvSeriesGrid.getChildAt(0);
+        if (firstRow instanceof LinearLayout
+                && ((LinearLayout) firstRow).getChildCount() > 0) {
+            ((LinearLayout) firstRow).getChildAt(0).requestFocus();
+        }
+    }
+
+    private void loadTvSeriesGrid(
+            String categoryId, String categoryName,
+            String base, String user, String pass) {
+        tvSeriesSelectedCategoryId = categoryId;
+        tvSeriesSelectedCategoryName = categoryName;
+        tvSeriesStatus.setText("Loading " + categoryName + "...");
+        tvSeriesGrid.removeAllViews();
+
+        new Thread(() -> {
+            ArrayList<Channel> loaded = new ArrayList<>();
+            String failure = null;
+            try {
+                String api = base + "/player_api.php?username="
+                        + apiEncode(user) + "&password=" + apiEncode(pass);
+                JSONArray streams = getXtreamArray(
+                        api + "&action=get_series&category_id="
+                                + apiEncode(categoryId));
+
+                for (int i = 0; i < streams.length(); i++) {
+                    JSONObject item = streams.getJSONObject(i);
+                    String id = item.optString("series_id", "");
+                    if (id.isEmpty()) continue;
+
+                    loaded.add(new Channel(
+                            item.optString("name", "Untitled series"),
+                            id,
+                            categoryName,
+                            "",
+                            item.optString("cover", "")));
+                }
+            } catch (Exception e) {
+                failure = e.getMessage() == null
+                        ? "Could not load shows." : e.getMessage();
+            }
+
+            final String error = failure;
+            runOnUiThread(() -> {
+                tvSeriesGrid.removeAllViews();
+                if (error != null) {
+                    tvSeriesStatus.setText("Unable to load shows: " + error);
+                    tvSeriesGrid.addView(label(
+                            "Check your Xtream login and connection.", 14));
+                    return;
+                }
+
+                tvSeriesStatus.setText(loaded.size() + " shows");
+                if (loaded.isEmpty()) {
+                    tvSeriesGrid.addView(label(
+                            "No shows were returned in this category.", 16));
+                    return;
+                }
+
+                int width = getResources().getConfiguration().screenWidthDp;
+                int columns = Math.max(3, Math.min(7, width / 170));
+                LinearLayout gridRow = null;
+                int column = 0;
+
+                for (Channel series : loaded) {
+                    if (column == 0) {
+                        gridRow = new LinearLayout(this);
+                        gridRow.setOrientation(LinearLayout.HORIZONTAL);
+                        gridRow.setGravity(Gravity.TOP);
+                        tvSeriesGrid.addView(gridRow,
+                                new LinearLayout.LayoutParams(
+                                        LinearLayout.LayoutParams.MATCH_PARENT,
+                                        LinearLayout.LayoutParams.WRAP_CONTENT));
+                    }
+
+                    LinearLayout card = createSeriesPosterCard(
+                            series, base, user, pass);
+                    LinearLayout.LayoutParams cardParams =
+                            new LinearLayout.LayoutParams(
+                                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                    cardParams.setMargins(dp(4), dp(5), dp(4), dp(8));
+                    gridRow.addView(card, cardParams);
+
+                    column++;
+                    if (column >= columns) column = 0;
+                }
+                focusFirstTvSeriesPoster();
             });
         }).start();
     }
@@ -1508,6 +1793,8 @@ public class MainActivity extends Activity {
 
     private void showSeriesEpisodes(Channel series, String base, String user, String pass) {
         releaseGuidePreview();
+        showingTvSeriesEpisodes = isTelevisionDevice();
+        showingTvSeries = false;
         showingLiveTv = false;
         showingTvGuide = false;
 
@@ -1531,12 +1818,6 @@ public class MainActivity extends Activity {
         screen.addView(scroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        TextView back = label("BACK TO SERIES", 16);
-        back.setFocusable(true);
-        back.setClickable(true);
-        back.setPadding(dp(8), dp(12), dp(8), dp(12));
-        back.setOnClickListener(v -> showSeries());
-        screen.addView(back);
         setContentView(screen);
 
         new Thread(() -> {
