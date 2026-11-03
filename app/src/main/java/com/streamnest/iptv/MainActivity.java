@@ -393,14 +393,55 @@ public class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         if (showingTvVod) {
-            showingTvVod = false;
-            showHomeScreen();
+            if (tvVodCategoryScroll != null
+                    && tvVodCategoryScroll.getVisibility() == View.VISIBLE) {
+                tvVodCategoryScroll.setVisibility(View.GONE);
+                focusFirstTvVodPoster();
+            } else if (tvVodCategoryScroll != null) {
+                tvVodCategoryScroll.setVisibility(View.VISIBLE);
+                focusTvVodSelectedCategory();
+            }
+            return;
         } else if (showingTvSeriesEpisodes) {
             showingTvSeriesEpisodes = false;
             showSeries();
+            return;
         } else if (showingTvSeries) {
-            showingTvSeries = false;
-            showHomeScreen();
+            if (tvSeriesCategoryScroll != null
+                    && tvSeriesCategoryScroll.getVisibility() == View.VISIBLE) {
+                tvSeriesCategoryScroll.setVisibility(View.GONE);
+                focusFirstTvSeriesPoster();
+            } else if (tvSeriesCategoryScroll != null) {
+                tvSeriesCategoryScroll.setVisibility(View.VISIBLE);
+                focusTvSeriesSelectedCategory();
+            }
+            return;
+        } else if (showingTvGuide && guideCategoryScrollView != null) {
+            if (guideCategoryScrollView.getVisibility() == View.VISIBLE) {
+                guideCategoryScrollView.setVisibility(View.GONE);
+
+                String selectedUrl = guidePreviewChannel != null
+                        ? guidePreviewChannel.url
+                        : getPreferences(MODE_PRIVATE)
+                                .getString("last_channel_url", "");
+
+                boolean focusedChannel = false;
+                for (View cell : guideChannelNameCells) {
+                    if (selectedUrl != null
+                            && selectedUrl.equals(cell.getTag())) {
+                        cell.requestFocus();
+                        focusedChannel = true;
+                        break;
+                    }
+                }
+                if (!focusedChannel && !guideChannelNameCells.isEmpty()) {
+                    guideChannelNameCells.get(0).requestFocus();
+                }
+            } else {
+                guideCategoryScrollView.setVisibility(View.VISIBLE);
+                focusGuideSelectedCategory();
+            }
+            return;
         } else if (showingLiveTv || showingTvGuide) {
             showHomeScreen();
         } else {
@@ -2057,51 +2098,7 @@ public class MainActivity extends Activity {
     }
 
     private void showHomeScreen() {
-        showingTvVod = false;
-        stopFeaturedRotation();
-        releaseGuidePreview();
-        if (isPhoneLayout()) {
-            setRequestedOrientation(
-                    android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
-        }
-        showingLiveTv = false;
-        showingTvGuide = false;
-        screen = new LinearLayout(this);
-        screen.setOrientation(LinearLayout.VERTICAL);
-        TextView status = label("Downloading programme listings...", 15);
-        screen.setBackgroundColor(NAVY);
-        screen.setPadding(dp(16), dp(8), dp(16), dp(12));
-
-        TextView title = label("StreamNest IPTV", 28);
-        title.setTextColor(Color.rgb(95, 190, 255));
-        title.setTypeface(null, Typeface.BOLD);
-        screen.addView(title);
-        screen.addView(label("Your entertainment, organized.", 14));
-
-        ScrollView homeScroll = new ScrollView(this);
-        LinearLayout homeMenu = new LinearLayout(this);
-        homeMenu.setOrientation(LinearLayout.VERTICAL);
-        homeScroll.addView(homeMenu);
-
-addHomeSection(homeMenu, "SEARCH",
-                "Find live TV channels");
-        addHomeSection(homeMenu, "TV GUIDE",
-                "Browse programs and schedules");
-        addHomeSection(homeMenu, "MOVIES",
-                "Browse your video-on-demand library");
-        addHomeSection(homeMenu, "TV SERIES",
-                "Explore seasons and episodes");
-        addHomeSection(homeMenu, "CATCH-UP",
-                "Replay programs where supported");
-        addHomeSection(homeMenu, "SETTINGS",
-                "Configure your playlist and preferences");
-
-        screen.addView(homeScroll, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
-
-        setContentView(screen);
-        homeMenu.getChildAt(0).requestFocus();
-
+        showTvGuide();
     }
 
     private void showSearchDialog() {
