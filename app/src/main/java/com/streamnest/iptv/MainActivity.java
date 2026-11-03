@@ -162,7 +162,11 @@ public class MainActivity extends Activity {
         favorites = new LinkedHashSet<>(getPreferences(MODE_PRIVATE)
                 .getStringSet("favorite_urls", Collections.emptySet()));
 
-        showHomeScreen();
+        screen = new LinearLayout(this);
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.setBackgroundColor(NAVY);
+        setContentView(screen);
+
         restoreSavedConnection();
     }
 
