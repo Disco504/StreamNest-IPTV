@@ -3156,7 +3156,7 @@ public class MainActivity extends Activity {
         screen.removeAllViews();
         screen.setOrientation(LinearLayout.VERTICAL);
 
-        int previewHeight = phoneGuideLayout ? dp(110) : dp(250);
+        int previewHeight = phoneGuideLayout ? dp(110) : dp(190);
 
         LinearLayout previewRow = new LinearLayout(this);
         previewRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -3183,7 +3183,7 @@ public class MainActivity extends Activity {
                 "Programme information unavailable", 13);
         previewInfo.addView(guidePreviewProgramInfoView);
         previewRow.addView(previewInfo, new LinearLayout.LayoutParams(
-                0, previewHeight, phoneGuideLayout ? 0.8f : 1f));
+                0, previewHeight, phoneGuideLayout ? 0.8f : 2f));
 
         screen.addView(previewRow, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, previewHeight));
@@ -3556,7 +3556,7 @@ if (categoryPrograms == null) {
                 (getResources().getConfiguration().screenWidthDp - 144) / 120);
         final int channelWidth = dp(120);
         final int slotWidth = dp(30 * pixelsPerMinute);
-        final int rowHeight = dp(isPhoneLayout() ? 54 : 44);
+        final int rowHeight = dp(isPhoneLayout() ? 54 : 40);
 
         SimpleDateFormat clock =
                 new SimpleDateFormat("h:mm a", Locale.getDefault());
@@ -3588,7 +3588,7 @@ if (categoryPrograms == null) {
             tick.setPadding(dp(2), dp(4), dp(2), dp(4));
             tick.setBackgroundColor(PANEL);
             LinearLayout.LayoutParams tickParams =
-                    new LinearLayout.LayoutParams(slotWidth * 2, dp(42));
+                    new LinearLayout.LayoutParams(slotWidth * 2, dp(phoneGuideLayout ? 42 : 32));
             timeHeader.addView(tick, tickParams);
         }
         // Time ruler is displayed separately above the scrolling channel rows.
@@ -3998,14 +3998,14 @@ if (categoryPrograms == null) {
         LinearLayout channelColumn = new LinearLayout(this);
         channelColumn.setOrientation(LinearLayout.VERTICAL);
         channelColumn.addView(channelHeader, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(42)));
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(isPhoneLayout() ? 42 : 32)));
         channelColumn.addView(channelVerticalScroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         LinearLayout programColumn = new LinearLayout(this);
         programColumn.setOrientation(LinearLayout.VERTICAL);
         programColumn.addView(headerScroll, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(42)));
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(isPhoneLayout() ? 42 : 32)));
         programColumn.addView(rowVerticalScroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
