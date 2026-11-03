@@ -85,6 +85,7 @@ public class MainActivity extends Activity {
     private boolean showingLiveTv = false;
     private boolean showingTvGuide = false;
     private ScrollView guideCategoryScrollView;
+    private ScrollView guideMainMenuScroll;
     private boolean showingTvVod = false;
     private ScrollView tvVodMainMenuScroll;
     private ScrollView tvVodCategoryScroll;
@@ -96,6 +97,7 @@ public class MainActivity extends Activity {
     private boolean showingTvSeries = false;
     private boolean showingTvSeriesEpisodes = false;
     private ScrollView tvSeriesCategoryScroll;
+    private ScrollView tvSeriesMainMenuScroll;
     private LinearLayout tvSeriesCategoryList;
     private LinearLayout tvSeriesGrid;
     private TextView tvSeriesStatus;
@@ -224,6 +226,22 @@ public class MainActivity extends Activity {
                     return true;
                 }
 
+                if (showingTvSeries
+                        && tvSeriesCategoryScroll != null
+                        && tvSeriesCategoryScroll.getVisibility() == View.VISIBLE
+                        && tvSeriesMainMenuScroll != null
+                        && tvSeriesMainMenuScroll.getVisibility() != View.VISIBLE
+                        && focused != null
+                        && focused.getParent() == tvSeriesCategoryList) {
+                    tvSeriesMainMenuScroll.setVisibility(View.VISIBLE);
+                    View menu = tvSeriesMainMenuScroll.getChildAt(0);
+                    if (menu instanceof LinearLayout
+                            && ((LinearLayout) menu).getChildCount() > 0) {
+                        ((LinearLayout) menu).getChildAt(0).requestFocus();
+                    }
+                    return true;
+                }
+
                 if (showingTvVod) {
                     if (tvVodCategoryScroll != null
                             && tvVodCategoryScroll.getVisibility() != View.VISIBLE
@@ -247,6 +265,23 @@ public class MainActivity extends Activity {
                         }
                         return true;
                     }
+                }
+
+                if (showingTvGuide
+                        && guideCategoryScrollView != null
+                        && guideCategoryScrollView.getVisibility() == View.VISIBLE
+                        && guideMainMenuScroll != null
+                        && guideMainMenuScroll.getVisibility() != View.VISIBLE
+                        && focused != null
+                        && guideCategoryScrollView.getChildAt(0) instanceof LinearLayout
+                        && focused.getParent() == guideCategoryScrollView.getChildAt(0)) {
+                    guideMainMenuScroll.setVisibility(View.VISIBLE);
+                    View menu = guideMainMenuScroll.getChildAt(0);
+                    if (menu instanceof LinearLayout
+                            && ((LinearLayout) menu).getChildCount() > 0) {
+                        ((LinearLayout) menu).getChildAt(0).requestFocus();
+                    }
+                    return true;
                 }
 
                 if (showingTvGuide
@@ -295,6 +330,14 @@ public class MainActivity extends Activity {
 
             if (key == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) {
                 if (showingTvSeries
+                        && tvSeriesMainMenuScroll != null
+                        && tvSeriesMainMenuScroll.getVisibility() == View.VISIBLE) {
+                    tvSeriesMainMenuScroll.setVisibility(View.GONE);
+                    focusTvSeriesSelectedCategory();
+                    return true;
+                }
+
+                if (showingTvSeries
                         && tvSeriesCategoryScroll != null
                         && tvSeriesCategoryScroll.getVisibility() == View.VISIBLE) {
                     tvSeriesCategoryScroll.setVisibility(View.GONE);
@@ -316,6 +359,14 @@ public class MainActivity extends Activity {
                         focusFirstTvVodPoster();
                         return true;
                     }
+                }
+
+                if (showingTvGuide
+                        && guideMainMenuScroll != null
+                        && guideMainMenuScroll.getVisibility() == View.VISIBLE) {
+                    guideMainMenuScroll.setVisibility(View.GONE);
+                    focusGuideSelectedCategory();
+                    return true;
                 }
 
                 if (showingTvGuide
@@ -1433,6 +1484,23 @@ public class MainActivity extends Activity {
         screen.addView(body, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
+        tvSeriesMainMenuScroll = new ScrollView(this);
+        tvSeriesMainMenuScroll.setVisibility(View.GONE);
+
+        LinearLayout seriesMainMenu = new LinearLayout(this);
+        seriesMainMenu.setOrientation(LinearLayout.VERTICAL);
+        seriesMainMenu.setPadding(dp(5), dp(5), dp(5), dp(5));
+        addHomeSection(seriesMainMenu, "SEARCH", "Find live TV channels");
+        addHomeSection(seriesMainMenu, "TV GUIDE", "Browse the TV schedule");
+        addHomeSection(seriesMainMenu, "MOVIES", "Browse movies");
+        addHomeSection(seriesMainMenu, "TV SERIES", "Browse TV series");
+        addHomeSection(seriesMainMenu, "CATCH-UP", "Recently aired programs");
+        addHomeSection(seriesMainMenu, "SETTINGS", "Playlist and app settings");
+
+        tvSeriesMainMenuScroll.addView(seriesMainMenu);
+        body.addView(tvSeriesMainMenuScroll, new LinearLayout.LayoutParams(
+                dp(190), LinearLayout.LayoutParams.MATCH_PARENT));
+
         tvSeriesCategoryScroll = new ScrollView(this);
         tvSeriesCategoryScroll.setVisibility(View.GONE);
 
@@ -2215,6 +2283,43 @@ addHomeSection(homeMenu, "SEARCH",
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    private void focusGuideSelectedCategory() {
+        if (guideCategoryScrollView == null) return;
+
+        Channel selectedChannel = guidePreviewChannel;
+        if (selectedChannel == null) {
+            String lastUrl = getPreferences(MODE_PRIVATE)
+                    .getString("last_channel_url", "");
+            for (Channel channel : channels) {
+                if (channel.url != null && channel.url.equals(lastUrl)) {
+                    selectedChannel = channel;
+                    break;
+                }
+            }
+        }
+
+        if (selectedChannel == null) return;
+
+        String group = selectedChannel.group;
+        if (group == null || group.trim().isEmpty()) {
+            group = "Uncategorized";
+        }
+
+        View list = guideCategoryScrollView.getChildAt(0);
+        if (list instanceof LinearLayout) {
+            LinearLayout items = (LinearLayout) list;
+            for (int i = 0; i < items.getChildCount(); i++) {
+                View child = items.getChildAt(i);
+                if (child instanceof TextView
+                        && ((TextView) child).getText().toString()
+                        .startsWith(group + " (")) {
+                    child.requestFocus();
+                    return;
+                }
+            }
+        }
     }
 
     private void addHomeSection(LinearLayout menu, String title,
@@ -3034,6 +3139,27 @@ addHomeSection(homeMenu, "SEARCH",
 
         LinearLayout guideContent = new LinearLayout(this);
         guideContent.setOrientation(LinearLayout.HORIZONTAL);
+
+        guideMainMenuScroll = null;
+        if (!phoneGuideLayout) {
+            guideMainMenuScroll = new ScrollView(this);
+            guideMainMenuScroll.setVisibility(View.GONE);
+
+            LinearLayout guideMainMenu = new LinearLayout(this);
+            guideMainMenu.setOrientation(LinearLayout.VERTICAL);
+            guideMainMenu.setPadding(dp(5), dp(5), dp(5), dp(5));
+            addHomeSection(guideMainMenu, "SEARCH", "Find live TV channels");
+            addHomeSection(guideMainMenu, "TV GUIDE", "Browse the TV schedule");
+            addHomeSection(guideMainMenu, "MOVIES", "Browse movies");
+            addHomeSection(guideMainMenu, "TV SERIES", "Browse TV series");
+            addHomeSection(guideMainMenu, "CATCH-UP", "Recently aired programs");
+            addHomeSection(guideMainMenu, "SETTINGS", "Playlist and app settings");
+
+            guideMainMenuScroll.addView(guideMainMenu);
+            guideContent.addView(guideMainMenuScroll,
+                    new LinearLayout.LayoutParams(
+                            dp(190), LinearLayout.LayoutParams.MATCH_PARENT));
+        }
 
         LinearLayout categoryList = new LinearLayout(this);
         categoryList.setOrientation(LinearLayout.VERTICAL);
