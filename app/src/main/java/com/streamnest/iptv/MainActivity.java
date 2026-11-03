@@ -3563,6 +3563,8 @@ if (categoryPrograms == null) {
 
         LinearLayout channelRows = new LinearLayout(this);
         channelRows.setOrientation(LinearLayout.VERTICAL);
+        channelRows.setDividerDrawable(new android.graphics.drawable.ColorDrawable(0xFF777777));
+        channelRows.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
         LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
         grid.setDividerDrawable(
@@ -3686,7 +3688,7 @@ if (categoryPrograms == null) {
                 for (int i = 0; i < 48; i++) {
                     long time = gridStart + i * slotMillis;
                     TextView cell = label(
-                            "No Information\n" + clock.format(new Date(time)), 11);
+                            "NO INFORMATION", 11);
                     cell.setGravity(android.view.Gravity.CENTER);
                     cell.setPadding(dp(3), dp(2), dp(3), dp(2));
                     cell.setMaxLines(2);
@@ -3715,7 +3717,7 @@ if (categoryPrograms == null) {
                         int gapMinutes = Math.max(1, (int) Math.ceil(
                                 (gapStop - gapCursor) / 60000.0));
                         TextView gap = label(
-                                "No Information\n"
+                                "NO INFORMATION"
                                         + clock.format(new Date(gapCursor)), 12);
                         gap.setGravity(android.view.Gravity.CENTER);
                         gap.setPadding(dp(4), dp(3), dp(4), dp(3));
@@ -3798,7 +3800,7 @@ if (categoryPrograms == null) {
                 int gapMinutes = Math.max(1, (int) Math.ceil(
                         (gapStop - cursor) / 60000.0));
                 TextView gap = label(
-                        "No Information\n" + clock.format(new Date(cursor)), 12);
+                        "NO INFORMATION", 12);
                 gap.setGravity(android.view.Gravity.CENTER);
                 gap.setPadding(dp(4), dp(3), dp(4), dp(3));
                 android.graphics.drawable.GradientDrawable gapBackground =
