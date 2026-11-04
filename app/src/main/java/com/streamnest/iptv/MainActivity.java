@@ -3719,37 +3719,90 @@ if (categoryPrograms == null) {
     private void loadChannelLogo(
             android.widget.ImageView imageView, String logoUrl) {
         imageView.setTag(logoUrl);
+
         logoExecutor.execute(() -> {
             java.net.HttpURLConnection connection = null;
+            java.io.File tempFile = null;
+
             try {
-                java.net.URL url = new java.net.URL(logoUrl);
                 connection = (java.net.HttpURLConnection)
-                        url.openConnection();
+                        new java.net.URL(logoUrl).openConnection();
                 connection.setConnectTimeout(5000);
                 connection.setReadTimeout(5000);
                 connection.setInstanceFollowRedirects(true);
                 connection.connect();
 
-                android.graphics.Bitmap bitmap;
+                tempFile = java.io.File.createTempFile(
+                        "artwork_", ".img", getCacheDir());
+
+                long totalBytes = 0;
+                byte[] buffer = new byte[8192];
+
                 try (java.io.InputStream stream =
-                             connection.getInputStream()) {
-                    bitmap = android.graphics.BitmapFactory
-                            .decodeStream(stream);
+                             connection.getInputStream();
+                     java.io.FileOutputStream output =
+                             new java.io.FileOutputStream(tempFile)) {
+
+                    int count;
+                    while ((count = stream.read(buffer)) != -1) {
+                        totalBytes += count;
+                        if (totalBytes > 10 * 1024 * 1024) {
+                            throw new java.io.IOException(
+                                    "Artwork exceeds 10 MB");
+                        }
+                        output.write(buffer, 0, count);
+                    }
                 }
 
+                android.graphics.BitmapFactory.Options bounds =
+                        new android.graphics.BitmapFactory.Options();
+                bounds.inJustDecodeBounds = true;
+                android.graphics.BitmapFactory.decodeFile(
+                        tempFile.getAbsolutePath(), bounds);
+
+                if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                    return;
+                }
+
+                int sampleSize = 1;
+                while (bounds.outWidth / sampleSize > 300
+                        || bounds.outHeight / sampleSize > 300) {
+                    sampleSize *= 2;
+                }
+
+                android.graphics.BitmapFactory.Options options =
+                        new android.graphics.BitmapFactory.Options();
+                options.inSampleSize = sampleSize;
+                options.inPreferredConfig =
+                        android.graphics.Bitmap.Config.ARGB_8888;
+
+                android.graphics.Bitmap bitmap =
+                        android.graphics.BitmapFactory.decodeFile(
+                                tempFile.getAbsolutePath(), options);
+
                 if (bitmap != null) {
-                    imageView.post(() -> {
+                    boolean posted = imageView.post(() -> {
                         if (logoUrl.equals(imageView.getTag())) {
                             imageView.setImageBitmap(bitmap);
+                        } else {
+                            bitmap.recycle();
                         }
                     });
+
+                    if (!posted) {
+                        bitmap.recycle();
+                    }
                 }
+
             } catch (Exception e) {
                 android.util.Log.d("StreamNest",
                         "Channel logo unavailable: " + logoUrl);
             } finally {
                 if (connection != null) {
                     connection.disconnect();
+                }
+                if (tempFile != null) {
+                    tempFile.delete();
                 }
             }
         });
