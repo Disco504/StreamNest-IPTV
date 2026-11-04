@@ -898,19 +898,15 @@ public class MainActivity extends Activity {
                     streamsUrl += "&category_id=" + apiEncode(categoryId);
                 }
                 forEachXtreamObject(streamsUrl, item -> {
-                    String id = item.has("stream_id")
-                            ? item.get("stream_id").getAsString() : "";
+                    String id = seriesJsonString(item, "stream_id", "");
                     if (id.isEmpty()) return;
 
-                    String extension = item.has("container_extension")
-                            ? item.get("container_extension").getAsString() : "mp4";
+                    String extension = seriesJsonString(item, "container_extension", "mp4");
                     String url = base + "/movie/" + Uri.encode(user) + "/"
                             + Uri.encode(pass) + "/" + Uri.encode(id) + "."
                             + Uri.encode(extension);
-                    String name = item.has("name")
-                            ? item.get("name").getAsString() : "Untitled movie";
-                    String icon = item.has("stream_icon")
-                            ? item.get("stream_icon").getAsString() : "";
+                    String name = seriesJsonString(item, "name", "Untitled movie");
+                    String icon = seriesJsonString(item, "stream_icon", "");
 
                     loaded.add(new Channel(
                             name, url, categoryName, "", icon));
