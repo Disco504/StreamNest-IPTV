@@ -2882,7 +2882,7 @@ public class MainActivity extends Activity {
         guideContent.setOrientation(LinearLayout.HORIZONTAL);
 
         guideMainMenuScroll = null;
-        if (!phoneGuideLayout) {
+        {
             guideMainMenuScroll = new ScrollView(this);
             guideMainMenuScroll.setVisibility(View.GONE);
 
@@ -2927,12 +2927,16 @@ public class MainActivity extends Activity {
                     new android.widget.Button(this);
             categoriesButton.setText("CATEGORIES");
             categoriesButton.setOnClickListener(v -> {
-                if (guideCategoryScrollView != null) {
-                    int visibility = guideCategoryScrollView.getVisibility();
-                    guideCategoryScrollView.setVisibility(
-                            visibility == android.view.View.VISIBLE
-                                    ? android.view.View.GONE
-                                    : android.view.View.VISIBLE);
+                if (guideCategoryScrollView == null || guideMainMenuScroll == null) return;
+
+                if (guideMainMenuScroll.getVisibility() == android.view.View.VISIBLE) {
+                    guideMainMenuScroll.setVisibility(android.view.View.GONE);
+                    guideCategoryScrollView.setVisibility(android.view.View.VISIBLE);
+                } else if (guideCategoryScrollView.getVisibility() == android.view.View.VISIBLE) {
+                    guideCategoryScrollView.setVisibility(android.view.View.GONE);
+                    guideMainMenuScroll.setVisibility(android.view.View.VISIBLE);
+                } else {
+                    guideCategoryScrollView.setVisibility(android.view.View.VISIBLE);
                 }
             });
             screen.addView(categoriesButton, new LinearLayout.LayoutParams(
