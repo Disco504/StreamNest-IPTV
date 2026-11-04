@@ -4,6 +4,11 @@ import android.util.Xml;
 import android.net.Uri;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
@@ -892,21 +897,24 @@ public class MainActivity extends Activity {
                 if (!"__ALL_MOVIES__".equals(categoryId)) {
                     streamsUrl += "&category_id=" + apiEncode(categoryId);
                 }
-                JSONArray streams = getXtreamArray(streamsUrl);
+                forEachXtreamObject(streamsUrl, item -> {
+                    String id = item.has("stream_id")
+                            ? item.get("stream_id").getAsString() : "";
+                    if (id.isEmpty()) return;
 
-                for (int i = 0; i < streams.length(); i++) {
-                    JSONObject item = streams.getJSONObject(i);
-                    String id = item.optString("stream_id", "");
-                    if (id.isEmpty()) continue;
-                    String extension = item.optString("container_extension", "mp4");
+                    String extension = item.has("container_extension")
+                            ? item.get("container_extension").getAsString() : "mp4";
                     String url = base + "/movie/" + Uri.encode(user) + "/"
                             + Uri.encode(pass) + "/" + Uri.encode(id) + "."
                             + Uri.encode(extension);
+                    String name = item.has("name")
+                            ? item.get("name").getAsString() : "Untitled movie";
+                    String icon = item.has("stream_icon")
+                            ? item.get("stream_icon").getAsString() : "";
+
                     loaded.add(new Channel(
-                            item.optString("name", "Untitled movie"),
-                            url, categoryName, "",
-                            item.optString("stream_icon", "")));
-                }
+                            name, url, categoryName, "", icon));
+                });
             } catch (Exception e) {
                 failure = e.getMessage() == null
                         ? "Could not load movies." : e.getMessage();
@@ -1425,22 +1433,25 @@ public class MainActivity extends Activity {
             try {
                 String api = base + "/player_api.php?username="
                         + apiEncode(user) + "&password=" + apiEncode(pass);
-                JSONArray streams = getXtreamArray(
-                        api + "&action=get_series&category_id="
-                                + apiEncode(categoryId));
+                String streamsUrl = api + "&action=get_series&category_id="
+                        + apiEncode(categoryId);
 
-                for (int i = 0; i < streams.length(); i++) {
-                    JSONObject item = streams.getJSONObject(i);
-                    String id = item.optString("series_id", "");
-                    if (id.isEmpty()) continue;
+                forEachXtreamObject(streamsUrl, item -> {
+                    String id = item.has("series_id")
+                            && !item.get("series_id").isJsonNull()
+                            ? item.get("series_id").getAsString() : "";
+                    if (id.isEmpty()) return;
+
+                    String name = item.has("name")
+                            && !item.get("name").isJsonNull()
+                            ? item.get("name").getAsString() : "Untitled series";
+                    String cover = item.has("cover")
+                            && !item.get("cover").isJsonNull()
+                            ? item.get("cover").getAsString() : "";
 
                     loaded.add(new Channel(
-                            item.optString("name", "Untitled series"),
-                            id,
-                            categoryName,
-                            "",
-                            item.optString("cover", "")));
-                }
+                            name, id, categoryName, "", cover));
+                });
             } catch (Exception e) {
                 failure = e.getMessage() == null
                         ? "Could not load shows." : e.getMessage();
@@ -1581,23 +1592,25 @@ public class MainActivity extends Activity {
                 String api = base + "/player_api.php?username="
                         + apiEncode(user) + "&password=" + apiEncode(pass);
 
-                JSONArray streams = getXtreamArray(
-                        api + "&action=get_series&category_id="
-                                + apiEncode(categoryId));
+                String streamsUrl = api + "&action=get_series&category_id="
+                        + apiEncode(categoryId);
 
-                for (int i = 0; i < streams.length(); i++) {
-                    JSONObject item = streams.getJSONObject(i);
-                    String id = item.optString("series_id", "");
-                    if (id.isEmpty()) continue;
+                forEachXtreamObject(streamsUrl, item -> {
+                    String id = item.has("series_id")
+                            && !item.get("series_id").isJsonNull()
+                            ? item.get("series_id").getAsString() : "";
+                    if (id.isEmpty()) return;
+
+                    String name = item.has("name")
+                            && !item.get("name").isJsonNull()
+                            ? item.get("name").getAsString() : "Untitled series";
+                    String cover = item.has("cover")
+                            && !item.get("cover").isJsonNull()
+                            ? item.get("cover").getAsString() : "";
 
                     loaded.add(new Channel(
-                            item.optString("name", "Untitled series"),
-                            id,
-                            categoryName,
-                            "",
-                            item.optString("cover", "")));
-                }
-
+                            name, id, categoryName, "", cover));
+                });
             } catch (Exception e) {
                 failure = e.getMessage() == null
                         ? "Could not load shows." : e.getMessage();
@@ -1712,42 +1725,9 @@ public class MainActivity extends Activity {
             try {
                 String api = base + "/player_api.php?username="
                         + apiEncode(user) + "&password=" + apiEncode(pass)
-                        + "&action=get_series_info&series_id=" + apiEncode(series.url);
-                JSONObject info = new JSONObject(getSeriesInfoText(api));
-
-                JSONArray episodeGroups = info.optJSONArray("episodes");
-                JSONObject episodeObject = info.optJSONObject("episodes");
-
-                if (episodeGroups != null) {
-                    for (int i = 0; i < episodeGroups.length(); i++) {
-                        Object value = episodeGroups.opt(i);
-                        if (value instanceof JSONObject) {
-                            JSONObject ep = (JSONObject) value;
-                            addSeriesEpisode(ep, series, episodes);
-                        }
-                    }
-                } else if (episodeObject != null) {
-                    java.util.Iterator<String> keys = episodeObject.keys();
-                    while (keys.hasNext()) {
-                        JSONArray group = episodeObject.optJSONArray(keys.next());
-                        if (group == null) continue;
-                        for (int i = 0; i < group.length(); i++) {
-                            JSONObject ep = group.optJSONObject(i);
-                            if (ep != null) addSeriesEpisode(ep, series, episodes);
-                        }
-                    }
-                }
-
-                JSONArray seasons = info.optJSONArray("seasons");
-                if (seasons != null) {
-                    for (int i = 0; i < seasons.length(); i++) {
-                        JSONObject season = seasons.optJSONObject(i);
-                        if (season != null) {
-                            seasonLabels.add(season.optString("name",
-                                    "Season " + season.optString("season_number", String.valueOf(i + 1))));
-                        }
-                    }
-                }
+                        + "&action=get_series_info&series_id="
+                        + apiEncode(series.url);
+                readSeriesEpisodes(api, series, episodes);
             } catch (Exception e) {
                 failure = e.getMessage() == null ? "Could not load episodes." : e.getMessage();
             }
@@ -1800,48 +1780,112 @@ public class MainActivity extends Activity {
         }).start();
     }
 
-    private String getSeriesInfoText(String urlText) throws Exception {
+    private void readSeriesEpisodes(
+            String urlText, Channel series, ArrayList<Channel> episodes)
+            throws Exception {
         HttpURLConnection connection = null;
         try {
-            connection = (HttpURLConnection) new URL(urlText).openConnection();
+            connection = (HttpURLConnection)
+                    new URL(urlText).openConnection();
             connection.setConnectTimeout(15000);
             connection.setReadTimeout(25000);
-            connection.setRequestProperty("User-Agent", "StreamNestIPTV/1.0");
+            connection.setRequestProperty(
+                    "User-Agent", "StreamNestIPTV/1.0");
+
             int status = connection.getResponseCode();
             if (status < 200 || status >= 300) {
-                throw new java.io.IOException("Provider returned HTTP " + status);
+                throw new java.io.IOException(
+                        "Provider returned HTTP " + status);
             }
+
             try (InputStream input = connection.getInputStream();
-                 java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream()) {
-                byte[] buffer = new byte[8192];
-                int count;
-                while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
-                return new String(output.toByteArray(), StandardCharsets.UTF_8);
+                 InputStreamReader inputReader = new InputStreamReader(
+                         input, StandardCharsets.UTF_8);
+                 JsonReader reader = new JsonReader(inputReader)) {
+                reader.beginObject();
+
+                while (reader.hasNext()) {
+                    String key = reader.nextName();
+
+                    if (!"episodes".equals(key)) {
+                        reader.skipValue();
+                    } else if (reader.peek() == JsonToken.BEGIN_ARRAY) {
+                        readSeriesEpisodeArray(reader, series, episodes);
+                    } else if (reader.peek() == JsonToken.BEGIN_OBJECT) {
+                        reader.beginObject();
+                        while (reader.hasNext()) {
+                            reader.nextName();
+                            if (reader.peek() == JsonToken.BEGIN_ARRAY) {
+                                readSeriesEpisodeArray(
+                                        reader, series, episodes);
+                            } else {
+                                reader.skipValue();
+                            }
+                        }
+                        reader.endObject();
+                    } else {
+                        reader.skipValue();
+                    }
+                }
+
+                reader.endObject();
             }
         } finally {
             if (connection != null) connection.disconnect();
         }
     }
 
-    private void addSeriesEpisode(JSONObject ep, Channel series, ArrayList<Channel> episodes) {
-        String id = ep.optString("id", "");
-        if (id.isEmpty()) id = ep.optString("episode_id", "");
+    private void readSeriesEpisodeArray(
+            JsonReader reader, Channel series, ArrayList<Channel> episodes)
+            throws Exception {
+        reader.beginArray();
+        while (reader.hasNext()) {
+            if (reader.peek() == JsonToken.BEGIN_OBJECT) {
+                JsonObject episode =
+                        JsonParser.parseReader(reader).getAsJsonObject();
+                addSeriesEpisode(episode, series, episodes);
+            } else {
+                reader.skipValue();
+            }
+        }
+        reader.endArray();
+    }
+
+    private String seriesJsonString(
+            JsonObject item, String key, String fallback) {
+        if (!item.has(key) || item.get(key).isJsonNull()) return fallback;
+        return item.get(key).getAsString();
+    }
+
+    private void addSeriesEpisode(
+            JsonObject ep, Channel series, ArrayList<Channel> episodes) {
+        String id = seriesJsonString(ep, "id", "");
+        if (id.isEmpty()) {
+            id = seriesJsonString(ep, "episode_id", "");
+        }
         if (id.isEmpty()) return;
 
-        String extension = ep.optString("container_extension", "mp4");
-        String season = ep.optString("season", "");
-        String episodeNumber = ep.optString("episode_num", "");
-        String title = ep.optString("title", "Episode " + (episodes.size() + 1));
-        String name = episodeNumber.isEmpty() ? title : "Episode " + episodeNumber + " — " + title;
+        String extension = seriesJsonString(
+                ep, "container_extension", "mp4");
+        String season = seriesJsonString(ep, "season", "");
+        String episodeNumber = seriesJsonString(ep, "episode_num", "");
+        String title = seriesJsonString(
+                ep, "title", "Episode " + (episodes.size() + 1));
+        String name = episodeNumber.isEmpty()
+                ? title : "Episode " + episodeNumber + " — " + title;
 
-        String url = getPreferences(MODE_PRIVATE).getString("xtream_server", "")
+        String url = getPreferences(MODE_PRIVATE).getString(
+                "xtream_server", "")
                 + "/series/" + Uri.encode(getPreferences(MODE_PRIVATE)
-                .getString("xtream_username", "")) + "/"
-                + Uri.encode(getPreferences(MODE_PRIVATE).getString("xtream_password", ""))
+                        .getString("xtream_username", "")) + "/"
+                + Uri.encode(getPreferences(MODE_PRIVATE)
+                        .getString("xtream_password", ""))
                 + "/" + Uri.encode(id) + "." + Uri.encode(extension);
 
-        episodes.add(new Channel(name, url,
-                season.isEmpty() ? "Episodes" : "Season " + season, "", ""));
+        episodes.add(new Channel(
+                name, url,
+                season.isEmpty() ? "Episodes" : "Season " + season,
+                "", ""));
     }
 
     private void showHomeScreen() {
@@ -2264,6 +2308,49 @@ public class MainActivity extends Activity {
 
     private String apiEncode(String value) throws Exception {
         return URLEncoder.encode(value, "UTF-8");
+    }
+
+    private interface XtreamObjectHandler {
+        void onObject(JsonObject item) throws Exception;
+    }
+
+    private void forEachXtreamObject(
+            String urlText, XtreamObjectHandler handler) throws Exception {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection)
+                    new URL(urlText).openConnection();
+            connection.setConnectTimeout(15000);
+            connection.setReadTimeout(25000);
+            connection.setRequestProperty(
+                    "User-Agent", "StreamNestIPTV/1.0");
+
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) {
+                throw new java.io.IOException(
+                        "Provider returned HTTP " + status);
+            }
+
+            try (InputStream input = connection.getInputStream();
+                 InputStreamReader inputReader = new InputStreamReader(
+                         input, StandardCharsets.UTF_8);
+                 JsonReader reader = new JsonReader(inputReader)) {
+                reader.beginArray();
+                while (reader.hasNext()) {
+                    if (reader.peek() == JsonToken.BEGIN_OBJECT) {
+                        JsonElement element = JsonParser.parseReader(reader);
+                        handler.onObject(element.getAsJsonObject());
+                    } else {
+                        reader.skipValue();
+                    }
+                }
+                reader.endArray();
+            }
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
     }
 
     private JSONArray getXtreamArray(String urlText) throws Exception {
