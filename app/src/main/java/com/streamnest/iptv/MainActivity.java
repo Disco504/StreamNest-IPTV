@@ -2278,16 +2278,18 @@ public class MainActivity extends Activity {
             }
 
             try (InputStream input = connection.getInputStream();
-                 java.io.ByteArrayOutputStream output =
-                         new java.io.ByteArrayOutputStream()) {
-                byte[] buffer = new byte[8192];
+                 BufferedReader reader = new BufferedReader(
+                         new InputStreamReader(
+                                 input, StandardCharsets.UTF_8))) {
+                StringBuilder json = new StringBuilder();
+                char[] buffer = new char[8192];
                 int count;
-                while ((count = input.read(buffer)) != -1) {
-                    output.write(buffer, 0, count);
+
+                while ((count = reader.read(buffer)) != -1) {
+                    json.append(buffer, 0, count);
                 }
-                return new JSONArray(
-                        new String(output.toByteArray(),
-                                StandardCharsets.UTF_8));
+
+                return new JSONArray(json.toString());
             }
         } finally {
             if (connection != null) {
