@@ -46,8 +46,9 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -67,7 +68,11 @@ public class MainActivity extends Activity {
                 && getResources().getConfiguration().smallestScreenWidthDp < 600;
     }
 
-    private final ExecutorService logoExecutor = Executors.newFixedThreadPool(4);
+    private final ThreadPoolExecutor logoExecutor =
+            new ThreadPoolExecutor(
+                    4, 4, 0L, TimeUnit.MILLISECONDS,
+                    new ArrayBlockingQueue<>(40),
+                    new ThreadPoolExecutor.DiscardOldestPolicy());
 
     private static final int NAVY = Color.rgb(15, 20, 35);
     private static final int PANEL = Color.rgb(27, 36, 54);
