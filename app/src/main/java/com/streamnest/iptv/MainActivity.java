@@ -346,38 +346,21 @@ public class MainActivity extends Activity {
                         && guideChannelNameCells.contains(focused)) {
                     guideCategoryScrollView.setVisibility(View.VISIBLE);
 
-                    Channel selectedChannel = guidePreviewChannel;
-                    if (selectedChannel == null) {
-                        String lastUrl = getPreferences(MODE_PRIVATE)
-                                .getString("last_channel_url", "");
-                        for (Channel channel : channels) {
-                            if (channel.url != null && channel.url.equals(lastUrl)) {
-                                selectedChannel = channel;
+                    View list = guideCategoryScrollView.getChildAt(0);
+                    if (list instanceof LinearLayout) {
+                        LinearLayout items = (LinearLayout) list;
+                        View selectedCategory = null;
+                        for (int i = 0; i < items.getChildCount(); i++) {
+                            View child = items.getChildAt(i);
+                            if (child.isSelected()) {
+                                selectedCategory = child;
                                 break;
                             }
                         }
-                    }
-
-                    if (selectedChannel != null) {
-                        String selectedGroup = selectedChannel.group;
-                        if (selectedGroup == null || selectedGroup.trim().isEmpty()) {
-                            selectedGroup = "Uncategorized";
+                        if (selectedCategory == null && items.getChildCount() > 0) {
+                            selectedCategory = items.getChildAt(0);
                         }
-
-                        View list = guideCategoryScrollView.getChildAt(0);
-                        if (list instanceof LinearLayout) {
-                            LinearLayout items = (LinearLayout) list;
-                            for (int i = 0; i < items.getChildCount(); i++) {
-                                View child = items.getChildAt(i);
-                                if (child instanceof TextView
-                                        && ((TextView) child).getText().toString()
-                                                .startsWith(selectedGroup + " (")) {
-                                    child.performClick();
-                                    child.requestFocus();
-                                    break;
-                                }
-                            }
-                        }
+                        if (selectedCategory != null) selectedCategory.requestFocus();
                     }
                     return true;
                 }
