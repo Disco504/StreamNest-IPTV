@@ -2928,22 +2928,18 @@ public class MainActivity extends Activity {
 
         LinearLayout previewRow = new LinearLayout(this);
         previewRow.setOrientation(LinearLayout.HORIZONTAL);
-        if (phoneGuideLayout) {
-            previewRow.setBackgroundColor(PANEL);
-        }
+        previewRow.setBackgroundColor(PANEL);
 
         previewPlayerView = new PlayerView(this);
         previewPlayerView.setUseController(false);
         previewPlayerView.setFocusable(false);
         previewPlayerView.setBackgroundColor(Color.BLACK);
         previewRow.addView(previewPlayerView, new LinearLayout.LayoutParams(
-                0, previewHeight, phoneGuideLayout ? 1.2f : 1f));
+                0, previewHeight, phoneGuideLayout ? 1.2f : 1.4f));
 
         LinearLayout previewInfo = new LinearLayout(this);
         previewInfo.setOrientation(LinearLayout.VERTICAL);
-        if (phoneGuideLayout) {
-            previewInfo.setBackgroundColor(PANEL);
-        }
+        previewInfo.setBackgroundColor(PANEL);
         previewInfo.setPadding(dp(10), dp(8), dp(8), dp(8));
         guidePreviewChannelNameView = label("Now Playing", 16);
         previewInfo.addView(guidePreviewChannelNameView);
@@ -2951,7 +2947,7 @@ public class MainActivity extends Activity {
                 "Programme information unavailable", 13);
         previewInfo.addView(guidePreviewProgramInfoView);
         previewRow.addView(previewInfo, new LinearLayout.LayoutParams(
-                0, previewHeight, phoneGuideLayout ? 0.8f : 2f));
+                0, previewHeight, phoneGuideLayout ? 0.8f : 1.6f));
 
         screen.addView(previewRow, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, previewHeight));
@@ -3515,11 +3511,13 @@ if (categoryPrograms == null) {
                 android.graphics.drawable.GradientDrawable normalBrick =
                         new android.graphics.drawable.GradientDrawable();
                 normalBrick.setColor(PANEL);
+                normalBrick.setCornerRadius(dp(4));
                 normalBrick.setStroke(dp(1), 0xFF777777);
 
                 android.graphics.drawable.GradientDrawable focusedBrick =
                         new android.graphics.drawable.GradientDrawable();
                 focusedBrick.setColor(BLUE);
+                focusedBrick.setCornerRadius(dp(4));
                 focusedBrick.setStroke(dp(1), 0xFFFFFFFF);
 
                 brick.setBackground(normalBrick);
@@ -3875,9 +3873,12 @@ if (categoryPrograms == null) {
                 new android.graphics.drawable.GradientDrawable();
         background.setColor(focused ? BLUE : PANEL);
 
-        if (playing) {
+        if (focused) {
+            background.setStroke(dp(2), Color.WHITE);
+        } else if (playing) {
             background.setStroke(dp(2), BLUE);
         }
+        background.setCornerRadius(dp(4));
         cell.setBackground(background);
     }
 
@@ -3893,9 +3894,12 @@ if (categoryPrograms == null) {
                     new android.graphics.drawable.GradientDrawable();
             background.setColor(cell.hasFocus() ? BLUE : PANEL);
 
-            if (playing) {
+            if (cell.hasFocus()) {
+                background.setStroke(dp(2), Color.WHITE);
+            } else if (playing) {
                 background.setStroke(dp(2), BLUE);
             }
+            background.setCornerRadius(dp(4));
             cell.setBackground(background);
         }
     }
