@@ -57,6 +57,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.TreeSet;
 
 public class MainActivity extends Activity {
@@ -2906,11 +2907,17 @@ public class MainActivity extends Activity {
                     android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         }
 
-        final Map<String, Channel> channelMap = new HashMap<>();
+        final Map<String, ArrayList<Channel>> channelMap = new HashMap<>();
         TextView status = new TextView(this);
         for (Channel channel : channels) {
-            if (channel.tvgId != null && !channel.tvgId.trim().isEmpty()) {
-                channelMap.put(normalizeEpgId(channel.tvgId), channel);
+            String epgId = normalizeEpgId(channel.tvgId);
+            if (!epgId.isEmpty()) {
+                ArrayList<Channel> matches = channelMap.get(epgId);
+                if (matches == null) {
+                    matches = new ArrayList<>();
+                    channelMap.put(epgId, matches);
+                }
+                matches.add(channel);
             }
         }
 
@@ -3115,22 +3122,19 @@ public class MainActivity extends Activity {
             };
 
     private long parseXmltvTime(String value) {
-        if (value == null || value.trim().isEmpty()) {
-            return 0;
-        }
+        if (value == null || value.trim().isEmpty()) return 0;
 
         String timestamp = value.trim();
-
-        try {
-            Date date = XMLTV_TIME_WITH_ZONE.get().parse(timestamp);
-            if (date != null) return date.getTime();
-        } catch (ParseException ignored) {
+        java.text.ParsePosition position = new java.text.ParsePosition(0);
+        Date date = XMLTV_TIME_WITH_ZONE.get().parse(timestamp, position);
+        if (date != null && position.getIndex() == timestamp.length()) {
+            return date.getTime();
         }
 
-        try {
-            Date date = XMLTV_TIME_DEFAULT_ZONE.get().parse(timestamp);
-            if (date != null) return date.getTime();
-        } catch (ParseException ignored) {
+        position = new java.text.ParsePosition(0);
+        date = XMLTV_TIME_DEFAULT_ZONE.get().parse(timestamp, position);
+        if (date != null && position.getIndex() == timestamp.length()) {
+            return date.getTime();
         }
 
         return 0;
@@ -3151,7 +3155,7 @@ public class MainActivity extends Activity {
     }
 
     private void renderGuidePrograms(List<EpgProgram> programs,
-            Map<String, Channel> channelMap, TextView status,
+            Map<String, ArrayList<Channel>> channelMap, TextView status,
             LinearLayout categoryList, LinearLayout results) {
         categoryList.removeAllViews();
         results.removeAllViews();
@@ -3176,19 +3180,24 @@ public class MainActivity extends Activity {
         }
 
         for (EpgProgram program : programs) {
-            Channel channel = channelMap.get(normalizeEpgId(program.channelId));
-            if (channel == null) continue;
+            ArrayList<Channel> matchingChannels =
+                    channelMap.get(normalizeEpgId(program.channelId));
+            if (matchingChannels == null || matchingChannels.isEmpty()) continue;
             matched++;
-
             if (program.stopMillis > now && program.startMillis < horizon) {
-                String category = channel.group;
-                if (category == null || category.trim().isEmpty()) {
-                    category = "Uncategorized";
+                Set<String> addedCategories = new HashSet<>();
+                for (Channel channel : matchingChannels) {
+                    String category = channel.group;
+                    if (category == null || category.trim().isEmpty()) {
+                        category = "Uncategorized";
+                    }
+                    if (addedCategories.add(category)) {
+                        if (!grouped.containsKey(category)) {
+                            grouped.put(category, new ArrayList<>());
+                        }
+                        grouped.get(category).add(program);
+                    }
                 }
-                if (!grouped.containsKey(category)) {
-                    grouped.put(category, new ArrayList<>());
-                }
-                grouped.get(category).add(program);
             }
         }
 
@@ -3298,7 +3307,7 @@ public class MainActivity extends Activity {
 
     private void renderGuideCategoryPrograms(String category,
             Map<String, ArrayList<EpgProgram>> grouped,
-            Map<String, Channel> channelMap, LinearLayout results) {
+            Map<String, ArrayList<Channel>> channelMap, LinearLayout results) {
         results.removeAllViews();
         guideChannelNameCells.clear();
 
@@ -3360,34 +3369,22 @@ if (categoryPrograms == null) {
         }
         // Time ruler is displayed separately above the scrolling channel rows.
 
-        Map<String, ArrayList<EpgProgram>> byChannel = new java.util.TreeMap<>();
-        Map<String, Channel> rowChannels = new java.util.TreeMap<>();
-
-        // Create a row for every playlist channel in this category.
+        ArrayList<Channel> rowChannels = new ArrayList<>();
+        Map<Channel, ArrayList<EpgProgram>> byChannel = new java.util.LinkedHashMap<>();
         for (Channel channel : channels) {
-            String channelCategory = channel.group;
-            if (channelCategory == null || channelCategory.trim().isEmpty()) {
-                channelCategory = "Uncategorized";
-            }
-            if (!category.equals(channelCategory)) continue;
-
-            String name = channel.name;
-            if (name == null || name.trim().isEmpty()) name = "Unnamed channel";
-
-            rowChannels.put(name, channel);
-            byChannel.put(name, new ArrayList<>());
+            String cat = channel.group;
+            if (cat == null || cat.trim().isEmpty()) cat = "Uncategorized";
+            if (!category.equals(cat)) continue;
+            rowChannels.add(channel);
+            byChannel.put(channel, new ArrayList<>());
         }
-
-        // Add EPG programmes where a matching channel ID exists.
+        Collections.sort(rowChannels, (x, y) ->
+                (x.name == null ? "" : x.name).compareTo(y.name == null ? "" : y.name));
         for (EpgProgram program : categoryPrograms) {
-            Channel channel = channelMap.get(normalizeEpgId(program.channelId));
-            if (channel == null) continue;
-
-            String name = channel.name;
-            if (name == null || name.trim().isEmpty()) name = "Unnamed channel";
-
-            if (byChannel.containsKey(name)) {
-                byChannel.get(name).add(program);
+            ArrayList<Channel> matches = channelMap.get(normalizeEpgId(program.channelId));
+            if (matches == null) continue;
+            for (Channel channel : matches) {
+                if (byChannel.containsKey(channel)) byChannel.get(channel).add(program);
             }
         }
 
@@ -3396,8 +3393,8 @@ if (categoryPrograms == null) {
                 .getString("last_channel_url", "");
         View lastWatchedRow = null;
 
-        for (Map.Entry<String, ArrayList<EpgProgram>> entry : byChannel.entrySet()) {
-            ArrayList<EpgProgram> programs = entry.getValue();
+        for (Channel rowChannel : rowChannels) {
+            ArrayList<EpgProgram> programs = byChannel.get(rowChannel);
             Collections.sort(programs, Comparator.comparingLong(
                     program -> program.startMillis));
 
@@ -3407,8 +3404,7 @@ if (categoryPrograms == null) {
                     new android.graphics.drawable.ColorDrawable(0xFF777777));
             row.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
 
-            Channel rowChannel = rowChannels.get(entry.getKey());
-        if (rowChannel == null) continue;
+            String rowName = rowChannel.name == null || rowChannel.name.trim().isEmpty() ? "Unnamed channel" : rowChannel.name;
         if (firstPreviewChannel == null) firstPreviewChannel = rowChannel;
         if (rowChannel.url != null
                 && rowChannel.url.equals(preferredChannelUrl)) {
@@ -3434,7 +3430,7 @@ if (categoryPrograms == null) {
             channelCell.addView(logoView, new LinearLayout.LayoutParams(
                     dp(34), dp(34)));
 
-            TextView channelLabel = label(entry.getKey(), 13);
+            TextView channelLabel = label(rowName, 13);
             channelLabel.setGravity(
                     android.view.Gravity.CENTER_VERTICAL);
             channelLabel.setPadding(dp(6), dp(4), dp(2), dp(4));
@@ -3532,21 +3528,15 @@ if (categoryPrograms == null) {
                     v.setSelected(focused);
                 });
 
-                Channel channel = channelMap.get(normalizeEpgId(program.channelId));
-                if (channel != null) {
-                    if (firstPreviewChannel == null) {
-                        firstPreviewChannel = channel;
-                    }
-                    brick.setOnClickListener(v -> {
-                        if (guidePreviewChannel != null
-                                && channel.url.equals(guidePreviewChannel.url)) {
-                            playChannel(channel);
-                        } else {
-                            playGuidePreview(channel);
-                        }
-                    });
+                brick.setOnClickListener(v -> {
+                if (guidePreviewChannel != null
+                        && rowChannel.url != null
+                        && rowChannel.url.equals(guidePreviewChannel.url)) {
+                    playChannel(rowChannel);
+                } else {
+                    playGuidePreview(rowChannel);
                 }
-
+            });
                 LinearLayout.LayoutParams brickParams =
                         new LinearLayout.LayoutParams(brickWidth, rowHeight);
                 row.addView(brick, brickParams);
