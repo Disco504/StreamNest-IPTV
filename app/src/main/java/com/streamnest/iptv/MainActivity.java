@@ -3468,7 +3468,7 @@ if (categoryPrograms == null) {
 
             if (programs.isEmpty()) {
                 TextView cell = label("NO INFORMATION", 11);
-                cell.setGravity(android.view.Gravity.CENTER);
+                cell.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.LEFT);
                 cell.setPadding(dp(3), dp(2), dp(3), dp(2));
                 cell.setMaxLines(2);
                 cell.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -3495,7 +3495,7 @@ if (categoryPrograms == null) {
                         TextView gap = label(
                                 "NO INFORMATION"
                                         + clock.format(new Date(gapCursor)), 12);
-                        gap.setGravity(android.view.Gravity.CENTER);
+                        gap.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.LEFT);
                         gap.setPadding(dp(4), dp(3), dp(4), dp(3));
                         android.graphics.drawable.GradientDrawable gapBackground =
                         new android.graphics.drawable.GradientDrawable();
