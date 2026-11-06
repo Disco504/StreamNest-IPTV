@@ -3467,25 +3467,19 @@ if (categoryPrograms == null) {
             }
 
             if (programs.isEmpty()) {
-                for (int i = 0; i < 48; i++) {
-                    long time = gridStart + i * slotMillis;
-                    TextView cell = label(
-                            "NO INFORMATION", 11);
-                    cell.setGravity(android.view.Gravity.CENTER);
-                    cell.setPadding(dp(3), dp(2), dp(3), dp(2));
-                    cell.setMaxLines(2);
-                    cell.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                    configureGuideNoInfoBrick(cell, rowChannel);
-
-                    row.addView(cell, new LinearLayout.LayoutParams(
-                            Math.max(1, dp(30 * pixelsPerMinute)), rowHeight));
-                }
-
+                TextView cell = label("NO INFORMATION", 11);
+                cell.setGravity(android.view.Gravity.CENTER);
+                cell.setPadding(dp(3), dp(2), dp(3), dp(2));
+                cell.setMaxLines(2);
+                cell.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                configureGuideNoInfoBrick(cell, rowChannel);
+                row.addView(cell, new LinearLayout.LayoutParams(
+                        Math.max(1, dp(24 * 60 * pixelsPerMinute)),
+                        rowHeight));
                 grid.addView(row, new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT, rowHeight));
                 continue;
             }
-
             long cursor = gridStart;
             for (EpgProgram program : programs) {
                 long startTime = Math.max(program.startMillis, gridStart);
