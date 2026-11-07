@@ -2967,6 +2967,8 @@ public class MainActivity extends Activity {
 
         previewPlayerView = new PlayerView(this);
         previewPlayerView.setUseController(false);
+        previewPlayerView.setResizeMode(
+                androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM);
         previewPlayerView.setFocusable(false);
         previewPlayerView.setBackgroundColor(Color.BLACK);
         previewRow.addView(previewPlayerView, new LinearLayout.LayoutParams(
@@ -3032,7 +3034,23 @@ public class MainActivity extends Activity {
         guideContent.addView(results, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
 
-        screen.addView(guideContent, new LinearLayout.LayoutParams(
+        android.widget.FrameLayout guideContentFrame =
+                new android.widget.FrameLayout(this);
+        guideContentFrame.addView(guideContent,
+                new android.widget.FrameLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+
+        View guideDivider = new View(this);
+        guideDivider.setBackgroundColor(0xFF777777);
+        android.widget.FrameLayout.LayoutParams dividerParams =
+                new android.widget.FrameLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        dp(1));
+        dividerParams.topMargin = dp(phoneGuideLayout ? 42 : 32);
+        guideContentFrame.addView(guideDivider, dividerParams);
+
+        screen.addView(guideContentFrame, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         if (isPhoneLayout()) {
@@ -3363,9 +3381,9 @@ if (categoryPrograms == null) {
         final long gridEnd = gridStart + 24L * 60L * 60L * 1000L;
         final int pixelsPerMinute = Math.max(2,
                 (getResources().getConfiguration().screenWidthDp - 144) / 120);
-        final int channelWidth = dp(120);
+        final int channelWidth = dp(isPhoneLayout() ? 120 : 175);
         final int slotWidth = dp(30 * pixelsPerMinute);
-        final int rowHeight = dp(isPhoneLayout() ? 54 : 40);
+        final int rowHeight = dp(isPhoneLayout() ? 54 : 50);
 
         SimpleDateFormat clock =
                 new SimpleDateFormat("h:mm a", Locale.getDefault());
@@ -3746,7 +3764,7 @@ if (categoryPrograms == null) {
         stationaryLabelsScroll.addView(stationaryLabels);
         programRowsFrame.addView(stationaryLabelsScroll,
                 new android.widget.FrameLayout.LayoutParams(
-                        dp(160),
+                        channelWidth,
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT));
 
         programRowsFrame.addView(currentTimeMarker, markerParams);
