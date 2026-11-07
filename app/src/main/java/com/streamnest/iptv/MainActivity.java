@@ -95,6 +95,7 @@ public class MainActivity extends Activity {
     private String selectedCategory = "All Channels";
     private boolean showingLiveTv = false;
     private boolean showingTvGuide = false;
+    private boolean guideBackLongPressHandled = false;
     private ScrollView guideCategoryScrollView;
     private ScrollView guideMainMenuScroll;
     private boolean showingTvVod = false;
@@ -214,8 +215,34 @@ public class MainActivity extends Activity {
         return row.indexOfChild(focused) == 0;
     }
 
+    private void focusFirstGuideMenuItem() {
+        if (guideMainMenuScroll == null
+                || !(guideMainMenuScroll.getChildAt(0) instanceof LinearLayout)) {
+            return;
+        }
+        LinearLayout menu = (LinearLayout) guideMainMenuScroll.getChildAt(0);
+        for (int i = 0; i < menu.getChildCount(); i++) {
+            View child = menu.getChildAt(i);
+            if (child.getVisibility() == View.VISIBLE && child.isFocusable()) {
+                child.requestFocus();
+                return;
+            }
+        }
+    }
+
     @Override
     public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_BACK) {
+            if (event.getAction() == android.view.KeyEvent.ACTION_UP
+                    && guideBackLongPressHandled) {
+                guideBackLongPressHandled = false;
+                return true;
+            }
+            if (event.getAction() == android.view.KeyEvent.ACTION_DOWN
+                    && event.getRepeatCount() == 0) {
+                guideBackLongPressHandled = false;
+            }
+        }
         if (event.getAction() == android.view.KeyEvent.ACTION_DOWN
                 && isTelevisionDevice()) {
             int key = event.getKeyCode();
@@ -332,11 +359,7 @@ public class MainActivity extends Activity {
                         && guideCategoryScrollView.getChildAt(0) instanceof LinearLayout
                         && focused.getParent() == guideCategoryScrollView.getChildAt(0)) {
                     guideMainMenuScroll.setVisibility(View.VISIBLE);
-                    View menu = guideMainMenuScroll.getChildAt(0);
-                    if (menu instanceof LinearLayout
-                            && ((LinearLayout) menu).getChildCount() > 0) {
-                        ((LinearLayout) menu).getChildAt(0).requestFocus();
-                    }
+                    focusFirstGuideMenuItem();
                     return true;
                 }
 
@@ -422,6 +445,7 @@ public class MainActivity extends Activity {
                 && event.getAction() == android.view.KeyEvent.ACTION_DOWN
                 && event.isLongPress()
                 && guidePreviewChannel != null) {
+            guideBackLongPressHandled = true;
             playChannel(guidePreviewChannel);
             return true;
         }
@@ -456,18 +480,29 @@ public class MainActivity extends Activity {
             }
             return;
         } else if (showingTvGuide && guideCategoryScrollView != null) {
-            if (guideCategoryScrollView.getVisibility() == View.VISIBLE) {
+            if (isTelevisionDevice()) {
+                if (guideMainMenuScroll != null
+                        && guideMainMenuScroll.getVisibility() == View.VISIBLE) {
+                    super.onBackPressed();
+                } else if (guideCategoryScrollView.getVisibility() == View.VISIBLE) {
+                    guideCategoryScrollView.setVisibility(View.GONE);
+                    if (guideMainMenuScroll != null) {
+                        guideMainMenuScroll.setVisibility(View.VISIBLE);
+                        focusFirstGuideMenuItem();
+                    }
+                } else {
+                    guideCategoryScrollView.setVisibility(View.VISIBLE);
+                    focusGuideSelectedCategory();
+                }
+            } else if (guideCategoryScrollView.getVisibility() == View.VISIBLE) {
                 guideCategoryScrollView.setVisibility(View.GONE);
-
                 String selectedUrl = guidePreviewChannel != null
                         ? guidePreviewChannel.url
                         : getPreferences(MODE_PRIVATE)
                                 .getString("last_channel_url", "");
-
                 boolean focusedChannel = false;
                 for (View cell : guideChannelNameCells) {
-                    if (selectedUrl != null
-                            && selectedUrl.equals(cell.getTag())) {
+                    if (selectedUrl != null && selectedUrl.equals(cell.getTag())) {
                         cell.requestFocus();
                         focusedChannel = true;
                         break;
@@ -2963,6 +2998,8 @@ public class MainActivity extends Activity {
             LinearLayout guideMainMenu = new LinearLayout(this);
             guideMainMenu.setOrientation(LinearLayout.VERTICAL);
             guideMainMenu.setPadding(dp(5), dp(5), dp(5), dp(5));
+            guideMainMenu.addView(new View(this), new LinearLayout.LayoutParams(
+                    1, dp(phoneGuideLayout ? 42 : 32)));
             addHomeSection(guideMainMenu, "SEARCH", "Find live TV channels");
             addHomeSection(guideMainMenu, "TV GUIDE", "Browse the TV schedule");
             addHomeSection(guideMainMenu, "MOVIES", "Browse movies");
@@ -2978,6 +3015,8 @@ public class MainActivity extends Activity {
 
         LinearLayout categoryList = new LinearLayout(this);
         categoryList.setOrientation(LinearLayout.VERTICAL);
+        categoryList.addView(new View(this), new LinearLayout.LayoutParams(
+                1, dp(phoneGuideLayout ? 42 : 32)));
         guideCategoryScrollView = new ScrollView(this);
         guideCategoryScrollView.addView(categoryList);
         guideCategoryScrollView.setVisibility(
@@ -3347,22 +3386,41 @@ if (categoryPrograms == null) {
                 new android.graphics.drawable.ColorDrawable(0xFF777777));
         timeHeader.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
 
-        TextView channelHeader = label("CHANNEL", 13);
-        channelHeader.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        channelHeader.setPadding(dp(6), dp(6), dp(6), dp(6));
+        SimpleDateFormat dateTimeLabel =
+                new SimpleDateFormat("EEE, MMM d\nh:mm a", Locale.getDefault());
+        TextView channelHeader = label(dateTimeLabel.format(new Date()), 11);
+        channelHeader.setGravity(android.view.Gravity.CENTER);
+        channelHeader.setPadding(dp(3), dp(3), dp(3), dp(3));
         channelHeader.setBackgroundColor(PANEL);
 
-
         for (long time = gridStart; time < gridEnd;
-                time += 60L * 60L * 1000L) {
-            TextView tick = label(clock.format(new Date(time)), 12);
+                time += slotMillis) {
+            TextView tick = label(clock.format(new Date(time)), 11);
             tick.setGravity(android.view.Gravity.CENTER);
             tick.setPadding(dp(2), dp(4), dp(2), dp(4));
             tick.setBackgroundColor(PANEL);
             LinearLayout.LayoutParams tickParams =
-                    new LinearLayout.LayoutParams(slotWidth * 2, dp(isPhoneLayout() ? 42 : 32));
+                    new LinearLayout.LayoutParams(slotWidth, dp(isPhoneLayout() ? 42 : 32));
             timeHeader.addView(tick, tickParams);
         }
+        HorizontalScrollView headerScroll = new HorizontalScrollView(this);
+        headerScroll.setHorizontalScrollBarEnabled(false);
+        headerScroll.addView(timeHeader);
+
+        HorizontalScrollView horizontalScroll = new HorizontalScrollView(this);
+        horizontalScroll.setHorizontalScrollBarEnabled(true);
+
+        headerScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
+            if (horizontalScroll.getScrollX() != x) {
+                horizontalScroll.scrollTo(x, 0);
+            }
+        });
+        horizontalScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
+            if (headerScroll.getScrollX() != x) {
+                headerScroll.scrollTo(x, 0);
+            }
+        });
+
         // Time ruler is displayed separately above the scrolling channel rows.
 
         ArrayList<Channel> rowChannels = new ArrayList<>();
@@ -3606,118 +3664,10 @@ if (categoryPrograms == null) {
         gridFrame.addView(grid, new android.widget.FrameLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        android.view.View currentTimeMarker = new android.view.View(this);
-        currentTimeMarker.setBackgroundColor(Color.RED);
-        currentTimeMarker.setElevation(dp(8));
-        currentTimeMarker.setVisibility(View.VISIBLE);
-        android.widget.FrameLayout.LayoutParams markerParams =
-                new android.widget.FrameLayout.LayoutParams(
-                        dp(3), android.view.ViewGroup.LayoutParams.MATCH_PARENT);
-        markerParams.leftMargin = 0;
-        markerParams.topMargin = 0;
-        gridFrame.addView(currentTimeMarker, markerParams);
-        currentTimeMarker.bringToFront();
+        horizontalScroll.addView(gridFrame);
 
         final android.os.Handler clockHandler =
                 new android.os.Handler(android.os.Looper.getMainLooper());
-        final Runnable[] markerUpdater = new Runnable[1];
-        markerUpdater[0] = new Runnable() {
-            @Override
-            public void run() {
-                long now = System.currentTimeMillis();
-                int minutes = (int) ((now - gridStart) / 60000L);
-                int markerX = dp(Math.max(0, minutes) * pixelsPerMinute);
-                android.widget.FrameLayout.LayoutParams params =
-                        (android.widget.FrameLayout.LayoutParams)
-                                currentTimeMarker.getLayoutParams();
-                params.leftMargin = markerX;
-                if (gridFrame.getHeight() > 0) {
-                    params.height = gridFrame.getHeight();
-                }
-                currentTimeMarker.setLayoutParams(params);
-                currentTimeMarker.bringToFront();
-                clockHandler.postDelayed(this, 30000L);
-            }
-        };
-        gridFrame.post(markerUpdater[0]);
-        gridFrame.addOnAttachStateChangeListener(
-                new android.view.View.OnAttachStateChangeListener() {
-                    @Override
-                    public void onViewAttachedToWindow(android.view.View v) {
-                    }
-
-                    @Override
-                    public void onViewDetachedFromWindow(android.view.View v) {
-                        clockHandler.removeCallbacks(markerUpdater[0]);
-                    }
-                });
-
-        HorizontalScrollView headerScroll = new HorizontalScrollView(this);
-        headerScroll.setHorizontalScrollBarEnabled(false);
-        headerScroll.addView(timeHeader);
-
-        HorizontalScrollView horizontalScroll = new HorizontalScrollView(this);
-        horizontalScroll.setHorizontalScrollBarEnabled(true);
-        horizontalScroll.addView(gridFrame);
-
-        headerScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
-            if (horizontalScroll.getScrollX() != x) {
-                horizontalScroll.scrollTo(x, 0);
-            }
-        });
-        horizontalScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
-            if (headerScroll.getScrollX() != x) {
-                headerScroll.scrollTo(x, 0);
-            }
-        });
-
-        final Runnable[] hourlyScroller = new Runnable[1];
-        hourlyScroller[0] = new Runnable() {
-            @Override
-            public void run() {
-                long now = System.currentTimeMillis();
-                long elapsedHours = Math.max(0L,
-                        (now - gridStart) / (60L * 60L * 1000L));
-
-                horizontalScroll.smoothScrollTo(
-                        (int) (elapsedHours * slotWidth * 2L), 0);
-
-                java.util.Calendar nextHour =
-                        java.util.Calendar.getInstance();
-                nextHour.set(java.util.Calendar.MINUTE, 0);
-                nextHour.set(java.util.Calendar.SECOND, 0);
-                nextHour.set(java.util.Calendar.MILLISECOND, 0);
-                nextHour.add(java.util.Calendar.HOUR_OF_DAY, 1);
-
-                clockHandler.postDelayed(this,
-                        Math.max(1000L, nextHour.getTimeInMillis() - now));
-            }
-        };
-
-        horizontalScroll.addOnAttachStateChangeListener(
-                new android.view.View.OnAttachStateChangeListener() {
-            @Override
-            public void onViewAttachedToWindow(View v) {
-                clockHandler.removeCallbacks(hourlyScroller[0]);
-                java.util.Calendar nextHour =
-                        java.util.Calendar.getInstance();
-                nextHour.set(java.util.Calendar.MINUTE, 0);
-                nextHour.set(java.util.Calendar.SECOND, 0);
-                nextHour.set(java.util.Calendar.MILLISECOND, 0);
-                nextHour.add(java.util.Calendar.HOUR_OF_DAY, 1);
-
-                clockHandler.postDelayed(hourlyScroller[0],
-                        Math.max(1000L,
-                                nextHour.getTimeInMillis()
-                                        - System.currentTimeMillis()));
-            }
-
-            @Override
-            public void onViewDetachedFromWindow(View v) {
-                clockHandler.removeCallbacks(hourlyScroller[0]);
-            }
-        });
 
         ScrollView channelVerticalScroll = new ScrollView(this);
         channelVerticalScroll.setFillViewport(false);
@@ -3726,6 +3676,62 @@ if (categoryPrograms == null) {
         ScrollView rowVerticalScroll = new ScrollView(this);
         rowVerticalScroll.setFillViewport(false);
         rowVerticalScroll.addView(horizontalScroll);
+
+        android.widget.FrameLayout programRowsFrame =
+                new android.widget.FrameLayout(this);
+        programRowsFrame.addView(rowVerticalScroll,
+                new android.widget.FrameLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+
+        android.view.View currentTimeMarker = new android.view.View(this);
+        currentTimeMarker.setBackgroundColor(Color.RED);
+        currentTimeMarker.setElevation(dp(8));
+        android.widget.FrameLayout.LayoutParams markerParams =
+                new android.widget.FrameLayout.LayoutParams(
+                        dp(3),
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT);
+        markerParams.leftMargin = 0;
+        programRowsFrame.addView(currentTimeMarker, markerParams);
+
+        final Runnable[] timelineScroller = new Runnable[1];
+        timelineScroller[0] = new Runnable() {
+            @Override
+            public void run() {
+                long now = System.currentTimeMillis();
+                channelHeader.setText(dateTimeLabel.format(new Date(now)));
+
+                int minutes = (int) Math.max(
+                        0L, (now - gridStart) / 60000L);
+                int targetX = dp(minutes * pixelsPerMinute);
+                if (horizontalScroll.getChildCount() > 0
+                        && horizontalScroll.getWidth() > 0
+                        && horizontalScroll.getChildAt(0).getWidth() > 0) {
+                    int contentWidth =
+                            horizontalScroll.getChildAt(0).getWidth();
+                    int maxScroll = Math.max(
+                            0, contentWidth - horizontalScroll.getWidth());
+
+                    horizontalScroll.scrollTo(
+                            Math.min(targetX, maxScroll), 0);
+                }
+                clockHandler.postDelayed(this, 1000L);
+            }
+        };
+
+        programRowsFrame.addOnAttachStateChangeListener(
+                new android.view.View.OnAttachStateChangeListener() {
+                    @Override
+                    public void onViewAttachedToWindow(View v) {
+                        clockHandler.removeCallbacks(timelineScroller[0]);
+                        programRowsFrame.post(timelineScroller[0]);
+                    }
+
+                    @Override
+                    public void onViewDetachedFromWindow(View v) {
+                        clockHandler.removeCallbacks(timelineScroller[0]);
+                    }
+                });
 
         channelVerticalScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
             if (rowVerticalScroll.getScrollY() != y) {
@@ -3755,7 +3761,7 @@ if (categoryPrograms == null) {
         programColumn.setOrientation(LinearLayout.VERTICAL);
         programColumn.addView(headerScroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(isPhoneLayout() ? 42 : 32)));
-        programColumn.addView(rowVerticalScroll, new LinearLayout.LayoutParams(
+        programColumn.addView(programRowsFrame, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         LinearLayout timeline = new LinearLayout(this);
