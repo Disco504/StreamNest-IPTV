@@ -3376,6 +3376,8 @@ if (categoryPrograms == null) {
         channelRows.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
         LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout stationaryLabels = new LinearLayout(this);
+        stationaryLabels.setOrientation(LinearLayout.VERTICAL);
         grid.setDividerDrawable(
                 new android.graphics.drawable.ColorDrawable(0xFF777777));
         grid.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
@@ -3500,7 +3502,16 @@ if (categoryPrograms == null) {
             }
 
             if (programs.isEmpty()) {
-                TextView cell = label("NO INFORMATION", 11);
+                TextView stationaryLabel = label(rowName, 12);
+                stationaryLabel.setGravity(android.view.Gravity.CENTER_VERTICAL
+                        | android.view.Gravity.LEFT);
+                stationaryLabel.setPadding(dp(6), dp(2), dp(4), dp(2));
+                stationaryLabel.setMaxLines(2);
+                stationaryLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                configureGuideNoInfoBrick(stationaryLabel, rowChannel);
+                stationaryLabels.addView(stationaryLabel,
+                        new LinearLayout.LayoutParams(dp(160), rowHeight));
+                TextView cell = label("", 11);
                 cell.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.LEFT);
                 cell.setPadding(dp(3), dp(2), dp(3), dp(2));
                 cell.setMaxLines(2);
@@ -3513,6 +3524,8 @@ if (categoryPrograms == null) {
                         LinearLayout.LayoutParams.WRAP_CONTENT, rowHeight));
                 continue;
             }
+            stationaryLabels.addView(new View(this),
+                    new LinearLayout.LayoutParams(dp(160), rowHeight));
             long cursor = gridStart;
             for (EpgProgram program : programs) {
                 long startTime = Math.max(program.startMillis, gridStart);
@@ -3526,8 +3539,8 @@ if (categoryPrograms == null) {
                         int gapMinutes = Math.max(1, (int) Math.ceil(
                                 (gapStop - gapCursor) / 60000.0));
                         TextView gap = label(
-                                "NO INFORMATION"
-                                        + clock.format(new Date(gapCursor)), 12);
+                                rowName
+                                        + "  " + clock.format(new Date(gapCursor)), 12);
                         gap.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.LEFT);
                         gap.setPadding(dp(4), dp(3), dp(4), dp(3));
                         android.graphics.drawable.GradientDrawable gapBackground =
@@ -3605,7 +3618,7 @@ if (categoryPrograms == null) {
                 int gapMinutes = Math.max(1, (int) Math.ceil(
                         (gapStop - cursor) / 60000.0));
                 TextView gap = label(
-                        "NO INFORMATION", 12);
+                        rowName, 12);
                 gap.setGravity(android.view.Gravity.CENTER);
                 gap.setPadding(dp(4), dp(3), dp(4), dp(3));
                 android.graphics.drawable.GradientDrawable gapBackground =
@@ -3692,6 +3705,50 @@ if (categoryPrograms == null) {
                         dp(3),
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT);
         markerParams.leftMargin = 0;
+        android.widget.ScrollView stationaryLabelsScroll =
+                new android.widget.ScrollView(this) {
+            private boolean stationaryLabelTouchActive;
+
+            @Override
+            public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+                if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) {
+                    stationaryLabelTouchActive = false;
+                    float y = event.getY() + getScrollY();
+                    float x = event.getX();
+
+                    for (int i = 0; i < stationaryLabels.getChildCount(); i++) {
+                        View child = stationaryLabels.getChildAt(i);
+                        if (child.isClickable() && child.isFocusable()
+                                && x >= child.getLeft() && x <= child.getRight()
+                                && y >= child.getTop() && y <= child.getBottom()) {
+                            stationaryLabelTouchActive = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!stationaryLabelTouchActive) return false;
+
+                boolean handled = super.dispatchTouchEvent(event);
+
+                if (event.getAction() == android.view.MotionEvent.ACTION_UP
+                        || event.getAction() == android.view.MotionEvent.ACTION_CANCEL) {
+                    stationaryLabelTouchActive = false;
+                }
+
+                return handled;
+            }
+        };
+        stationaryLabelsScroll.setFillViewport(false);
+        stationaryLabelsScroll.setVerticalScrollBarEnabled(false);
+        stationaryLabelsScroll.setHorizontalScrollBarEnabled(false);
+        stationaryLabelsScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        stationaryLabelsScroll.addView(stationaryLabels);
+        programRowsFrame.addView(stationaryLabelsScroll,
+                new android.widget.FrameLayout.LayoutParams(
+                        dp(160),
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+
         programRowsFrame.addView(currentTimeMarker, markerParams);
 
         final Runnable[] timelineScroller = new Runnable[1];
@@ -3739,6 +3796,9 @@ if (categoryPrograms == null) {
             }
         });
         rowVerticalScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
+            if (stationaryLabelsScroll.getScrollY() != y) {
+                stationaryLabelsScroll.scrollTo(0, y);
+            }
             if (channelVerticalScroll.getScrollY() != y) {
                 channelVerticalScroll.scrollTo(0, y);
             }
