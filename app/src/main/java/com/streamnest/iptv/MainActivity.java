@@ -77,8 +77,8 @@ public class MainActivity extends Activity {
     private final ThreadPoolExecutor logoExecutor =
             new ThreadPoolExecutor(
                     4, 4, 0L, TimeUnit.MILLISECONDS,
-                    new ArrayBlockingQueue<>(40),
-                    new ThreadPoolExecutor.DiscardOldestPolicy());
+                    new java.util.concurrent.LinkedBlockingQueue<>(),
+                    new ThreadPoolExecutor.AbortPolicy());
 
     private static final int NAVY = Color.rgb(15, 20, 35);
     private static final int PANEL = Color.rgb(27, 36, 54);
