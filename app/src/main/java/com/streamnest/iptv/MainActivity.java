@@ -539,35 +539,47 @@ public class MainActivity extends Activity {
 
 
     private LinearLayout createMoviePosterCard(Channel movie) {
+        boolean tv = isTelevisionDevice();
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER_HORIZONTAL);
         card.setFocusable(true);
         card.setClickable(true);
         card.setBackgroundColor(PANEL);
-        card.setPadding(dp(4), dp(4), dp(4), dp(6));
+        card.setPadding(dp(4), dp(4), dp(4), dp(tv ? 3 : 6));
 
         android.widget.ImageView poster = new android.widget.ImageView(this);
         poster.setLayoutParams(new LinearLayout.LayoutParams(
-                dp(116), dp(164)));
-        poster.setScaleType(
-                android.widget.ImageView.ScaleType.CENTER_CROP);
+                tv ? LinearLayout.LayoutParams.MATCH_PARENT : dp(116),
+                dp(tv ? 250 : 164)));
+        poster.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
         poster.setBackgroundColor(Color.rgb(35, 45, 62));
         if (movie.logoUrl != null && !movie.logoUrl.isEmpty()) {
             loadChannelLogo(poster, movie.logoUrl);
         }
         card.addView(poster);
 
-        TextView name = label(movie.name, 13);
-        name.setMaxLines(2);
-        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        name.setGravity(Gravity.CENTER);
-        name.setPadding(dp(3), dp(6), dp(3), dp(2));
+        TextView name = label(movie.name, tv ? 14 : 13);
+        if (tv) {
+            name.setSingleLine(true);
+            name.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+            name.setMarqueeRepeatLimit(-1);
+            name.setGravity(Gravity.CENTER_VERTICAL | Gravity.CENTER_HORIZONTAL);
+            name.setPadding(dp(3), 0, dp(3), 0);
+        } else {
+            name.setMaxLines(2);
+            name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            name.setGravity(Gravity.CENTER);
+            name.setPadding(dp(3), dp(6), dp(3), dp(2));
+        }
         card.addView(name, new LinearLayout.LayoutParams(
-                dp(116), dp(48)));
+                tv ? LinearLayout.LayoutParams.MATCH_PARENT : dp(116),
+                dp(tv ? 32 : 48)));
 
-        card.setOnFocusChangeListener((v, focused) ->
-                v.setBackgroundColor(focused ? BLUE : PANEL));
+        card.setOnFocusChangeListener((v, focused) -> {
+            v.setBackgroundColor(focused ? BLUE : PANEL);
+            name.setSelected(tv && focused);
+        });
         card.setOnClickListener(v -> playVodItem(movie));
 
         return card;
@@ -1524,17 +1536,19 @@ public class MainActivity extends Activity {
     private LinearLayout createSeriesPosterCard(
             Channel series, String base, String user, String pass) {
 
+        boolean tv = isTelevisionDevice();
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER_HORIZONTAL);
         card.setFocusable(true);
         card.setClickable(true);
         card.setBackgroundColor(PANEL);
-        card.setPadding(dp(4), dp(4), dp(4), dp(6));
+        card.setPadding(dp(4), dp(4), dp(4), dp(tv ? 3 : 6));
 
         android.widget.ImageView poster = new android.widget.ImageView(this);
         poster.setLayoutParams(new LinearLayout.LayoutParams(
-                dp(116), dp(164)));
+                tv ? LinearLayout.LayoutParams.MATCH_PARENT : dp(116),
+                dp(tv ? 250 : 164)));
         poster.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
         poster.setBackgroundColor(Color.rgb(35, 45, 62));
 
@@ -1544,17 +1558,28 @@ public class MainActivity extends Activity {
 
         card.addView(poster);
 
-        TextView name = label(series.name, 13);
-        name.setMaxLines(2);
-        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        name.setGravity(Gravity.CENTER);
-        name.setPadding(dp(3), dp(6), dp(3), dp(2));
+        TextView name = label(series.name, tv ? 14 : 13);
+        if (tv) {
+            name.setSingleLine(true);
+            name.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+            name.setMarqueeRepeatLimit(-1);
+            name.setGravity(Gravity.CENTER_VERTICAL | Gravity.CENTER_HORIZONTAL);
+            name.setPadding(dp(3), 0, dp(3), 0);
+        } else {
+            name.setMaxLines(2);
+            name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            name.setGravity(Gravity.CENTER);
+            name.setPadding(dp(3), dp(6), dp(3), dp(2));
+        }
 
         card.addView(name, new LinearLayout.LayoutParams(
-                dp(116), dp(48)));
+                tv ? LinearLayout.LayoutParams.MATCH_PARENT : dp(116),
+                dp(tv ? 32 : 48)));
 
-        card.setOnFocusChangeListener((v, focused) ->
-                v.setBackgroundColor(focused ? BLUE : PANEL));
+        card.setOnFocusChangeListener((v, focused) -> {
+            v.setBackgroundColor(focused ? BLUE : PANEL);
+            name.setSelected(tv && focused);
+        });
 
         card.setOnClickListener(v ->
                 showSeriesEpisodes(series, base, user, pass));
