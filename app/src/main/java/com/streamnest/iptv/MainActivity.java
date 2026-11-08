@@ -103,7 +103,15 @@ public class MainActivity extends Activity {
     private ScrollView tvVodCategoryScroll;
     private LinearLayout tvVodCategoryList;
     private LinearLayout tvVodMovieGrid;
+    private ScrollView tvVodMovieScroll;
     private TextView tvVodMovieStatus;
+    private ArrayList<Channel> tvVodLoadedMovies = new ArrayList<>();
+    private int tvVodNextMovieIndex = 0;
+    private int tvVodMovieLoadGeneration = 0;
+    private boolean tvVodAppendingMovies = false;
+    private int tvVodGridColumns = 4;
+    private int tvVodGridColumn = 0;
+    private LinearLayout tvVodCurrentGridRow;
     private String tvVodSelectedCategoryId = "";
     private String tvVodSelectedCategoryName = "";
     private boolean showingTvSeries = false;
@@ -700,6 +708,8 @@ public class MainActivity extends Activity {
         screen.addView(back);
         setContentView(screen);
 
+
+
         new Thread(() -> {
             ArrayList<String[]> categories = new ArrayList<>();
             String failure = null;
@@ -818,15 +828,25 @@ public class MainActivity extends Activity {
         body.addView(tvVodCategoryScroll, new LinearLayout.LayoutParams(
                 dp(190), LinearLayout.LayoutParams.MATCH_PARENT));
 
-        ScrollView gridScroll = new ScrollView(this);
+        tvVodMovieScroll = new ScrollView(this);
         tvVodMovieGrid = new LinearLayout(this);
         tvVodMovieGrid.setOrientation(LinearLayout.VERTICAL);
         tvVodMovieGrid.setPadding(dp(5), dp(5), dp(5), dp(5));
-        gridScroll.addView(tvVodMovieGrid);
-        body.addView(gridScroll, new LinearLayout.LayoutParams(
+        tvVodMovieScroll.addView(tvVodMovieGrid);
+        body.addView(tvVodMovieScroll, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
 
         setContentView(screen);
+        tvVodMovieScroll.setOnScrollChangeListener(
+                (View v, int x, int y, int oldX, int oldY) -> {
+                    View content = tvVodMovieScroll.getChildAt(0);
+                    if (content != null
+                            && y + tvVodMovieScroll.getHeight()
+                            >= content.getHeight() - dp(500)) {
+                        appendTvVodMovieBatch();
+                    }
+                });
+
 
         new Thread(() -> {
             ArrayList<String[]> categories = new ArrayList<>();
@@ -915,8 +935,15 @@ public class MainActivity extends Activity {
             String base, String user, String pass) {
         tvVodSelectedCategoryId = categoryId;
         tvVodSelectedCategoryName = categoryName;
+        final int generation = ++tvVodMovieLoadGeneration;
+
         tvVodMovieStatus.setText("Loading " + categoryName + "...");
         tvVodMovieGrid.removeAllViews();
+        tvVodLoadedMovies.clear();
+        tvVodNextMovieIndex = 0;
+        tvVodGridColumn = 0;
+        tvVodCurrentGridRow = null;
+        tvVodAppendingMovies = false;
 
         new Thread(() -> {
             ArrayList<Channel> loaded = new ArrayList<>();
@@ -949,48 +976,85 @@ public class MainActivity extends Activity {
 
             final String error = failure;
             runOnUiThread(() -> {
-                tvVodMovieGrid.removeAllViews();
+                if (generation != tvVodMovieLoadGeneration || !showingTvVod) {
+                    return;
+                }
                 if (error != null) {
                     tvVodMovieStatus.setText("Unable to load movies: " + error);
                     return;
                 }
-                tvVodMovieStatus.setText(loaded.size() + " movies");
-
                 if (loaded.isEmpty()) {
+                    tvVodMovieStatus.setText("0 movies");
                     tvVodMovieGrid.addView(label(
                             "No movies were returned in this category.", 16));
                     return;
                 }
 
-                int width = getResources().getConfiguration().screenWidthDp;
-                int columns = Math.max(3, Math.min(7, width / 170));
-                LinearLayout gridRow = null;
-                int column = 0;
-
-                for (Channel movie : loaded) {
-                    if (column == 0) {
-                        gridRow = new LinearLayout(this);
-                        gridRow.setOrientation(LinearLayout.HORIZONTAL);
-                        gridRow.setGravity(Gravity.TOP);
-                        tvVodMovieGrid.addView(gridRow,
-                                new LinearLayout.LayoutParams(
-                                        LinearLayout.LayoutParams.MATCH_PARENT,
-                                        LinearLayout.LayoutParams.WRAP_CONTENT));
-                    }
-
-                    LinearLayout card = createMoviePosterCard(movie);
-                    LinearLayout.LayoutParams cardParams =
-                            new LinearLayout.LayoutParams(
-                                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-                    cardParams.setMargins(dp(4), dp(5), dp(4), dp(8));
-                    gridRow.addView(card, cardParams);
-
-                    column++;
-                    if (column >= columns) column = 0;
-                }
-                focusFirstTvVodPoster();
+                tvVodLoadedMovies = loaded;
+                tvVodMovieStatus.setText(loaded.size() + " movies");
+                tvVodMovieScroll.post(() -> {
+                    boolean tv = isTelevisionDevice();
+                    int widthDp = tv
+                            ? (int) (tvVodMovieScroll.getWidth()
+                                    / getResources().getDisplayMetrics().density)
+                            : getResources().getConfiguration().screenWidthDp;
+                    tvVodGridColumns = Math.max(tv ? 2 : 3,
+                            Math.min(7, widthDp / 170));
+                    appendTvVodMovieBatch();
+                    focusFirstTvVodPoster();
+                });
             });
         }).start();
+    }
+
+    private void appendTvVodMovieBatch() {
+        if (tvVodAppendingMovies || tvVodLoadedMovies.isEmpty()
+                || tvVodNextMovieIndex >= tvVodLoadedMovies.size()) {
+            return;
+        }
+
+        tvVodAppendingMovies = true;
+        int end = Math.min(
+                tvVodNextMovieIndex + 40, tvVodLoadedMovies.size());
+
+        while (tvVodNextMovieIndex < end) {
+            Channel movie = tvVodLoadedMovies.get(tvVodNextMovieIndex++);
+
+            if (tvVodGridColumn == 0) {
+                tvVodCurrentGridRow = new LinearLayout(this);
+                tvVodCurrentGridRow.setOrientation(LinearLayout.HORIZONTAL);
+                tvVodCurrentGridRow.setGravity(Gravity.TOP);
+                tvVodMovieGrid.addView(tvVodCurrentGridRow,
+                        new LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+
+            LinearLayout card = createMoviePosterCard(movie);
+            LinearLayout.LayoutParams cardParams =
+                    new LinearLayout.LayoutParams(
+                            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            cardParams.setMargins(dp(4), dp(5), dp(4), dp(8));
+            tvVodCurrentGridRow.addView(card, cardParams);
+
+            tvVodGridColumn++;
+            if (tvVodGridColumn >= tvVodGridColumns) {
+                tvVodGridColumn = 0;
+                tvVodCurrentGridRow = null;
+            }
+        }
+
+        tvVodAppendingMovies = false;
+
+        tvVodMovieScroll.post(() -> {
+            View content = tvVodMovieScroll.getChildAt(0);
+            if (content != null
+                    && tvVodNextMovieIndex < tvVodLoadedMovies.size()
+                    && content.getHeight()
+                    <= tvVodMovieScroll.getHeight() + dp(500)) {
+                appendTvVodMovieBatch();
+            }
+        });
     }
 
     private void focusTvVodSelectedCategory() {
