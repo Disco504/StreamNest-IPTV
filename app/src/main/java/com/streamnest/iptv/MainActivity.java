@@ -2125,6 +2125,35 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void addGuideMenuItem(LinearLayout menu, String title) {
+        TextView item = label(title, 16);
+        item.setFocusable(true);
+        item.setClickable(true);
+        item.setOnFocusChangeListener((v, focused) ->
+                item.setTextColor(focused ? BLUE : WHITE));
+        item.setOnClickListener(v -> {
+            if ("SETTINGS".equals(title)) {
+                showSettingsDialog();
+            } else if ("SEARCH".equals(title)) {
+                showSearchDialog();
+            } else if ("TV GUIDE".equals(title)) {
+                showTvGuide();
+            } else if ("MOVIES".equals(title)) {
+                showMovies();
+            } else if ("TV SERIES".equals(title)) {
+                showSeries();
+            } else {
+                Toast.makeText(this, title + " — coming next",
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, dp(7), 0, 0);
+        menu.addView(item, params);
+    }
+
     private void addHomeSection(LinearLayout menu, String title,
                                 String subtitle) {
         TextView item = label(title + "\n" + subtitle, 16);
@@ -3000,14 +3029,12 @@ public class MainActivity extends Activity {
             LinearLayout guideMainMenu = new LinearLayout(this);
             guideMainMenu.setOrientation(LinearLayout.VERTICAL);
             guideMainMenu.setPadding(dp(5), dp(5), dp(5), dp(5));
-            guideMainMenu.addView(new View(this), new LinearLayout.LayoutParams(
-                    1, dp(phoneGuideLayout ? 42 : 32)));
-            addHomeSection(guideMainMenu, "SEARCH", "Find live TV channels");
-            addHomeSection(guideMainMenu, "TV GUIDE", "Browse the TV schedule");
-            addHomeSection(guideMainMenu, "MOVIES", "Browse movies");
-            addHomeSection(guideMainMenu, "TV SERIES", "Browse TV series");
-            addHomeSection(guideMainMenu, "CATCH-UP", "Recently aired programs");
-            addHomeSection(guideMainMenu, "SETTINGS", "Playlist and app settings");
+            addGuideMenuItem(guideMainMenu, "SEARCH");
+            addGuideMenuItem(guideMainMenu, "TV GUIDE");
+            addGuideMenuItem(guideMainMenu, "MOVIES");
+            addGuideMenuItem(guideMainMenu, "TV SERIES");
+            addGuideMenuItem(guideMainMenu, "CATCH-UP");
+            addGuideMenuItem(guideMainMenu, "SETTINGS");
 
             guideMainMenuScroll.addView(guideMainMenu);
             guideContent.addView(guideMainMenuScroll,
@@ -3017,8 +3044,6 @@ public class MainActivity extends Activity {
 
         LinearLayout categoryList = new LinearLayout(this);
         categoryList.setOrientation(LinearLayout.VERTICAL);
-        categoryList.addView(new View(this), new LinearLayout.LayoutParams(
-                1, dp(phoneGuideLayout ? 42 : 32)));
         guideCategoryScrollView = new ScrollView(this);
         guideCategoryScrollView.addView(categoryList);
         guideCategoryScrollView.setVisibility(
@@ -3036,10 +3061,12 @@ public class MainActivity extends Activity {
 
         android.widget.FrameLayout guideContentFrame =
                 new android.widget.FrameLayout(this);
-        guideContentFrame.addView(guideContent,
+        android.widget.FrameLayout.LayoutParams contentParams =
                 new android.widget.FrameLayout.LayoutParams(
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                        android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT);
+        contentParams.topMargin = dp(phoneGuideLayout ? 43 : 33);
+        guideContentFrame.addView(guideContent, contentParams);
 
         View guideDivider = new View(this);
         guideDivider.setBackgroundColor(0xFF777777);
