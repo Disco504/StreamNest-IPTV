@@ -5,6 +5,7 @@
     <application
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:label="StreamNest IPTV"
+        android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
 
         <activity
@@ -14,6 +15,7 @@
 
         <activity
             android:name="com.streamnest.iptv.MainActivity"
+            android:theme="@style/StreamNestLaunchTheme"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden">
             <intent-filter>

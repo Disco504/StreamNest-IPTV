@@ -1,0 +1,9 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="#06152F" />
+    <item>
+        <bitmap
+            android:src="@drawable/streamnest_splash"
+            android:gravity="center"
+            android:filter="true" />
+    </item>
+</layer-list>
