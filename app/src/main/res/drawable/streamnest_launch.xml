@@ -1,5 +1,5 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="#06152F" />
+    <item android:drawable="@color/streamnest_splash_background" />
     <item>
         <bitmap
             android:src="@drawable/streamnest_splash"
