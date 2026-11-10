@@ -3077,7 +3077,7 @@ public class MainActivity extends Activity {
         screen.removeAllViews();
         screen.setOrientation(LinearLayout.VERTICAL);
 
-        int previewHeight = phoneGuideLayout ? dp(110) : dp(250);
+        int previewHeight = phoneGuideLayout ? dp(110) : dp(190);
 
         LinearLayout previewRow = new LinearLayout(this);
         previewRow.setOrientation(LinearLayout.HORIZONTAL);
