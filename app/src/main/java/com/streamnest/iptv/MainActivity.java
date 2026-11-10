@@ -3856,50 +3856,6 @@ if (categoryPrograms == null) {
                         dp(3),
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT);
         markerParams.leftMargin = 0;
-        android.widget.ScrollView stationaryLabelsScroll =
-                new android.widget.ScrollView(this) {
-            private boolean stationaryLabelTouchActive;
-
-            @Override
-            public boolean dispatchTouchEvent(android.view.MotionEvent event) {
-                if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) {
-                    stationaryLabelTouchActive = false;
-                    float y = event.getY() + getScrollY();
-                    float x = event.getX();
-
-                    for (int i = 0; i < stationaryLabels.getChildCount(); i++) {
-                        View child = stationaryLabels.getChildAt(i);
-                        if (child.isClickable() && child.isFocusable()
-                                && x >= child.getLeft() && x <= child.getRight()
-                                && y >= child.getTop() && y <= child.getBottom()) {
-                            stationaryLabelTouchActive = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (!stationaryLabelTouchActive) return false;
-
-                boolean handled = super.dispatchTouchEvent(event);
-
-                if (event.getAction() == android.view.MotionEvent.ACTION_UP
-                        || event.getAction() == android.view.MotionEvent.ACTION_CANCEL) {
-                    stationaryLabelTouchActive = false;
-                }
-
-                return handled;
-            }
-        };
-        stationaryLabelsScroll.setFillViewport(false);
-        stationaryLabelsScroll.setVerticalScrollBarEnabled(false);
-        stationaryLabelsScroll.setHorizontalScrollBarEnabled(false);
-        stationaryLabelsScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        stationaryLabelsScroll.addView(stationaryLabels);
-        programRowsFrame.addView(stationaryLabelsScroll,
-                new android.widget.FrameLayout.LayoutParams(
-                        channelWidth,
-                        android.view.ViewGroup.LayoutParams.MATCH_PARENT));
-
         programRowsFrame.addView(currentTimeMarker, markerParams);
 
         final int[] lastWindowIndex = {-1};
@@ -3965,9 +3921,6 @@ if (categoryPrograms == null) {
             }
         });
         rowVerticalScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
-            if (stationaryLabelsScroll.getScrollY() != y) {
-                stationaryLabelsScroll.scrollTo(0, y);
-            }
             if (channelVerticalScroll.getScrollY() != y) {
                 channelVerticalScroll.scrollTo(0, y);
             }
@@ -3995,8 +3948,6 @@ if (categoryPrograms == null) {
 
         LinearLayout timeline = new LinearLayout(this);
         timeline.setOrientation(LinearLayout.HORIZONTAL);
-        timeline.addView(channelColumn, new LinearLayout.LayoutParams(
-                channelWidth, LinearLayout.LayoutParams.MATCH_PARENT));
         timeline.addView(programColumn, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
 
