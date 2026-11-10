@@ -95,6 +95,8 @@ public class MainActivity extends Activity {
     private String selectedCategory = "All Channels";
     private boolean showingLiveTv = false;
     private boolean showingTvGuide = false;
+    private boolean startupGuidePending = false;
+    private boolean startupPreviewSuppressed = false;
     private boolean guideBackLongPressHandled = false;
     private ScrollView guideCategoryScrollView;
     private ScrollView guideMainMenuScroll;
@@ -194,8 +196,11 @@ public class MainActivity extends Activity {
 
             if (!server.isEmpty() && !username.isEmpty()
                     && !password.isEmpty()) {
-                loadXtreamChannels(server, username, password,
-                        prefs.getBoolean("launch_live_tv_on_boot", true));
+                boolean launchOnBoot =
+                        prefs.getBoolean("launch_live_tv_on_boot", true);
+                startupGuidePending = launchOnBoot;
+                startupPreviewSuppressed = launchOnBoot;
+                loadXtreamChannels(server, username, password, launchOnBoot);
             } else {
                 Toast.makeText(this,
                         "Please log in to Xtream Codes once more to save your password.",
@@ -208,8 +213,11 @@ public class MainActivity extends Activity {
         if ("m3u".equals(type)
                 || (type.isEmpty() && !playlistUrl.isEmpty())) {
             if (!playlistUrl.isEmpty()) {
-                loadPlaylist(playlistUrl,
-                        prefs.getBoolean("launch_live_tv_on_boot", true));
+                boolean launchOnBoot =
+                        prefs.getBoolean("launch_live_tv_on_boot", true);
+                startupGuidePending = launchOnBoot;
+                startupPreviewSuppressed = launchOnBoot;
+                loadPlaylist(playlistUrl, launchOnBoot);
             }
         }
     }
@@ -3043,11 +3051,15 @@ public class MainActivity extends Activity {
         showingTvGuide = true;
         String epgUrl = getPreferences(MODE_PRIVATE).getString("epg_url", "");
         if (epgUrl.trim().isEmpty()) {
+            startupGuidePending = false;
+            startupPreviewSuppressed = false;
             Toast.makeText(this, "Open Settings to enter your XMLTV EPG URL.",
                     Toast.LENGTH_LONG).show();
             return;
         }
         if (channels.isEmpty()) {
+            startupGuidePending = false;
+            startupPreviewSuppressed = false;
             Toast.makeText(this, "Load your M3U playlist first.",
                     Toast.LENGTH_LONG).show();
             return;
@@ -3254,7 +3266,11 @@ public class MainActivity extends Activity {
                 final String message = e.getMessage() == null
                         ? e.getClass().getSimpleName() : e.getMessage();
                 android.util.Log.e("StreamNest", "Could not load the EPG: " + message);
-                runOnUiThread(() -> status.setText("Could not load EPG: " + message));
+                runOnUiThread(() -> {
+                    startupGuidePending = false;
+                    startupPreviewSuppressed = false;
+                    status.setText("Could not load EPG: " + message);
+                });
             } finally {
                 if (connection != null) {
                     connection.disconnect();
@@ -3471,6 +3487,12 @@ public class MainActivity extends Activity {
                 }
             }
             selectedCategoryView.performClick();
+        }
+
+        if (startupGuidePending) {
+            startupGuidePending = false;
+            startupPreviewSuppressed = false;
+            launchLastPlayedChannel();
         }
     }
 
@@ -3818,7 +3840,11 @@ if (categoryPrograms == null) {
                 }
             }
             if (previewChannel != null) {
-                playGuidePreview(previewChannel);
+                if (startupPreviewSuppressed) {
+                    guidePreviewChannel = previewChannel;
+                } else {
+                    playGuidePreview(previewChannel);
+                }
             }
         }
         refreshGuideChannelNameBorders();
