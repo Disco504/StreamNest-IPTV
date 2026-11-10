@@ -3077,7 +3077,7 @@ public class MainActivity extends Activity {
         screen.removeAllViews();
         screen.setOrientation(LinearLayout.VERTICAL);
 
-        int previewHeight = phoneGuideLayout ? dp(110) : dp(190);
+        int previewHeight = phoneGuideLayout ? dp(110) : dp(250);
 
         LinearLayout previewRow = new LinearLayout(this);
         previewRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -3525,6 +3525,7 @@ if (categoryPrograms == null) {
                 new android.graphics.drawable.ColorDrawable(0xFF777777));
         timeHeader.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
 
+
         SimpleDateFormat dateTimeLabel =
                 new SimpleDateFormat("EEE, MMM d\nh:mm a", Locale.getDefault());
         TextView channelHeader = label(dateTimeLabel.format(new Date()), 11);
@@ -3630,8 +3631,7 @@ if (categoryPrograms == null) {
             channelCell.addView(channelLabel, new LinearLayout.LayoutParams(
                     0, rowHeight, 1f));
 
-            channelRows.addView(channelCell, new LinearLayout.LayoutParams(
-                    channelWidth, rowHeight));
+            channelRows.addView(channelCell, new LinearLayout.LayoutParams(channelWidth, rowHeight));
 
             if (rowChannel != null && rowChannel.logoUrl != null
                     && !rowChannel.logoUrl.trim().isEmpty()) {
@@ -3857,6 +3857,16 @@ if (categoryPrograms == null) {
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT);
         markerParams.leftMargin = 0;
         programRowsFrame.addView(currentTimeMarker, markerParams);
+        horizontalScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
+            if (headerScroll.getScrollX() != x) {
+                headerScroll.scrollTo(x, 0);
+            }
+            long now = System.currentTimeMillis();
+            long elapsed = Math.max(0L, now - gridStart);
+            int markerX = dp((int) Math.round((elapsed / 60000.0) * pixelsPerMinute)) - x;
+            markerParams.leftMargin = markerX;
+            currentTimeMarker.setLayoutParams(markerParams);
+        });
 
         final int[] lastWindowIndex = {-1};
         final long twoHoursMillis = 2L * 60L * 60L * 1000L;
@@ -3877,8 +3887,7 @@ if (categoryPrograms == null) {
                 int windowIndex = (int) (elapsedMillis / twoHoursMillis);
                 long withinWindowMillis = elapsedMillis % twoHoursMillis;
 
-                int markerX = dp((int) Math.round(
-                        (withinWindowMillis / 60000.0) * pixelsPerMinute));
+                int markerX = dp((int) Math.round((elapsedMillis / 60000.0) * pixelsPerMinute)) - horizontalScroll.getScrollX();
                 markerParams.leftMargin = markerX;
                 currentTimeMarker.setLayoutParams(markerParams);
 
@@ -3886,8 +3895,7 @@ if (categoryPrograms == null) {
                         && horizontalScroll.getChildCount() > 0
                         && horizontalScroll.getWidth() > 0
                         && horizontalScroll.getChildAt(0).getWidth() > 0) {
-                    int targetX = dp(
-                            windowIndex * 120 * pixelsPerMinute);
+                    int targetX = dp(windowIndex * 120 * pixelsPerMinute);
                     int contentWidth =
                             horizontalScroll.getChildAt(0).getWidth();
                     int maxScroll = Math.max(
@@ -3948,6 +3956,7 @@ if (categoryPrograms == null) {
 
         LinearLayout timeline = new LinearLayout(this);
         timeline.setOrientation(LinearLayout.HORIZONTAL);
+        timeline.addView(channelColumn, new LinearLayout.LayoutParams(channelWidth, LinearLayout.LayoutParams.MATCH_PARENT));
         timeline.addView(programColumn, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
 
