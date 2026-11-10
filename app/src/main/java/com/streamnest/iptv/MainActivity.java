@@ -3221,7 +3221,7 @@ public class MainActivity extends Activity {
             android.widget.FrameLayout content =
                     findViewById(android.R.id.content);
             startupCoverView = new View(this);
-            startupCoverView.setBackgroundColor(Color.BLACK);
+            startupCoverView.setBackgroundColor(NAVY);
             startupCoverView.setClickable(true);
             content.addView(startupCoverView,
                     new android.widget.FrameLayout.LayoutParams(
