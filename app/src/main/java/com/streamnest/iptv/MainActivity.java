@@ -3902,6 +3902,8 @@ if (categoryPrograms == null) {
 
         programRowsFrame.addView(currentTimeMarker, markerParams);
 
+        final int[] lastWindowIndex = {-1};
+        final long twoHoursMillis = 2L * 60L * 60L * 1000L;
         final Runnable[] timelineScroller = new Runnable[1];
         timelineScroller[0] = new Runnable() {
             @Override
@@ -3909,20 +3911,36 @@ if (categoryPrograms == null) {
                 long now = System.currentTimeMillis();
                 channelHeader.setText(dateTimeLabel.format(new Date(now)));
 
-                int minutes = (int) Math.max(
-                        0L, (now - gridStart) / 60000L);
-                int targetX = dp(minutes * pixelsPerMinute);
-                if (horizontalScroll.getChildCount() > 0
+                if (now >= gridEnd) {
+                    renderGuideCategoryPrograms(
+                            category, grouped, channelMap, results);
+                    return;
+                }
+
+                long elapsedMillis = Math.max(0L, now - gridStart);
+                int windowIndex = (int) (elapsedMillis / twoHoursMillis);
+                long withinWindowMillis = elapsedMillis % twoHoursMillis;
+
+                int markerX = dp((int) Math.round(
+                        (withinWindowMillis / 60000.0) * pixelsPerMinute));
+                markerParams.leftMargin = markerX;
+                currentTimeMarker.setLayoutParams(markerParams);
+
+                if (lastWindowIndex[0] != windowIndex
+                        && horizontalScroll.getChildCount() > 0
                         && horizontalScroll.getWidth() > 0
                         && horizontalScroll.getChildAt(0).getWidth() > 0) {
+                    int targetX = dp(
+                            windowIndex * 120 * pixelsPerMinute);
                     int contentWidth =
                             horizontalScroll.getChildAt(0).getWidth();
                     int maxScroll = Math.max(
                             0, contentWidth - horizontalScroll.getWidth());
-
                     horizontalScroll.scrollTo(
                             Math.min(targetX, maxScroll), 0);
+                    lastWindowIndex[0] = windowIndex;
                 }
+
                 clockHandler.postDelayed(this, 1000L);
             }
         };
