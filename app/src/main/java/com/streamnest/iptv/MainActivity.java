@@ -3490,6 +3490,9 @@ if (categoryPrograms == null) {
         final long slotMillis = 30L * 60L * 1000L;
         java.util.Calendar guideCalendar =
                 java.util.Calendar.getInstance();
+        int currentHour = guideCalendar.get(java.util.Calendar.HOUR_OF_DAY);
+        guideCalendar.set(java.util.Calendar.HOUR_OF_DAY,
+                (currentHour / 2) * 2);
         guideCalendar.set(java.util.Calendar.MINUTE, 0);
         guideCalendar.set(java.util.Calendar.SECOND, 0);
         guideCalendar.set(java.util.Calendar.MILLISECOND, 0);
@@ -3645,21 +3648,35 @@ if (categoryPrograms == null) {
                 configureGuideNoInfoBrick(stationaryLabel, rowChannel);
                 stationaryLabels.addView(stationaryLabel,
                         new LinearLayout.LayoutParams(dp(160), rowHeight));
-                TextView cell = label("", 11);
-                cell.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.LEFT);
-                cell.setPadding(dp(3), dp(2), dp(3), dp(2));
-                cell.setMaxLines(2);
-                cell.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                configureGuideNoInfoBrick(cell, rowChannel);
-                row.addView(cell, new LinearLayout.LayoutParams(
-                        Math.max(1, dp(24 * 60 * pixelsPerMinute)),
-                        rowHeight));
+
+                final long twoHours = 2L * 60L * 60L * 1000L;
+                for (int blockIndex = 0; blockIndex < 12; blockIndex++) {
+                    long blockStart = gridStart + blockIndex * twoHours;
+                    long blockEnd = blockStart + twoHours;
+                    TextView cell = label(rowName, 12);
+                    cell.setGravity(android.view.Gravity.CENTER);
+                    cell.setPadding(dp(4), dp(2), dp(4), dp(2));
+                    cell.setMaxLines(2);
+                    cell.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    configureGuideNoInfoBrick(cell, rowChannel);
+                    cell.setOnClickListener(v -> {
+                        long clickTime = System.currentTimeMillis();
+                        if (clickTime < blockStart || clickTime >= blockEnd) return;
+                        if (guidePreviewChannel != null
+                                && rowChannel.url != null
+                                && rowChannel.url.equals(guidePreviewChannel.url)) {
+                            playChannel(rowChannel);
+                        } else {
+                            playGuidePreview(rowChannel);
+                        }
+                    });
+                    row.addView(cell, new LinearLayout.LayoutParams(
+                            dp(120 * pixelsPerMinute), rowHeight));
+                }
                 grid.addView(row, new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT, rowHeight));
                 continue;
             }
-            stationaryLabels.addView(new View(this),
-                    new LinearLayout.LayoutParams(dp(160), rowHeight));
             long cursor = gridStart;
             for (EpgProgram program : programs) {
                 long startTime = Math.max(program.startMillis, gridStart);
