@@ -97,6 +97,8 @@ public class MainActivity extends Activity {
     private boolean showingTvGuide = false;
     private boolean startupGuidePending = false;
     private boolean startupPreviewSuppressed = false;
+    private View startupCoverView;
+    private boolean startupPlayerLaunched = false;
     private boolean guideBackLongPressHandled = false;
     private ScrollView guideCategoryScrollView;
     private ScrollView guideMainMenuScroll;
@@ -547,10 +549,23 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (startupPlayerLaunched) {
+            removeStartupCover();
+            startupPlayerLaunched = false;
+        }
         if (showingTvGuide && previewPlayerView != null
                 && guidePreviewChannel != null) {
             playGuidePreview(guidePreviewChannel);
         }
+    }
+
+    private void removeStartupCover() {
+        if (startupCoverView != null
+                && startupCoverView.getParent() instanceof android.view.ViewGroup) {
+            ((android.view.ViewGroup) startupCoverView.getParent())
+                    .removeView(startupCoverView);
+        }
+        startupCoverView = null;
     }
 
 
@@ -3202,6 +3217,18 @@ public class MainActivity extends Activity {
                     LinearLayout.LayoutParams.WRAP_CONTENT, dp(48)));
         }
 
+        if (startupGuidePending) {
+            android.widget.FrameLayout content =
+                    findViewById(android.R.id.content);
+            startupCoverView = new View(this);
+            startupCoverView.setBackgroundColor(Color.BLACK);
+            startupCoverView.setClickable(true);
+            content.addView(startupCoverView,
+                    new android.widget.FrameLayout.LayoutParams(
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+        }
+
         Thread worker = new Thread(() -> {
             HttpURLConnection connection = null;
             try {
@@ -3269,6 +3296,7 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     startupGuidePending = false;
                     startupPreviewSuppressed = false;
+                    removeStartupCover();
                     status.setText("Could not load EPG: " + message);
                 });
             } finally {
@@ -3492,7 +3520,9 @@ public class MainActivity extends Activity {
         if (startupGuidePending) {
             startupGuidePending = false;
             startupPreviewSuppressed = false;
-            launchLastPlayedChannel();
+            if (!launchLastPlayedChannel()) {
+                removeStartupCover();
+            }
         }
     }
 
@@ -4253,6 +4283,9 @@ private void playChannel(Channel channel) {
                 .apply();
 
         releaseGuidePreviewPlayer();
+        if (startupCoverView != null) {
+            startupPlayerLaunched = true;
+        }
 
         Intent intent = new Intent(this, PlayerActivity.class);
         intent.putExtra("channel_name", channel.name);
