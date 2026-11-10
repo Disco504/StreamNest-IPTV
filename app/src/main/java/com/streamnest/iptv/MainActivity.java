@@ -3090,7 +3090,7 @@ public class MainActivity extends Activity {
         previewPlayerView.setFocusable(false);
         previewPlayerView.setBackgroundColor(Color.BLACK);
         previewRow.addView(previewPlayerView, new LinearLayout.LayoutParams(
-                0, previewHeight, phoneGuideLayout ? 1.2f : 1.4f));
+                0, previewHeight, phoneGuideLayout ? 1.2f : 0.35f));
 
         LinearLayout previewInfo = new LinearLayout(this);
         previewInfo.setOrientation(LinearLayout.VERTICAL);
@@ -3102,7 +3102,7 @@ public class MainActivity extends Activity {
                 "Programme information unavailable", 13);
         previewInfo.addView(guidePreviewProgramInfoView);
         previewRow.addView(previewInfo, new LinearLayout.LayoutParams(
-                0, previewHeight, phoneGuideLayout ? 0.8f : 1.6f));
+                0, previewHeight, phoneGuideLayout ? 0.8f : 0.65f));
 
         screen.addView(previewRow, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, previewHeight));
@@ -3154,7 +3154,7 @@ public class MainActivity extends Activity {
                 new android.widget.FrameLayout.LayoutParams(
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT);
-        contentParams.topMargin = dp(phoneGuideLayout ? 43 : 33);
+        contentParams.topMargin = dp(phoneGuideLayout ? 43 : 0);
         guideContentFrame.addView(guideContent, contentParams);
 
         View guideDivider = new View(this);
@@ -3163,7 +3163,7 @@ public class MainActivity extends Activity {
                 new android.widget.FrameLayout.LayoutParams(
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                         dp(1));
-        dividerParams.topMargin = dp(phoneGuideLayout ? 42 : 32);
+        dividerParams.topMargin = dp(phoneGuideLayout ? 42 : 0);
         guideContentFrame.addView(guideDivider, dividerParams);
 
         screen.addView(guideContentFrame, new LinearLayout.LayoutParams(
