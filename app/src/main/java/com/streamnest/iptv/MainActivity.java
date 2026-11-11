@@ -1373,7 +1373,7 @@ public class MainActivity extends Activity {
         android.widget.FrameLayout hero = new android.widget.FrameLayout(this);
         hero.setBackgroundColor(Color.rgb(25, 35, 50));
         android.widget.ImageView backdrop = new android.widget.ImageView(this);
-        backdrop.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        backdrop.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         hero.addView(backdrop, new android.widget.FrameLayout.LayoutParams(
                 -1, -1));
         View shade = new View(this);
@@ -1381,7 +1381,7 @@ public class MainActivity extends Activity {
         hero.addView(shade, new android.widget.FrameLayout.LayoutParams(
                 -1, -1));
         content.addView(hero, new LinearLayout.LayoutParams(
-                -1, dp(isTelevisionDevice() ? 300 : 210)));
+                -1, dp(isTelevisionDevice() ? 400 : 210)));
 
         TextView title = label(movie.name, 26);
         title.setTextColor(Color.WHITE);
@@ -1409,13 +1409,13 @@ public class MainActivity extends Activity {
         TextView play = label("▶  PLAY", 20);
         play.setTextColor(Color.WHITE);
         play.setTypeface(null, Typeface.BOLD);
-        play.setGravity(Gravity.CENTER);
+        play.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
         play.setFocusable(true);
         play.setClickable(true);
-        play.setPadding(dp(16), dp(14), dp(16), dp(14));
-        play.setBackgroundColor(BLUE);
+        play.setPadding(0, dp(14), 0, dp(14));
+        play.setBackgroundColor(Color.TRANSPARENT);
         play.setOnFocusChangeListener((v, focused) ->
-                v.setBackgroundColor(focused ? Color.rgb(35, 125, 220) : BLUE));
+                play.setTextColor(focused ? Color.YELLOW : Color.WHITE));
         play.setOnClickListener(v -> playVodItem(movie));
         LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(
                 -1, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -1424,18 +1424,18 @@ public class MainActivity extends Activity {
 
         TextView myList = label("", 16);
         myList.setTextColor(Color.WHITE);
-        myList.setGravity(Gravity.CENTER);
+        myList.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
         myList.setFocusable(true);
         myList.setClickable(true);
-        myList.setPadding(dp(12), dp(13), dp(12), dp(13));
-        myList.setBackgroundColor(PANEL);
+        myList.setPadding(0, dp(13), 0, dp(13));
+        myList.setBackgroundColor(Color.TRANSPARENT);
         Runnable updateMyListText = () -> myList.setText(
                 isMovieSaved(movie.vodId)
                         ? "✓  REMOVE FROM MY LIST"
                         : "+  ADD TO MY LIST");
         updateMyListText.run();
         myList.setOnFocusChangeListener((v, focused) ->
-                v.setBackgroundColor(focused ? BLUE : PANEL));
+                myList.setTextColor(focused ? Color.YELLOW : Color.WHITE));
         myList.setOnClickListener(v -> {
             if (isMovieSaved(movie.vodId)) {
                 removeMovieFromList(movie.vodId);
@@ -1446,12 +1446,15 @@ public class MainActivity extends Activity {
         });
         content.addView(myList);
 
-        TextView back = label("BACK", 16);
+        TextView back = label("‹  BACK", 16);
         back.setTextColor(MUTED);
-        back.setGravity(Gravity.CENTER);
+        back.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
         back.setFocusable(true);
         back.setClickable(true);
-        back.setPadding(dp(12), dp(14), dp(12), dp(14));
+        back.setPadding(0, dp(14), 0, dp(14));
+        back.setBackgroundColor(Color.TRANSPARENT);
+        back.setOnFocusChangeListener((v, focused) ->
+                back.setTextColor(focused ? Color.YELLOW : MUTED));
         back.setOnClickListener(v -> onBackPressed());
         content.addView(back);
 
@@ -1461,7 +1464,7 @@ public class MainActivity extends Activity {
         setContentView(screen);
 
         if (movie.logoUrl != null && !movie.logoUrl.isEmpty()) {
-            loadChannelLogo(backdrop, movie.logoUrl);
+            loadMovieBackdrop(backdrop, movie.logoUrl);
         }
         play.requestFocus();
 
@@ -1546,7 +1549,7 @@ public class MainActivity extends Activity {
                     if (!imageUrl.startsWith("http")) {
                         imageUrl = base + "/" + imageUrl.replaceFirst("^/+", "");
                     }
-                    loadChannelLogo(backdrop, imageUrl);
+                    loadMovieBackdrop(backdrop, imageUrl);
                 }
             });
         }).start();
@@ -4452,6 +4455,90 @@ if (categoryPrograms == null) {
                 if (tempFile != null) {
                     tempFile.delete();
                 }
+            }
+        });
+    }
+
+    private void loadMovieBackdrop(
+            android.widget.ImageView imageView, String imageUrl) {
+        if (imageUrl == null || imageUrl.isEmpty()) return;
+        imageView.setTag(imageUrl);
+
+        logoExecutor.execute(() -> {
+            java.net.HttpURLConnection connection = null;
+            java.io.File tempFile = null;
+
+            try {
+                connection = (java.net.HttpURLConnection)
+                        new java.net.URL(imageUrl).openConnection();
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(5000);
+                connection.setInstanceFollowRedirects(true);
+                connection.connect();
+
+                tempFile = java.io.File.createTempFile(
+                        "movie_backdrop_", ".img", getCacheDir());
+
+                long totalBytes = 0;
+                byte[] buffer = new byte[8192];
+
+                try (java.io.InputStream stream =
+                             connection.getInputStream();
+                     java.io.FileOutputStream output =
+                             new java.io.FileOutputStream(tempFile)) {
+                    int count;
+                    while ((count = stream.read(buffer)) != -1) {
+                        totalBytes += count;
+                        if (totalBytes > 10 * 1024 * 1024) {
+                            throw new java.io.IOException(
+                                    "Movie artwork exceeds 10 MB");
+                        }
+                        output.write(buffer, 0, count);
+                    }
+                }
+
+                android.graphics.BitmapFactory.Options bounds =
+                        new android.graphics.BitmapFactory.Options();
+                bounds.inJustDecodeBounds = true;
+                android.graphics.BitmapFactory.decodeFile(
+                        tempFile.getAbsolutePath(), bounds);
+
+                if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                    return;
+                }
+
+                int sampleSize = 1;
+                while (bounds.outWidth / sampleSize > 1920
+                        || bounds.outHeight / sampleSize > 1080) {
+                    sampleSize *= 2;
+                }
+
+                android.graphics.BitmapFactory.Options options =
+                        new android.graphics.BitmapFactory.Options();
+                options.inSampleSize = sampleSize;
+                options.inPreferredConfig =
+                        android.graphics.Bitmap.Config.ARGB_8888;
+
+                android.graphics.Bitmap bitmap =
+                        android.graphics.BitmapFactory.decodeFile(
+                                tempFile.getAbsolutePath(), options);
+
+                if (bitmap != null) {
+                    boolean posted = imageView.post(() -> {
+                        if (imageUrl.equals(imageView.getTag())) {
+                            imageView.setImageBitmap(bitmap);
+                        } else {
+                            bitmap.recycle();
+                        }
+                    });
+                    if (!posted) bitmap.recycle();
+                }
+            } catch (Exception e) {
+                android.util.Log.d("StreamNest",
+                        "Movie backdrop unavailable: " + imageUrl, e);
+            } finally {
+                if (connection != null) connection.disconnect();
+                if (tempFile != null) tempFile.delete();
             }
         });
     }
