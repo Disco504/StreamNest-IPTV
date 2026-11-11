@@ -6,7 +6,7 @@ name: Build StreamNest IPTV APK
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 
 jobs:
@@ -59,3 +59,16 @@ jobs:
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
   
+
+      - name: Prepare stable APK filename
+        run: cp app/build/outputs/apk/release/*.apk StreamNest-IPTV.apk
+
+      - name: Publish latest GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest StreamNest IPTV
+          body: Official signed StreamNest IPTV Android release.
+          files: StreamNest-IPTV.apk
+          overwrite_files: true
+          make_latest: true
