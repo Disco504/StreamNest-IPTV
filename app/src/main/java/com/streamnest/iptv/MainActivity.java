@@ -103,6 +103,9 @@ public class MainActivity extends Activity {
     private ScrollView guideCategoryScrollView;
     private ScrollView guideMainMenuScroll;
     private boolean showingTvVod = false;
+    private boolean showingMovieDetails = false;
+    private LinearLayout movieGridScreen;
+    private View movieReturnFocus;
     private ScrollView tvVodMainMenuScroll;
     private ScrollView tvVodCategoryScroll;
     private LinearLayout tvVodCategoryList;
@@ -139,6 +142,8 @@ public class MainActivity extends Activity {
         String group;
         String tvgId;
         String logoUrl;
+        String vodId = "";
+        String vodExtension = "mp4";
 
         Channel(String name, String url, String group, String tvgId) {
             this(name, url, group, tvgId, "");
@@ -473,6 +478,19 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
+        if (showingMovieDetails) {
+            showingMovieDetails = false;
+            if (movieGridScreen != null) {
+                screen = movieGridScreen;
+                setContentView(screen);
+                movieGridScreen = null;
+            }
+            if (movieReturnFocus != null) {
+                movieReturnFocus.requestFocus();
+                movieReturnFocus = null;
+            }
+            return;
+        }
         if (showingTvVod) {
             if (tvVodCategoryScroll != null
                     && tvVodCategoryScroll.getVisibility() == View.VISIBLE) {
@@ -611,7 +629,7 @@ public class MainActivity extends Activity {
             v.setBackgroundColor(focused ? BLUE : PANEL);
             name.setSelected(tv && focused);
         });
-        card.setOnClickListener(v -> playVodItem(movie));
+        card.setOnClickListener(v -> showMovieDetails(movie, card));
 
         return card;
     }
@@ -628,6 +646,7 @@ public class MainActivity extends Activity {
 
         ArrayList<String[]> ordered = new ArrayList<>();
         ordered.add(new String[]{"__ALL_MOVIES__", "ALL MOVIES"});
+            ordered.add(new String[]{"__MY_LIST__", "MY LIST"});
 
         String[] releases = null;
         for (String[] category : categories) {
@@ -908,13 +927,15 @@ public class MainActivity extends Activity {
                     tvVodMovieStatus.setText("Unable to load categories: " + error);
                     return;
                 }
+                tvVodCategoryList.addView(createTvVodCategoryItem(
+                        "__ALL_MOVIES__", "ALL MOVIES", base, user, pass));
+                tvVodCategoryList.addView(createTvVodCategoryItem(
+                        "__MY_LIST__", "MY LIST", base, user, pass));
+
                 if (loadedCategories.isEmpty()) {
                     tvVodMovieStatus.setText("No movie categories were returned.");
                     return;
                 }
-
-                tvVodCategoryList.addView(createTvVodCategoryItem(
-                        "__ALL_MOVIES__", "ALL MOVIES", base, user, pass));
 
                 for (String[] category : loadedCategories) {
                     tvVodCategoryList.addView(createTvVodCategoryItem(
@@ -972,6 +993,9 @@ public class MainActivity extends Activity {
             ArrayList<Channel> loaded = new ArrayList<>();
             String failure = null;
             try {
+                if ("__MY_LIST__".equals(categoryId)) {
+                    loaded.addAll(buildSavedMovieChannels(base, user, pass));
+                } else {
                 String api = base + "/player_api.php?username="
                         + apiEncode(user) + "&password=" + apiEncode(pass);
                 String streamsUrl = api + "&action=get_vod_streams";
@@ -989,9 +1013,13 @@ public class MainActivity extends Activity {
                     String name = seriesJsonString(item, "name", "Untitled movie");
                     String icon = seriesJsonString(item, "stream_icon", "");
 
-                    loaded.add(new Channel(
-                            name, url, categoryName, "", icon));
+                    Channel movie = new Channel(
+                            name, url, categoryName, "", icon);
+                    movie.vodId = id;
+                    movie.vodExtension = extension;
+                    loaded.add(movie);
                 });
+                }
             } catch (Exception e) {
                 failure = e.getMessage() == null
                         ? "Could not load movies." : e.getMessage();
@@ -1143,6 +1171,9 @@ public class MainActivity extends Activity {
             String failure = null;
 
             try {
+                if ("__MY_LIST__".equals(categoryId)) {
+                    loaded.addAll(buildSavedMovieChannels(base, user, pass));
+                } else {
                 String api = base + "/player_api.php?username="
                         + apiEncode(user) + "&password=" + apiEncode(pass);
 
@@ -1163,16 +1194,17 @@ public class MainActivity extends Activity {
                             + Uri.encode(pass) + "/" + Uri.encode(id) + "."
                             + Uri.encode(extension);
 
-                    loaded.add(new Channel(
+                    Channel movie = new Channel(
                             item.optString("name", "Untitled movie"),
                             url,
                             categoryName,
                             "",
-                            item.optString("stream_icon", "")));
+                            item.optString("stream_icon", ""));
+                    movie.vodId = id;
+                    movie.vodExtension = extension;
+                    loaded.add(movie);
                 }
-
-
-
+                }
             } catch (Exception e) {
                 failure = e.getMessage() == null
                         ? "Could not load movies." : e.getMessage();
@@ -1232,6 +1264,289 @@ public class MainActivity extends Activity {
                     if (firstRow.getChildCount() > 0) {
                         firstRow.getChildAt(0).requestFocus();
                     }
+                }
+            });
+        }).start();
+    }
+
+    private JSONArray getSavedMovieList() {
+        String json = getPreferences(MODE_PRIVATE)
+                .getString("movie_my_list", "[]");
+        try {
+            return new JSONArray(json);
+        } catch (Exception e) {
+            return new JSONArray();
+        }
+    }
+
+    private boolean isMovieSaved(String vodId) {
+        if (vodId == null || vodId.isEmpty()) return false;
+        JSONArray saved = getSavedMovieList();
+        for (int i = 0; i < saved.length(); i++) {
+            JSONObject entry = saved.optJSONObject(i);
+            if (entry != null && vodId.equals(entry.optString("id", ""))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void saveMovieToList(Channel movie) {
+        if (movie == null || movie.vodId == null || movie.vodId.isEmpty()) return;
+        JSONArray saved = getSavedMovieList();
+        for (int i = 0; i < saved.length(); i++) {
+            JSONObject entry = saved.optJSONObject(i);
+            if (entry != null && movie.vodId.equals(entry.optString("id", ""))) {
+                return;
+            }
+        }
+        JSONObject entry = new JSONObject();
+        try {
+            entry.put("id", movie.vodId);
+            entry.put("name", movie.name);
+            entry.put("logo", movie.logoUrl);
+            entry.put("extension", movie.vodExtension);
+            saved.put(entry);
+            getPreferences(MODE_PRIVATE).edit()
+                    .putString("movie_my_list", saved.toString()).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void removeMovieFromList(String vodId) {
+        JSONArray saved = getSavedMovieList();
+        JSONArray updated = new JSONArray();
+        for (int i = 0; i < saved.length(); i++) {
+            JSONObject entry = saved.optJSONObject(i);
+            if (entry != null && !vodId.equals(entry.optString("id", ""))) {
+                updated.put(entry);
+            }
+        }
+        getPreferences(MODE_PRIVATE).edit()
+                .putString("movie_my_list", updated.toString()).apply();
+    }
+
+    private ArrayList<Channel> buildSavedMovieChannels(
+            String base, String user, String pass) {
+        ArrayList<Channel> movies = new ArrayList<>();
+        JSONArray saved = getSavedMovieList();
+        for (int i = 0; i < saved.length(); i++) {
+            JSONObject entry = saved.optJSONObject(i);
+            if (entry == null) continue;
+            String id = entry.optString("id", "");
+            if (id.isEmpty()) continue;
+            String extension = entry.optString("extension", "mp4");
+            String url = base + "/movie/" + Uri.encode(user) + "/"
+                    + Uri.encode(pass) + "/" + Uri.encode(id) + "."
+                    + Uri.encode(extension);
+            Channel movie = new Channel(
+                    entry.optString("name", "Untitled movie"),
+                    url, "MY LIST", "", entry.optString("logo", ""));
+            movie.vodId = id;
+            movie.vodExtension = extension;
+            movies.add(movie);
+        }
+        return movies;
+    }
+
+
+    private void showMovieDetails(Channel movie, View returnFocus) {
+        if (movie == null) return;
+
+        String base = getPreferences(MODE_PRIVATE).getString("xtream_server", "");
+        String user = getPreferences(MODE_PRIVATE).getString("xtream_username", "");
+        String pass = getPreferences(MODE_PRIVATE).getString("xtream_password", "");
+
+        showingMovieDetails = true;
+        movieGridScreen = screen;
+        movieReturnFocus = returnFocus;
+
+        LinearLayout detailsScreen = new LinearLayout(this);
+        detailsScreen.setOrientation(LinearLayout.VERTICAL);
+        detailsScreen.setBackgroundColor(NAVY);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), dp(12), dp(16), dp(20));
+
+        android.widget.FrameLayout hero = new android.widget.FrameLayout(this);
+        hero.setBackgroundColor(Color.rgb(25, 35, 50));
+        android.widget.ImageView backdrop = new android.widget.ImageView(this);
+        backdrop.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        hero.addView(backdrop, new android.widget.FrameLayout.LayoutParams(
+                -1, -1));
+        View shade = new View(this);
+        shade.setBackgroundColor(0x77000000);
+        hero.addView(shade, new android.widget.FrameLayout.LayoutParams(
+                -1, -1));
+        content.addView(hero, new LinearLayout.LayoutParams(
+                -1, dp(isTelevisionDevice() ? 300 : 210)));
+
+        TextView title = label(movie.name, 26);
+        title.setTextColor(Color.WHITE);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setPadding(0, dp(16), 0, dp(8));
+        content.addView(title);
+
+        TextView meta = label("Loading movie information...", 14);
+        meta.setTextColor(MUTED);
+        content.addView(meta);
+
+        TextView plot = label("Loading description...", 16);
+        plot.setTextColor(Color.WHITE);
+        plot.setPadding(0, dp(14), 0, dp(12));
+        content.addView(plot);
+
+        TextView cast = label("", 14);
+        cast.setTextColor(MUTED);
+        content.addView(cast);
+
+        TextView director = label("", 14);
+        director.setTextColor(MUTED);
+        content.addView(director);
+
+        TextView play = label("▶  PLAY", 20);
+        play.setTextColor(Color.WHITE);
+        play.setTypeface(null, Typeface.BOLD);
+        play.setGravity(Gravity.CENTER);
+        play.setFocusable(true);
+        play.setClickable(true);
+        play.setPadding(dp(16), dp(14), dp(16), dp(14));
+        play.setBackgroundColor(BLUE);
+        play.setOnFocusChangeListener((v, focused) ->
+                v.setBackgroundColor(focused ? Color.rgb(35, 125, 220) : BLUE));
+        play.setOnClickListener(v -> playVodItem(movie));
+        LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(
+                -1, LinearLayout.LayoutParams.WRAP_CONTENT);
+        actionParams.setMargins(0, dp(18), 0, dp(8));
+        content.addView(play, actionParams);
+
+        TextView myList = label("", 16);
+        myList.setTextColor(Color.WHITE);
+        myList.setGravity(Gravity.CENTER);
+        myList.setFocusable(true);
+        myList.setClickable(true);
+        myList.setPadding(dp(12), dp(13), dp(12), dp(13));
+        myList.setBackgroundColor(PANEL);
+        Runnable updateMyListText = () -> myList.setText(
+                isMovieSaved(movie.vodId)
+                        ? "✓  REMOVE FROM MY LIST"
+                        : "+  ADD TO MY LIST");
+        updateMyListText.run();
+        myList.setOnFocusChangeListener((v, focused) ->
+                v.setBackgroundColor(focused ? BLUE : PANEL));
+        myList.setOnClickListener(v -> {
+            if (isMovieSaved(movie.vodId)) {
+                removeMovieFromList(movie.vodId);
+            } else {
+                saveMovieToList(movie);
+            }
+            updateMyListText.run();
+        });
+        content.addView(myList);
+
+        TextView back = label("BACK", 16);
+        back.setTextColor(MUTED);
+        back.setGravity(Gravity.CENTER);
+        back.setFocusable(true);
+        back.setClickable(true);
+        back.setPadding(dp(12), dp(14), dp(12), dp(14));
+        back.setOnClickListener(v -> onBackPressed());
+        content.addView(back);
+
+        scroll.addView(content);
+        detailsScreen.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+        screen = detailsScreen;
+        setContentView(screen);
+
+        if (movie.logoUrl != null && !movie.logoUrl.isEmpty()) {
+            loadChannelLogo(backdrop, movie.logoUrl);
+        }
+        play.requestFocus();
+
+        if (base.isEmpty() || user.isEmpty() || pass.isEmpty()
+                || movie.vodId == null || movie.vodId.isEmpty()) {
+            meta.setText("Movie information is unavailable.");
+            plot.setText("You can still play this movie.");
+            return;
+        }
+
+        new Thread(() -> {
+            JSONObject info = null;
+            String error = null;
+            try {
+                String api = base + "/player_api.php?username="
+                        + apiEncode(user) + "&password=" + apiEncode(pass);
+                JSONObject response = getXtreamObject(api
+                        + "&action=get_vod_info&vod_id="
+                        + apiEncode(movie.vodId));
+                info = response.optJSONObject("info");
+                if (info == null) error = "No movie details were returned.";
+            } catch (Exception e) {
+                error = e.getMessage() == null
+                        ? "Could not load movie details." : e.getMessage();
+            }
+
+            final JSONObject result = info;
+            final String failure = error;
+            runOnUiThread(() -> {
+                if (screen != detailsScreen) return;
+                if (result == null) {
+                    meta.setText(failure);
+                    plot.setText("You can still play this movie.");
+                    return;
+                }
+
+                String description = result.optString("plot", "");
+                plot.setText(description.isEmpty()
+                        ? "No description available." : description);
+
+                String genre = result.optString("genre", "");
+                String released = result.optString("releasedate", "");
+                String rating = result.optString("rating", "");
+                String details = "";
+                if (!released.isEmpty()) details += released;
+                if (!genre.isEmpty()) details += (details.isEmpty() ? "" : "  •  ") + genre;
+                if (!rating.isEmpty()) details += (details.isEmpty() ? "" : "  •  ")
+                        + "Rating: " + rating;
+                meta.setText(details.isEmpty() ? "Movie details" : details);
+
+                Object castValue = result.opt("cast");
+                String castText = "";
+                if (castValue instanceof JSONArray) {
+                    JSONArray names = (JSONArray) castValue;
+                    StringBuilder joined = new StringBuilder();
+                    for (int i = 0; i < names.length(); i++) {
+                        String name = names.optString(i, "");
+                        if (!name.isEmpty()) {
+                            if (joined.length() > 0) joined.append(", ");
+                            joined.append(name);
+                        }
+                    }
+                    castText = joined.toString();
+                } else if (castValue != null && !JSONObject.NULL.equals(castValue)) {
+                    castText = String.valueOf(castValue);
+                }
+                cast.setText(castText.isEmpty() ? "" : "CAST: " + castText);
+
+                String directorName = result.optString("director", "");
+                director.setText(directorName.isEmpty()
+                        ? "" : "DIRECTOR: " + directorName);
+
+                String imageUrl = "";
+                JSONArray backdrops = result.optJSONArray("backdrop_path");
+                if (backdrops != null && backdrops.length() > 0) {
+                    imageUrl = backdrops.optString(0, "");
+                }
+                if (imageUrl.isEmpty()) {
+                    imageUrl = result.optString("movie_image", "");
+                }
+                if (!imageUrl.isEmpty()) {
+                    if (!imageUrl.startsWith("http")) {
+                        imageUrl = base + "/" + imageUrl.replaceFirst("^/+", "");
+                    }
+                    loadChannelLogo(backdrop, imageUrl);
                 }
             });
         }).start();
@@ -2543,6 +2858,35 @@ public class MainActivity extends Activity {
             if (connection != null) {
                 connection.disconnect();
             }
+        }
+    }
+
+    private JSONObject getXtreamObject(String urlText) throws Exception {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(urlText).openConnection();
+            connection.setConnectTimeout(15000);
+            connection.setReadTimeout(25000);
+            connection.setRequestProperty("User-Agent", "StreamNestIPTV/1.0");
+
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) {
+                throw new java.io.IOException("Provider returned HTTP " + status);
+            }
+
+            try (InputStream input = connection.getInputStream();
+                 BufferedReader reader = new BufferedReader(
+                         new InputStreamReader(input, StandardCharsets.UTF_8))) {
+                StringBuilder json = new StringBuilder();
+                char[] buffer = new char[8192];
+                int count;
+                while ((count = reader.read(buffer)) != -1) {
+                    json.append(buffer, 0, count);
+                }
+                return new JSONObject(json.toString());
+            }
+        } finally {
+            if (connection != null) connection.disconnect();
         }
     }
 
