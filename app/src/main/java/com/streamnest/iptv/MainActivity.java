@@ -144,6 +144,9 @@ public class MainActivity extends Activity {
         String logoUrl;
         String vodId = "";
         String vodExtension = "mp4";
+        String episodeArtwork = "";
+        String episodeDescription = "";
+        String episodeNumber = "";
 
         Channel(String name, String url, String group, String tvgId) {
             this(name, url, group, tvgId, "");
@@ -2291,11 +2294,46 @@ public class MainActivity extends Activity {
                         list.addView(seasonTitle);
                     }
 
-                    TextView row = label(episode.name, 16);
+                    boolean tv = isTelevisionDevice();
+                    LinearLayout row = new LinearLayout(this);
+                    row.setOrientation(LinearLayout.HORIZONTAL);
+                    row.setGravity(Gravity.CENTER_VERTICAL);
                     row.setFocusable(true);
                     row.setClickable(true);
-                    row.setPadding(dp(12), dp(12), dp(8), dp(12));
+                    row.setPadding(dp(6), dp(6), dp(6), dp(6));
                     row.setBackgroundColor(PANEL);
+
+                    ImageView poster = new ImageView(this);
+                    poster.setLayoutParams(new LinearLayout.LayoutParams(
+                            dp(tv ? 150 : 76), dp(tv ? 210 : 104)));
+                    poster.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    poster.setBackgroundColor(Color.rgb(35, 45, 62));
+                    if (episode.episodeArtwork != null
+                            && !episode.episodeArtwork.isEmpty()) {
+                        loadChannelLogo(poster, episode.episodeArtwork);
+                    }
+                    row.addView(poster);
+
+                    LinearLayout details = new LinearLayout(this);
+                    details.setOrientation(LinearLayout.VERTICAL);
+                    details.setPadding(dp(12), dp(4), dp(6), dp(4));
+
+                    TextView title = label(episode.name, tv ? 16 : 14);
+                    title.setTextColor(Color.WHITE);
+                    title.setTypeface(null, Typeface.BOLD);
+                    details.addView(title);
+
+                    if (episode.episodeDescription != null
+                            && !episode.episodeDescription.trim().isEmpty()) {
+                        TextView synopsis = label(
+                                episode.episodeDescription, tv ? 14 : 12);
+                        synopsis.setTextColor(Color.LTGRAY);
+                        synopsis.setMaxLines(tv ? 5 : 4);
+                        details.addView(synopsis);
+                    }
+
+                    row.addView(details, new LinearLayout.LayoutParams(
+                            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
                     row.setOnFocusChangeListener((v, focused) ->
                             v.setBackgroundColor(focused ? BLUE : PANEL));
                     row.setOnClickListener(v -> playVodItem(episode));
@@ -2388,6 +2426,14 @@ public class MainActivity extends Activity {
         return item.get(key).getAsString();
     }
 
+    private String seriesEpisodeString(JsonObject ep, String key, String fallback) {
+        String value = seriesJsonString(ep, key, "");
+        if (!value.isEmpty()) return value;
+        if (ep.has("info") && ep.get("info").isJsonObject())
+            return seriesJsonString(ep.getAsJsonObject("info"), key, fallback);
+        return fallback;
+    }
+
     private void addSeriesEpisode(
             JsonObject ep, Channel series, ArrayList<Channel> episodes) {
         String id = seriesJsonString(ep, "id", "");
@@ -2413,10 +2459,18 @@ public class MainActivity extends Activity {
                         .getString("xtream_password", ""))
                 + "/" + Uri.encode(id) + "." + Uri.encode(extension);
 
-        episodes.add(new Channel(
-                name, url,
-                season.isEmpty() ? "Episodes" : "Season " + season,
-                "", ""));
+        String artwork = seriesEpisodeString(ep, "movie_image", "");
+        if (artwork.isEmpty()) artwork = seriesEpisodeString(ep, "cover_big", "");
+        if (artwork.isEmpty()) artwork = seriesEpisodeString(ep, "cover", "");
+        if (artwork.isEmpty()) artwork = seriesEpisodeString(ep, "stream_icon", "");
+        String description = seriesEpisodeString(ep, "plot", "");
+        if (description.isEmpty()) description = seriesEpisodeString(ep, "description", "");
+        if (description.isEmpty()) description = seriesEpisodeString(ep, "overview", "");
+        Channel episode = new Channel(name, url, season.isEmpty() ? "Episodes" : "Season " + season, "", "");
+        episode.episodeArtwork = artwork;
+        episode.episodeDescription = description;
+        episode.episodeNumber = episodeNumber;
+        episodes.add(episode);
     }
 
     private void showHomeScreen() {
