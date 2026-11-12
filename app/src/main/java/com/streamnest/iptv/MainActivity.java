@@ -1361,6 +1361,8 @@ public class MainActivity extends Activity {
         movieGridScreen = screen;
         movieReturnFocus = returnFocus;
 
+        boolean tvDetails = isTelevisionDevice();
+
         LinearLayout detailsScreen = new LinearLayout(this);
         detailsScreen.setOrientation(LinearLayout.VERTICAL);
         detailsScreen.setBackgroundColor(NAVY);
@@ -1368,20 +1370,63 @@ public class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(16), dp(12), dp(16), dp(20));
+        content.setPadding(dp(24), dp(20), dp(20), dp(20));
 
         android.widget.FrameLayout hero = new android.widget.FrameLayout(this);
-        hero.setBackgroundColor(Color.rgb(25, 35, 50));
+        hero.setBackgroundColor(tvDetails ? NAVY : Color.rgb(25, 35, 50));
         android.widget.ImageView backdrop = new android.widget.ImageView(this);
         backdrop.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         hero.addView(backdrop, new android.widget.FrameLayout.LayoutParams(
                 -1, -1));
-        View shade = new View(this);
-        shade.setBackgroundColor(0x77000000);
-        hero.addView(shade, new android.widget.FrameLayout.LayoutParams(
-                -1, -1));
-        content.addView(hero, new LinearLayout.LayoutParams(
-                -1, dp(isTelevisionDevice() ? 400 : 210)));
+        if (!tvDetails) {
+            View shade = new View(this);
+            shade.setBackgroundColor(0x77000000);
+            hero.addView(shade,
+                    new android.widget.FrameLayout.LayoutParams(-1, -1));
+        }
+        if (tvDetails) {
+            int fadeSize = dp(64);
+
+            View leftFade = new View(this);
+            leftFade.setBackground(new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{NAVY, Color.TRANSPARENT}));
+            android.widget.FrameLayout.LayoutParams leftParams =
+                    new android.widget.FrameLayout.LayoutParams(
+                            fadeSize, -1, Gravity.LEFT);
+            hero.addView(leftFade, leftParams);
+
+            View rightFade = new View(this);
+            rightFade.setBackground(new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{Color.TRANSPARENT, NAVY}));
+            android.widget.FrameLayout.LayoutParams rightParams =
+                    new android.widget.FrameLayout.LayoutParams(
+                            fadeSize, -1, Gravity.RIGHT);
+            hero.addView(rightFade, rightParams);
+
+            View topFade = new View(this);
+            topFade.setBackground(new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{NAVY, Color.TRANSPARENT}));
+            android.widget.FrameLayout.LayoutParams topParams =
+                    new android.widget.FrameLayout.LayoutParams(
+                            -1, fadeSize, Gravity.TOP);
+            hero.addView(topFade, topParams);
+
+            View bottomFade = new View(this);
+            bottomFade.setBackground(new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{Color.TRANSPARENT, NAVY}));
+            android.widget.FrameLayout.LayoutParams bottomParams =
+                    new android.widget.FrameLayout.LayoutParams(
+                            -1, fadeSize, Gravity.BOTTOM);
+            hero.addView(bottomFade, bottomParams);
+        }
+        if (!tvDetails) {
+            content.addView(hero, new LinearLayout.LayoutParams(
+                    -1, dp(210)));
+        }
 
         TextView title = label(movie.name, 26);
         title.setTextColor(Color.WHITE);
@@ -1458,8 +1503,49 @@ public class MainActivity extends Activity {
         back.setOnClickListener(v -> onBackPressed());
         content.addView(back);
 
+        if (tvDetails) {
+            content.removeView(play);
+            content.removeView(myList);
+            content.removeView(back);
+
+            LinearLayout actions = new LinearLayout(this);
+            actions.setOrientation(LinearLayout.HORIZONTAL);
+            actions.setGravity(Gravity.CENTER_VERTICAL);
+
+            TextView[] actionViews = {play, myList, back};
+            for (TextView action : actionViews) {
+                action.setGravity(Gravity.CENTER);
+                action.setTextSize(14);
+                action.setPadding(dp(4), dp(12), dp(4), dp(12));
+                actions.addView(action,
+                        new LinearLayout.LayoutParams(0, -2, 1f));
+            }
+
+            LinearLayout.LayoutParams actionsParams =
+                    new LinearLayout.LayoutParams(-1, -2);
+            actionsParams.setMargins(0, dp(18), 0, dp(8));
+            content.addView(actions, actionsParams);
+        }
+
         scroll.addView(content);
-        detailsScreen.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+
+        if (tvDetails) {
+            LinearLayout tvBody = new LinearLayout(this);
+            tvBody.setOrientation(LinearLayout.HORIZONTAL);
+            tvBody.setGravity(Gravity.CENTER_VERTICAL);
+
+            tvBody.addView(scroll, new LinearLayout.LayoutParams(
+                    0, -1, 0.48f));
+
+            tvBody.addView(hero, new LinearLayout.LayoutParams(
+                    0, -1, 0.52f));
+
+            detailsScreen.addView(tvBody,
+                    new LinearLayout.LayoutParams(-1, 0, 1f));
+        } else {
+            detailsScreen.addView(scroll,
+                    new LinearLayout.LayoutParams(-1, 0, 1f));
+        }
         screen = detailsScreen;
         setContentView(screen);
 
@@ -4524,6 +4610,13 @@ if (categoryPrograms == null) {
                                 tempFile.getAbsolutePath(), options);
 
                 if (bitmap != null) {
+                    android.util.Log.d("StreamNest",
+                            "Movie artwork: source=" + bounds.outWidth
+                            + "x" + bounds.outHeight
+                            + ", decoded=" + bitmap.getWidth()
+                            + "x" + bitmap.getHeight()
+                            + ", bytes=" + totalBytes);
+
                     boolean posted = imageView.post(() -> {
                         if (imageUrl.equals(imageView.getTag())) {
                             imageView.setImageBitmap(bitmap);
