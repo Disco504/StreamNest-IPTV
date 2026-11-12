@@ -2311,7 +2311,7 @@ public class MainActivity extends Activity {
                     poster.setBackgroundColor(Color.rgb(35, 45, 62));
                     if (episode.episodeArtwork != null
                             && !episode.episodeArtwork.isEmpty()) {
-                        loadChannelLogo(poster, episode.episodeArtwork);
+                        loadChannelLogo(poster, episode.episodeArtwork, 1080);
                     }
                     row.addView(poster);
 
@@ -4510,6 +4510,12 @@ if (categoryPrograms == null) {
 
     private void loadChannelLogo(
             android.widget.ImageView imageView, String logoUrl) {
+        loadChannelLogo(imageView, logoUrl, 300);
+    }
+
+    private void loadChannelLogo(
+            android.widget.ImageView imageView, String logoUrl,
+            int maxDimension) {
         imageView.setTag(logoUrl);
 
         logoExecutor.execute(() -> {
@@ -4557,8 +4563,8 @@ if (categoryPrograms == null) {
                 }
 
                 int sampleSize = 1;
-                while (bounds.outWidth / sampleSize > 300
-                        || bounds.outHeight / sampleSize > 300) {
+                while (bounds.outWidth / sampleSize > maxDimension
+                        || bounds.outHeight / sampleSize > maxDimension) {
                     sampleSize *= 2;
                 }
 
