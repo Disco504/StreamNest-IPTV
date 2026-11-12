@@ -1385,7 +1385,7 @@ public class MainActivity extends Activity {
                     new android.widget.FrameLayout.LayoutParams(-1, -1));
         }
         if (tvDetails) {
-            int fadeSize = dp(64);
+            int fadeSize = dp(100);
 
             View leftFade = new View(this);
             leftFade.setBackground(new android.graphics.drawable.GradientDrawable(
