@@ -1330,6 +1330,50 @@ public class MainActivity extends Activity {
                 .putString("movie_my_list", updated.toString()).apply();
     }
 
+    private JSONArray getSavedSeriesList() {
+        String json = getPreferences(MODE_PRIVATE).getString("series_my_list", "[]");
+        try { return new JSONArray(json); }
+        catch (Exception e) { return new JSONArray(); }
+    }
+
+    private boolean isSeriesSaved(String id) {
+        if (id == null || id.isEmpty()) return false;
+        JSONArray saved = getSavedSeriesList();
+        for (int i = 0; i < saved.length(); i++) {
+            JSONObject entry = saved.optJSONObject(i);
+            if (entry != null && id.equals(entry.optString("id", ""))) return true;
+        }
+        return false;
+    }
+
+    private void saveSeriesToList(Channel series) {
+        if (series == null || series.url == null || series.url.isEmpty()) return;
+        if (isSeriesSaved(series.url)) return;
+        JSONObject entry = new JSONObject();
+        try {
+            entry.put("id", series.url);
+            entry.put("name", series.name);
+            entry.put("logo", series.logoUrl);
+            JSONArray saved = getSavedSeriesList();
+            saved.put(entry);
+            getPreferences(MODE_PRIVATE).edit()
+                    .putString("series_my_list", saved.toString()).apply();
+        } catch (Exception ignored) { }
+    }
+
+    private void removeSeriesFromList(String id) {
+        JSONArray saved = getSavedSeriesList();
+        JSONArray updated = new JSONArray();
+        for (int i = 0; i < saved.length(); i++) {
+            JSONObject entry = saved.optJSONObject(i);
+            if (entry != null && !id.equals(entry.optString("id", ""))) {
+                updated.put(entry);
+            }
+        }
+        getPreferences(MODE_PRIVATE).edit()
+                .putString("series_my_list", updated.toString()).apply();
+    }
+
     private ArrayList<Channel> buildSavedMovieChannels(
             String base, String user, String pass) {
         ArrayList<Channel> movies = new ArrayList<>();
@@ -2235,11 +2279,132 @@ public class MainActivity extends Activity {
         screen.setBackgroundColor(NAVY);
         screen.setPadding(dp(12), dp(8), dp(12), dp(8));
 
+        boolean tvLayout = isTelevisionDevice();
+        TextView seriesPlot = label("Loading description...", 16);
+        seriesPlot.setTextColor(Color.WHITE);
+        seriesPlot.setMaxLines(8);
+
         TextView heading = label(series.name, 22);
         heading.setTextColor(Color.rgb(95, 190, 255));
         heading.setTypeface(null, Typeface.BOLD);
-        screen.addView(heading);
 
+        final Channel[] firstSeriesEpisode = {null};
+        if (tvLayout) {
+            LinearLayout heroRow = new LinearLayout(this);
+            heroRow.setOrientation(LinearLayout.HORIZONTAL);
+
+            LinearLayout details = new LinearLayout(this);
+            details.setOrientation(LinearLayout.VERTICAL);
+            details.addView(heading);
+            seriesPlot.setPadding(0, dp(12), dp(16), 0);
+            details.addView(seriesPlot);
+
+            TextView play = label("▶  PLAY", 20);
+            play.setTextColor(Color.WHITE);
+            play.setTypeface(null, Typeface.BOLD);
+            play.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+            play.setFocusable(true);
+            play.setClickable(true);
+            play.setPadding(0, dp(14), 0, dp(14));
+            play.setBackgroundColor(Color.TRANSPARENT);
+            play.setOnFocusChangeListener((v, focused) ->
+                    play.setTextColor(focused ? Color.YELLOW : Color.WHITE));
+            play.setOnClickListener(v -> {
+                if (firstSeriesEpisode[0] != null) playVodItem(firstSeriesEpisode[0]);
+            });
+
+            TextView myList = label("", 16);
+            myList.setTextColor(Color.WHITE);
+            myList.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+            myList.setFocusable(true);
+            myList.setClickable(true);
+            myList.setPadding(0, dp(13), 0, dp(13));
+            myList.setBackgroundColor(Color.TRANSPARENT);
+            Runnable updateMyListText = () -> myList.setText(
+                    isSeriesSaved(series.url) ? "✓  REMOVE FROM MY LIST" : "+  ADD TO MY LIST");
+            updateMyListText.run();
+            myList.setOnFocusChangeListener((v, focused) ->
+                    myList.setTextColor(focused ? Color.YELLOW : Color.WHITE));
+            myList.setOnClickListener(v -> {
+                if (isSeriesSaved(series.url)) removeSeriesFromList(series.url);
+                else saveSeriesToList(series);
+                updateMyListText.run();
+            });
+
+            TextView back = label("‹  BACK", 16);
+            back.setTextColor(MUTED);
+            back.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+            back.setFocusable(true);
+            back.setClickable(true);
+            back.setPadding(0, dp(14), 0, dp(14));
+            back.setBackgroundColor(Color.TRANSPARENT);
+            back.setOnFocusChangeListener((v, focused) ->
+                    back.setTextColor(focused ? Color.YELLOW : MUTED));
+            back.setOnClickListener(v -> onBackPressed());
+
+            LinearLayout actions = new LinearLayout(this);
+            actions.setOrientation(LinearLayout.HORIZONTAL);
+            actions.setGravity(Gravity.CENTER_VERTICAL);
+            TextView[] actionViews = {play, myList, back};
+            for (TextView action : actionViews) {
+                action.setGravity(Gravity.CENTER);
+                action.setTextSize(14);
+                action.setPadding(dp(4), dp(12), dp(4), dp(12));
+                actions.addView(action, new LinearLayout.LayoutParams(0, -2, 1f));
+            }
+            LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, -2);
+            actionsParams.setMargins(0, dp(18), 0, dp(8));
+            details.addView(actions, actionsParams);
+
+            heroRow.addView(details, new LinearLayout.LayoutParams(
+                    0, -1, 1f));
+
+            FrameLayout artworkFrame = new FrameLayout(this);
+            ImageView backdrop = new ImageView(this);
+            backdrop.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            artworkFrame.addView(backdrop, new FrameLayout.LayoutParams(-1, -1));
+            loadMovieBackdrop(backdrop, series.logoUrl);
+
+            GradientDrawable leftFade = new GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{NAVY, Color.TRANSPARENT});
+            View leftOverlay = new View(this);
+            leftOverlay.setBackground(leftFade);
+            FrameLayout.LayoutParams leftParams = new FrameLayout.LayoutParams(
+                    dp(100), -1, Gravity.LEFT);
+            artworkFrame.addView(leftOverlay, leftParams);
+
+            GradientDrawable rightFade = new GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{Color.TRANSPARENT, NAVY});
+            View rightOverlay = new View(this);
+            rightOverlay.setBackground(rightFade);
+            artworkFrame.addView(rightOverlay, new FrameLayout.LayoutParams(
+                    dp(100), -1, Gravity.RIGHT));
+
+            GradientDrawable topFade = new GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{NAVY, Color.TRANSPARENT});
+            View topOverlay = new View(this);
+            topOverlay.setBackground(topFade);
+            artworkFrame.addView(topOverlay, new FrameLayout.LayoutParams(
+                    -1, dp(65), Gravity.TOP));
+
+            GradientDrawable bottomFade = new GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{Color.TRANSPARENT, NAVY});
+            View bottomOverlay = new View(this);
+            bottomOverlay.setBackground(bottomFade);
+            artworkFrame.addView(bottomOverlay, new FrameLayout.LayoutParams(
+                    -1, dp(65), Gravity.BOTTOM));
+
+            heroRow.addView(artworkFrame, new LinearLayout.LayoutParams(
+                    0, -1, 1f));
+            screen.addView(heroRow, new LinearLayout.LayoutParams(
+                    -1, dp(270)));
+        } else {
+            screen.addView(heading);
+        }
         TextView status = label("Loading seasons and episodes...", 15);
         screen.addView(status);
 
@@ -2256,19 +2421,24 @@ public class MainActivity extends Activity {
             String failure = null;
             ArrayList<String> seasonLabels = new ArrayList<>();
             ArrayList<Channel> episodes = new ArrayList<>();
+            String[] seriesDescription = {""};
 
             try {
                 String api = base + "/player_api.php?username="
                         + apiEncode(user) + "&password=" + apiEncode(pass)
                         + "&action=get_series_info&series_id="
                         + apiEncode(series.url);
-                readSeriesEpisodes(api, series, episodes);
+                readSeriesEpisodes(api, series, episodes, seriesDescription);
             } catch (Exception e) {
                 failure = e.getMessage() == null ? "Could not load episodes." : e.getMessage();
             }
 
             final String error = failure;
             runOnUiThread(() -> {
+                seriesPlot.setText(seriesDescription[0] == null
+                        || seriesDescription[0].trim().isEmpty()
+                        ? "No description available."
+                        : seriesDescription[0]);
                 list.removeAllViews();
                 if (error != null) {
                     status.setText("Unable to load episodes: " + error);
@@ -2276,6 +2446,7 @@ public class MainActivity extends Activity {
                     return;
                 }
 
+                if (!episodes.isEmpty()) firstSeriesEpisode[0] = episodes.get(0);
                 status.setText(episodes.size() + " episodes");
                 if (episodes.isEmpty()) {
                     list.addView(label("No episodes were returned for this series.", 16));
@@ -2283,6 +2454,10 @@ public class MainActivity extends Activity {
                 }
 
                 String currentSeason = "";
+                View firstEpisodeView = null;
+                HorizontalScrollView seasonScroll = null;
+                LinearLayout seasonRow = null;
+
                 for (Channel episode : episodes) {
                     String season = episode.group == null ? "" : episode.group;
                     if (!season.equals(currentSeason)) {
@@ -2293,65 +2468,122 @@ public class MainActivity extends Activity {
                         seasonTitle.setTypeface(null, Typeface.BOLD);
                         seasonTitle.setPadding(dp(4), dp(12), dp(4), dp(6));
                         list.addView(seasonTitle);
+
+                        if (tvLayout) {
+                            seasonScroll = new HorizontalScrollView(this);
+                            seasonScroll.setHorizontalScrollBarEnabled(false);
+                            seasonRow = new LinearLayout(this);
+                            seasonRow.setOrientation(LinearLayout.HORIZONTAL);
+                            seasonScroll.addView(seasonRow);
+                            list.addView(seasonScroll);
+                        }
                     }
 
-                    boolean tv = isTelevisionDevice();
-                    LinearLayout row = new LinearLayout(this);
-                    row.setOrientation(LinearLayout.HORIZONTAL);
-                    row.setGravity(Gravity.CENTER_VERTICAL);
-                    row.setFocusable(true);
-                    row.setClickable(true);
-                    row.setPadding(dp(6), dp(6), dp(6), dp(6));
-                    row.setBackgroundColor(PANEL);
+                    if (tvLayout) {
+                        LinearLayout card = new LinearLayout(this);
+                        card.setOrientation(LinearLayout.VERTICAL);
+                        card.setFocusable(true);
+                        card.setClickable(true);
+                        card.setPadding(dp(6), dp(6), dp(6), dp(8));
+                        card.setBackgroundColor(PANEL);
 
-                    ImageView poster = new ImageView(this);
-                    poster.setLayoutParams(new LinearLayout.LayoutParams(
-                            dp(tv ? 150 : 76), dp(tv ? 210 : 104)));
-                    poster.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                    poster.setBackgroundColor(Color.rgb(35, 45, 62));
-                    if (episode.episodeArtwork != null
-                            && !episode.episodeArtwork.isEmpty()) {
-                        loadChannelLogo(poster, episode.episodeArtwork, 1080);
+                        ImageView poster = new ImageView(this);
+                        poster.setLayoutParams(new LinearLayout.LayoutParams(
+                                dp(190), dp(270)));
+                        poster.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        poster.setBackgroundColor(Color.rgb(35, 45, 62));
+                        if (episode.episodeArtwork != null
+                                && !episode.episodeArtwork.isEmpty()) {
+                            loadChannelLogo(poster, episode.episodeArtwork, 1080);
+                        }
+                        card.addView(poster);
+
+                        TextView title = label(episode.name, 16);
+                        title.setTextColor(Color.WHITE);
+                        title.setTypeface(null, Typeface.BOLD);
+                        title.setMaxLines(2);
+                        title.setPadding(0, dp(8), 0, dp(4));
+                        card.addView(title);
+
+                        if (episode.episodeDescription != null
+                                && !episode.episodeDescription.trim().isEmpty()) {
+                            TextView synopsis = label(episode.episodeDescription, 13);
+                            synopsis.setTextColor(Color.LTGRAY);
+                            synopsis.setMaxLines(3);
+                            card.addView(synopsis);
+                        }
+
+                        card.setOnFocusChangeListener((v, focused) ->
+                                v.setBackgroundColor(focused ? BLUE : PANEL));
+                        card.setOnClickListener(v -> playVodItem(episode));
+
+                        LinearLayout.LayoutParams cardParams =
+                                new LinearLayout.LayoutParams(
+                                        dp(202), LinearLayout.LayoutParams.WRAP_CONTENT);
+                        cardParams.setMargins(dp(4), dp(3), dp(4), dp(8));
+                        seasonRow.addView(card, cardParams);
+                        if (firstEpisodeView == null) firstEpisodeView = card;
+                    } else {
+                        LinearLayout row = new LinearLayout(this);
+                        row.setOrientation(LinearLayout.HORIZONTAL);
+                        row.setGravity(Gravity.CENTER_VERTICAL);
+                        row.setFocusable(true);
+                        row.setClickable(true);
+                        row.setPadding(dp(6), dp(6), dp(6), dp(6));
+                        row.setBackgroundColor(PANEL);
+
+                        ImageView poster = new ImageView(this);
+                        poster.setLayoutParams(new LinearLayout.LayoutParams(
+                                dp(76), dp(104)));
+                        poster.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        poster.setBackgroundColor(Color.rgb(35, 45, 62));
+                        if (episode.episodeArtwork != null
+                                && !episode.episodeArtwork.isEmpty()) {
+                            loadChannelLogo(poster, episode.episodeArtwork, 1080);
+                        }
+                        row.addView(poster);
+
+                        LinearLayout details = new LinearLayout(this);
+                        details.setOrientation(LinearLayout.VERTICAL);
+                        details.setPadding(dp(12), dp(4), dp(6), dp(4));
+
+                        TextView title = label(episode.name, 14);
+                        title.setTextColor(Color.WHITE);
+                        title.setTypeface(null, Typeface.BOLD);
+                        details.addView(title);
+
+                        if (episode.episodeDescription != null
+                                && !episode.episodeDescription.trim().isEmpty()) {
+                            TextView synopsis = label(episode.episodeDescription, 12);
+                            synopsis.setTextColor(Color.LTGRAY);
+                            synopsis.setMaxLines(4);
+                            details.addView(synopsis);
+                        }
+
+                        row.addView(details, new LinearLayout.LayoutParams(
+                                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                        row.setOnFocusChangeListener((v, focused) ->
+                                v.setBackgroundColor(focused ? BLUE : PANEL));
+                        row.setOnClickListener(v -> playVodItem(episode));
+
+                        LinearLayout.LayoutParams params =
+                                new LinearLayout.LayoutParams(
+                                        LinearLayout.LayoutParams.MATCH_PARENT,
+                                        LinearLayout.LayoutParams.WRAP_CONTENT);
+                        params.setMargins(0, dp(3), 0, dp(3));
+                        list.addView(row, params);
+                        if (firstEpisodeView == null) firstEpisodeView = row;
                     }
-                    row.addView(poster);
-
-                    LinearLayout details = new LinearLayout(this);
-                    details.setOrientation(LinearLayout.VERTICAL);
-                    details.setPadding(dp(12), dp(4), dp(6), dp(4));
-
-                    TextView title = label(episode.name, tv ? 16 : 14);
-                    title.setTextColor(Color.WHITE);
-                    title.setTypeface(null, Typeface.BOLD);
-                    details.addView(title);
-
-                    if (episode.episodeDescription != null
-                            && !episode.episodeDescription.trim().isEmpty()) {
-                        TextView synopsis = label(
-                                episode.episodeDescription, tv ? 14 : 12);
-                        synopsis.setTextColor(Color.LTGRAY);
-                        synopsis.setMaxLines(tv ? 5 : 4);
-                        details.addView(synopsis);
-                    }
-
-                    row.addView(details, new LinearLayout.LayoutParams(
-                            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-                    row.setOnFocusChangeListener((v, focused) ->
-                            v.setBackgroundColor(focused ? BLUE : PANEL));
-                    row.setOnClickListener(v -> playVodItem(episode));
-
-                    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT);
-                    params.setMargins(0, dp(3), 0, dp(3));
-                    list.addView(row, params);
                 }
-                if (list.getChildCount() > 0) list.getChildAt(1).requestFocus();
+
+                if (firstEpisodeView != null) firstEpisodeView.requestFocus();
             });
         }).start();
     }
 
     private void readSeriesEpisodes(
-            String urlText, Channel series, ArrayList<Channel> episodes)
+            String urlText, Channel series, ArrayList<Channel> episodes,
+            String[] seriesDescription)
             throws Exception {
         HttpURLConnection connection = null;
         try {
@@ -2377,7 +2609,12 @@ public class MainActivity extends Activity {
                 while (reader.hasNext()) {
                     String key = reader.nextName();
 
-                    if (!"episodes".equals(key)) {
+                    if ("info".equals(key) && reader.peek() == JsonToken.BEGIN_OBJECT) {
+                        JsonObject info = JsonParser.parseReader(reader).getAsJsonObject();
+                        seriesDescription[0] = seriesJsonString(info, "plot", "");
+                        if (seriesDescription[0].isEmpty()) seriesDescription[0] = seriesJsonString(info, "description", "");
+                        if (seriesDescription[0].isEmpty()) seriesDescription[0] = seriesJsonString(info, "overview", "");
+                    } else if (!"episodes".equals(key)) {
                         reader.skipValue();
                     } else if (reader.peek() == JsonToken.BEGIN_ARRAY) {
                         readSeriesEpisodeArray(reader, series, episodes);
