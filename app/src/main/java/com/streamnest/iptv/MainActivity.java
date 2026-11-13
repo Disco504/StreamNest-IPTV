@@ -4784,7 +4784,7 @@ if (categoryPrograms == null) {
                 channelVerticalScroll.scrollTo(0, y);
             }
             if (guideAppendMoreRows != null
-                    && y + v.getHeight() >= v.computeVerticalScrollRange() - dp(500)) {
+                    && y + v.getHeight() >= rowVerticalScroll.getChildAt(0).getHeight() - dp(500)) {
                 guideAppendMoreRows.run();
             }
         });
