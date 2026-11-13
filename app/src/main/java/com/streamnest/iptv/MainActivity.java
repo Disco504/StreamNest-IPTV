@@ -138,6 +138,9 @@ public class MainActivity extends Activity {
     private PlayerView previewPlayerView;
     private String previewChannelUrl;
     private Channel guidePreviewChannel;
+    private int guideRenderGeneration = 0;
+    private Runnable guideAppendMoreRows;
+    private static final int GUIDE_CHANNEL_BATCH_SIZE = 40;
     private final ArrayList<View> guideChannelNameCells = new ArrayList<>();
     private static class Channel {
         String name;
@@ -2911,7 +2914,6 @@ public class MainActivity extends Activity {
                                                 String type = types.get(index);
 
                                                 if ("LIVE TV".equals(type)) {
-                                                    showLiveTv();
                                                     playChannel(selected);
                                                 } else if ("MOVIE".equals(type)) {
                                                     playVodItem(selected);
@@ -4287,6 +4289,8 @@ public class MainActivity extends Activity {
     private void renderGuideCategoryPrograms(String category,
             Map<String, ArrayList<EpgProgram>> grouped,
             Map<String, ArrayList<Channel>> channelMap, LinearLayout results) {
+        final int renderGeneration = ++guideRenderGeneration;
+        guideAppendMoreRows = null;
         results.removeAllViews();
         guideChannelNameCells.clear();
 
@@ -4392,12 +4396,23 @@ if (categoryPrograms == null) {
             }
         }
 
-        Channel firstPreviewChannel = null;
+        Channel firstPreviewChannel = rowChannels.isEmpty() ? null : rowChannels.get(0);
         String preferredChannelUrl = getPreferences(MODE_PRIVATE)
                 .getString("last_channel_url", "");
-        View lastWatchedRow = null;
+        final View[] lastWatchedRow = {null};
+        final ScrollView[] rowScrollRef = new ScrollView[1];
+        final boolean[] lastWatchedScrollScheduled = {false};
+        final int[] nextGuideRow = {0};
+        final int guideBatchSize = isTelevisionDevice()
+                ? GUIDE_CHANNEL_BATCH_SIZE : Math.max(1, rowChannels.size());
+        final Runnable[] appendGuideRows = new Runnable[1];
+        appendGuideRows[0] = () -> {
+            if (renderGeneration != guideRenderGeneration) return;
+            int batchEnd = Math.min(rowChannels.size(),
+                    nextGuideRow[0] + guideBatchSize);
+            while (nextGuideRow[0] < batchEnd) {
+                Channel rowChannel = rowChannels.get(nextGuideRow[0]++);
 
-        for (Channel rowChannel : rowChannels) {
             ArrayList<EpgProgram> programs = byChannel.get(rowChannel);
             Collections.sort(programs, Comparator.comparingLong(
                     program -> program.startMillis));
@@ -4409,10 +4424,10 @@ if (categoryPrograms == null) {
             row.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
 
             String rowName = rowChannel.name == null || rowChannel.name.trim().isEmpty() ? "Unnamed channel" : rowChannel.name;
-        if (firstPreviewChannel == null) firstPreviewChannel = rowChannel;
+
         if (rowChannel.url != null
                 && rowChannel.url.equals(preferredChannelUrl)) {
-            lastWatchedRow = row;
+            lastWatchedRow[0] = row;
         }
             LinearLayout channelCell = new LinearLayout(this);
             channelCell.setOrientation(LinearLayout.HORIZONTAL);
@@ -4601,7 +4616,21 @@ if (categoryPrograms == null) {
 
             grid.addView(row, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, rowHeight));
-        }
+
+            }
+            guideAppendMoreRows = nextGuideRow[0] < rowChannels.size()
+                    ? appendGuideRows[0] : null;
+            if (!isPhoneLayout() && lastWatchedRow[0] != null
+                    && rowScrollRef[0] != null
+                    && rowScrollRef[0].isAttachedToWindow()
+                    && !lastWatchedScrollScheduled[0]) {
+                lastWatchedScrollScheduled[0] = true;
+                rowScrollRef[0].post(() -> rowScrollRef[0].smoothScrollTo(
+                        0, lastWatchedRow[0].getTop()));
+            }
+        };
+        guideAppendMoreRows = appendGuideRows[0];
+        appendGuideRows[0].run();
 
         String lastChannelUrl = getPreferences(MODE_PRIVATE)
                 .getString("last_channel_url", "");
@@ -4615,6 +4644,13 @@ if (categoryPrograms == null) {
                 }
             }
         }
+
+        String savedCategory = lastChannel == null ? "" : lastChannel.group;
+        if (savedCategory == null || savedCategory.trim().isEmpty()) {
+            savedCategory = "Uncategorized";
+        }
+        final boolean findLastWatchedRow = !isPhoneLayout()
+                && lastChannel != null && category.equals(savedCategory);
 
         if (guidePreviewChannel == null) {
             Channel previewChannel = firstPreviewChannel;
@@ -4652,6 +4688,7 @@ if (categoryPrograms == null) {
         channelVerticalScroll.addView(channelRows);
 
         ScrollView rowVerticalScroll = new ScrollView(this);
+        rowScrollRef[0] = rowVerticalScroll;
         rowVerticalScroll.setFillViewport(false);
         rowVerticalScroll.addView(horizontalScroll);
 
@@ -4746,9 +4783,13 @@ if (categoryPrograms == null) {
             if (channelVerticalScroll.getScrollY() != y) {
                 channelVerticalScroll.scrollTo(0, y);
             }
+            if (guideAppendMoreRows != null
+                    && y + v.getHeight() >= v.computeVerticalScrollRange() - dp(500)) {
+                guideAppendMoreRows.run();
+            }
         });
 
-        final View targetLastWatchedRow = lastWatchedRow;
+        final View targetLastWatchedRow = lastWatchedRow[0];
         if (!isPhoneLayout() && targetLastWatchedRow != null) {
             rowVerticalScroll.post(() ->
                     rowVerticalScroll.smoothScrollTo(0, targetLastWatchedRow.getTop()));
@@ -4776,6 +4817,20 @@ if (categoryPrograms == null) {
 
         results.addView(timeline, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        if (findLastWatchedRow && lastWatchedRow[0] == null) {
+            rowVerticalScroll.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (renderGeneration != guideRenderGeneration) return;
+                    if (lastWatchedRow[0] != null || guideAppendMoreRows == null) return;
+                    guideAppendMoreRows.run();
+                    if (lastWatchedRow[0] == null && guideAppendMoreRows != null) {
+                        rowVerticalScroll.post(this);
+                    }
+                }
+            });
+        }
     }
 
     private void loadChannelLogo(
