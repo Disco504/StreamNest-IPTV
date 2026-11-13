@@ -2407,7 +2407,7 @@ public class MainActivity extends Activity {
                     -1, dp(65), Gravity.BOTTOM));
 
             heroRow.addView(artworkFrame, new LinearLayout.LayoutParams(
-                    0, -1, 1f));
+                    0, -1, 1.15f));
             screen.addView(heroRow, new LinearLayout.LayoutParams(
                     -1, dp(270)));
         } else {
@@ -2502,7 +2502,7 @@ public class MainActivity extends Activity {
 
                         ImageView poster = new ImageView(this);
                         poster.setLayoutParams(new LinearLayout.LayoutParams(
-                                dp(190), dp(270)));
+                                dp(170), dp(240)));
                         poster.setScaleType(ImageView.ScaleType.FIT_CENTER);
                         poster.setBackgroundColor(Color.rgb(35, 45, 62));
                         if (episode.episodeArtwork != null
@@ -2522,7 +2522,7 @@ public class MainActivity extends Activity {
                                 && !episode.episodeDescription.trim().isEmpty()) {
                             TextView synopsis = label(episode.episodeDescription, 13);
                             synopsis.setTextColor(Color.LTGRAY);
-                            synopsis.setMaxLines(3);
+                            synopsis.setMaxLines(4);
                             card.addView(synopsis);
                         }
 
@@ -2532,7 +2532,7 @@ public class MainActivity extends Activity {
 
                         LinearLayout.LayoutParams cardParams =
                                 new LinearLayout.LayoutParams(
-                                        dp(202), LinearLayout.LayoutParams.WRAP_CONTENT);
+                                        dp(182), LinearLayout.LayoutParams.WRAP_CONTENT);
                         cardParams.setMargins(dp(4), dp(3), dp(4), dp(8));
                         seasonRow.addView(card, cardParams);
                         if (firstEpisodeView == null) firstEpisodeView = card;
