@@ -147,6 +147,7 @@ public class MainActivity extends Activity {
         String logoUrl;
         String vodId = "";
         String vodExtension = "mp4";
+        String seriesBackdrop = "";
         String episodeArtwork = "";
         String episodeDescription = "";
         String episodeNumber = "";
@@ -2291,6 +2292,7 @@ public class MainActivity extends Activity {
         heading.setTypeface(null, Typeface.BOLD);
 
         final Channel[] firstSeriesEpisode = {null};
+        final ImageView[] seriesBackdropView = {null};
         if (tvLayout) {
             LinearLayout heroRow = new LinearLayout(this);
             heroRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -2363,6 +2365,7 @@ public class MainActivity extends Activity {
 
             FrameLayout artworkFrame = new FrameLayout(this);
             ImageView backdrop = new ImageView(this);
+            seriesBackdropView[0] = backdrop;
             backdrop.setScaleType(ImageView.ScaleType.FIT_CENTER);
             artworkFrame.addView(backdrop, new FrameLayout.LayoutParams(-1, -1));
             loadMovieBackdrop(backdrop, series.logoUrl);
@@ -2437,6 +2440,11 @@ public class MainActivity extends Activity {
 
             final String error = failure;
             runOnUiThread(() -> {
+                if (seriesBackdropView[0] != null) {
+                    String artwork = series.seriesBackdrop == null || series.seriesBackdrop.isEmpty()
+                            ? series.logoUrl : series.seriesBackdrop;
+                    loadMovieBackdrop(seriesBackdropView[0], artwork);
+                }
                 seriesPlot.setText(seriesDescription[0] == null
                         || seriesDescription[0].trim().isEmpty()
                         ? "No description available."
@@ -2616,6 +2624,29 @@ public class MainActivity extends Activity {
                         seriesDescription[0] = seriesJsonString(info, "plot", "");
                         if (seriesDescription[0].isEmpty()) seriesDescription[0] = seriesJsonString(info, "description", "");
                         if (seriesDescription[0].isEmpty()) seriesDescription[0] = seriesJsonString(info, "overview", "");
+
+                        com.google.gson.JsonElement backdrop = info.get("backdrop_path");
+                        if (backdrop != null && !backdrop.isJsonNull()) {
+                            if (backdrop.isJsonArray()) {
+                                for (com.google.gson.JsonElement image : backdrop.getAsJsonArray()) {
+                                    if (image.isJsonPrimitive()) {
+                                        String url = image.getAsString();
+                                        if (!url.isEmpty()) {
+                                            series.seriesBackdrop = url;
+                                            break;
+                                        }
+                                    }
+                                }
+                            } else if (backdrop.isJsonPrimitive()) {
+                                series.seriesBackdrop = backdrop.getAsString();
+                            }
+                        }
+                        if (series.seriesBackdrop.isEmpty()) {
+                            series.seriesBackdrop = seriesJsonString(info, "backdrop", "");
+                        }
+                        if (series.seriesBackdrop.isEmpty()) {
+                            series.seriesBackdrop = seriesJsonString(info, "backdrop_url", "");
+                        }
                     } else if (!"episodes".equals(key)) {
                         reader.skipValue();
                     } else if (reader.peek() == JsonToken.BEGIN_ARRAY) {
