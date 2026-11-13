@@ -2093,9 +2093,17 @@ public class MainActivity extends Activity {
         android.widget.ImageView poster = new android.widget.ImageView(this);
         poster.setLayoutParams(new LinearLayout.LayoutParams(
                 tv ? LinearLayout.LayoutParams.MATCH_PARENT : dp(116),
-                dp(tv ? 250 : 164)));
+                dp(tv ? 158 : 164)));
         poster.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
-        poster.setBackgroundColor(Color.rgb(35, 45, 62));
+        if (tv) {
+            GradientDrawable posterBackground = new GradientDrawable();
+            posterBackground.setColor(Color.rgb(35, 45, 62));
+            posterBackground.setCornerRadius(dp(8));
+            poster.setBackground(posterBackground);
+            poster.setClipToOutline(true);
+        } else {
+            poster.setBackgroundColor(Color.rgb(35, 45, 62));
+        }
 
         if (series.logoUrl != null && !series.logoUrl.isEmpty()) {
             loadChannelLogo(poster, series.logoUrl);
@@ -2297,11 +2305,40 @@ public class MainActivity extends Activity {
         final Channel[] firstSeriesEpisode = {null};
         final ImageView[] seriesBackdropView = {null};
         if (tvLayout) {
-            LinearLayout heroRow = new LinearLayout(this);
-            heroRow.setOrientation(LinearLayout.HORIZONTAL);
+            FrameLayout heroFrame = new FrameLayout(this);
+            ImageView backdrop = new ImageView(this);
+            seriesBackdropView[0] = backdrop;
+            backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            heroFrame.addView(backdrop, new FrameLayout.LayoutParams(-1, -1));
+            loadMovieBackdrop(backdrop, series.logoUrl);
+
+            GradientDrawable leftFade = new GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{NAVY, NAVY, Color.TRANSPARENT});
+            View leftOverlay = new View(this);
+            leftOverlay.setBackground(leftFade);
+            heroFrame.addView(leftOverlay, new FrameLayout.LayoutParams(
+                    -1, -1));
+
+            GradientDrawable topFade = new GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{NAVY, Color.TRANSPARENT});
+            View topOverlay = new View(this);
+            topOverlay.setBackground(topFade);
+            heroFrame.addView(topOverlay, new FrameLayout.LayoutParams(
+                    -1, dp(55), Gravity.TOP));
+
+            GradientDrawable bottomFade = new GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{Color.TRANSPARENT, NAVY});
+            View bottomOverlay = new View(this);
+            bottomOverlay.setBackground(bottomFade);
+            heroFrame.addView(bottomOverlay, new FrameLayout.LayoutParams(
+                    -1, dp(115), Gravity.BOTTOM));
 
             LinearLayout details = new LinearLayout(this);
             details.setOrientation(LinearLayout.VERTICAL);
+            details.setPadding(dp(24), dp(12), 0, dp(8));
             details.addView(heading);
             seriesPlot.setPadding(0, dp(12), dp(16), 0);
             details.addView(seriesPlot);
@@ -2363,53 +2400,14 @@ public class MainActivity extends Activity {
             actionsParams.setMargins(0, dp(18), 0, dp(8));
             details.addView(actions, actionsParams);
 
-            heroRow.addView(details, new LinearLayout.LayoutParams(
-                    0, -1, 1f));
-
-            FrameLayout artworkFrame = new FrameLayout(this);
-            ImageView backdrop = new ImageView(this);
-            seriesBackdropView[0] = backdrop;
-            backdrop.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            artworkFrame.addView(backdrop, new FrameLayout.LayoutParams(-1, -1));
-            loadMovieBackdrop(backdrop, series.logoUrl);
-
-            GradientDrawable leftFade = new GradientDrawable(
-                    GradientDrawable.Orientation.LEFT_RIGHT,
-                    new int[]{NAVY, Color.TRANSPARENT});
-            View leftOverlay = new View(this);
-            leftOverlay.setBackground(leftFade);
-            FrameLayout.LayoutParams leftParams = new FrameLayout.LayoutParams(
-                    dp(100), -1, Gravity.LEFT);
-            artworkFrame.addView(leftOverlay, leftParams);
-
-            GradientDrawable rightFade = new GradientDrawable(
-                    GradientDrawable.Orientation.LEFT_RIGHT,
-                    new int[]{Color.TRANSPARENT, NAVY});
-            View rightOverlay = new View(this);
-            rightOverlay.setBackground(rightFade);
-            artworkFrame.addView(rightOverlay, new FrameLayout.LayoutParams(
-                    dp(100), -1, Gravity.RIGHT));
-
-            GradientDrawable topFade = new GradientDrawable(
-                    GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{NAVY, Color.TRANSPARENT});
-            View topOverlay = new View(this);
-            topOverlay.setBackground(topFade);
-            artworkFrame.addView(topOverlay, new FrameLayout.LayoutParams(
-                    -1, dp(65), Gravity.TOP));
-
-            GradientDrawable bottomFade = new GradientDrawable(
-                    GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{Color.TRANSPARENT, NAVY});
-            View bottomOverlay = new View(this);
-            bottomOverlay.setBackground(bottomFade);
-            artworkFrame.addView(bottomOverlay, new FrameLayout.LayoutParams(
-                    -1, dp(65), Gravity.BOTTOM));
-
-            heroRow.addView(artworkFrame, new LinearLayout.LayoutParams(
-                    0, -1, 1.15f));
-            screen.addView(heroRow, new LinearLayout.LayoutParams(
-                    -1, dp(270)));
+            FrameLayout.LayoutParams detailsParams = new FrameLayout.LayoutParams(
+                    (int) (getResources().getDisplayMetrics().widthPixels * 0.58f),
+                    -1, Gravity.LEFT | Gravity.TOP);
+            heroFrame.addView(details, detailsParams);
+            LinearLayout.LayoutParams heroParams =
+                    new LinearLayout.LayoutParams(-1, dp(340));
+            heroParams.setMargins(-dp(12), 0, -dp(12), 0);
+            screen.addView(heroFrame, heroParams);
         } else {
             screen.addView(heading);
         }
@@ -2502,9 +2500,13 @@ public class MainActivity extends Activity {
 
                         ImageView poster = new ImageView(this);
                         poster.setLayoutParams(new LinearLayout.LayoutParams(
-                                dp(170), dp(240)));
-                        poster.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                        poster.setBackgroundColor(Color.rgb(35, 45, 62));
+                                dp(170), dp(115)));
+                        poster.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                        GradientDrawable episodeBackground = new GradientDrawable();
+                        episodeBackground.setColor(Color.rgb(35, 45, 62));
+                        episodeBackground.setCornerRadius(dp(8));
+                        poster.setBackground(episodeBackground);
+                        poster.setClipToOutline(true);
                         if (episode.episodeArtwork != null
                                 && !episode.episodeArtwork.isEmpty()) {
                             loadChannelLogo(poster, episode.episodeArtwork, 1080);
