@@ -2375,7 +2375,7 @@ public class MainActivity extends Activity {
             ImageView backdrop = new ImageView(this);
             seriesBackdropView[0] = backdrop;
             backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            int artworkWidth = (int) (getResources().getDisplayMetrics().widthPixels * 1.0f);
+            int artworkWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.75f);
             heroFrame.addView(backdrop, new FrameLayout.LayoutParams(artworkWidth, -1, Gravity.RIGHT | Gravity.TOP));
             loadMovieBackdrop(backdrop, series.logoUrl);
 
