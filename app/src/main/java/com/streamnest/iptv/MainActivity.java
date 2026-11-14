@@ -1433,7 +1433,7 @@ public class MainActivity extends Activity {
         android.widget.ImageView backdrop = new android.widget.ImageView(this);
         if (tvDetails) {
             backdrop.setScaleType(android.widget.ImageView.ScaleType.FIT_START);
-            int artworkWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.42f);
+            int artworkWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.75f);
             hero.addView(backdrop, new android.widget.FrameLayout.LayoutParams(
                     artworkWidth, -1, Gravity.RIGHT | Gravity.TOP));
         } else {
@@ -1574,16 +1574,11 @@ public class MainActivity extends Activity {
         scroll.addView(content);
 
         if (tvDetails) {
-            LinearLayout tvBody = new LinearLayout(this);
-            tvBody.setOrientation(LinearLayout.HORIZONTAL);
-            tvBody.setGravity(Gravity.CENTER_VERTICAL);
-
-            tvBody.addView(scroll, new LinearLayout.LayoutParams(
-                    0, -1, 0.48f));
-
-            tvBody.addView(hero, new LinearLayout.LayoutParams(
-                    0, -1, 0.52f));
-
+            android.widget.FrameLayout tvBody = new android.widget.FrameLayout(this);
+            tvBody.addView(hero, new android.widget.FrameLayout.LayoutParams(-1, -1));
+            int detailsWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.30f);
+            tvBody.addView(scroll, new android.widget.FrameLayout.LayoutParams(
+                    detailsWidth, -1, Gravity.LEFT | Gravity.TOP));
             detailsScreen.addView(tvBody,
                     new LinearLayout.LayoutParams(-1, 0, 1f));
         } else {
@@ -2083,7 +2078,7 @@ public class MainActivity extends Activity {
         android.widget.ImageView poster = new android.widget.ImageView(this);
         poster.setLayoutParams(new LinearLayout.LayoutParams(
                 tv ? LinearLayout.LayoutParams.MATCH_PARENT : dp(116),
-                dp(tv ? 158 : 164)));
+                dp(tv ? 250 : 164)));
         poster.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
         if (tv) {
             GradientDrawable posterBackground = new GradientDrawable();
@@ -2299,7 +2294,7 @@ public class MainActivity extends Activity {
             ImageView backdrop = new ImageView(this);
             seriesBackdropView[0] = backdrop;
             backdrop.setScaleType(ImageView.ScaleType.FIT_START);
-            int artworkWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.52f);
+            int artworkWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.75f);
             heroFrame.addView(backdrop, new FrameLayout.LayoutParams(artworkWidth, -1, Gravity.RIGHT | Gravity.TOP));
             loadMovieBackdrop(backdrop, series.logoUrl);
 
@@ -2309,7 +2304,7 @@ public class MainActivity extends Activity {
             View leftOverlay = new View(this);
             leftOverlay.setBackground(leftFade);
             heroFrame.addView(leftOverlay, new FrameLayout.LayoutParams(
-                    -1, -1));
+                    dp(140), -1, Gravity.LEFT));
 
 
             GradientDrawable bottomFade = new GradientDrawable(
@@ -2385,7 +2380,7 @@ public class MainActivity extends Activity {
             details.addView(actions, actionsParams);
 
             FrameLayout.LayoutParams detailsParams = new FrameLayout.LayoutParams(
-                    (int) (getResources().getDisplayMetrics().widthPixels * 0.58f),
+                    (int) (getResources().getDisplayMetrics().widthPixels * 0.30f),
                     -1, Gravity.LEFT | Gravity.TOP);
             heroFrame.addView(details, detailsParams);
             LinearLayout.LayoutParams heroParams =
