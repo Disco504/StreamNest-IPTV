@@ -131,8 +131,20 @@ public class MainActivity extends Activity {
     private ScrollView tvSeriesMainMenuScroll;
     private LinearLayout tvSeriesCategoryList;
     private LinearLayout tvSeriesGrid;
+    private ScrollView tvSeriesGridScroll;
     private TextView tvSeriesStatus;
     private String tvSeriesSelectedCategoryId = "";
+    private ArrayList<Channel> tvSeriesLoadedShows = new ArrayList<>();
+    private int tvSeriesNextShowIndex = 0;
+    private int tvSeriesLoadGeneration = 0;
+    private ThreadPoolExecutor tvSeriesArtworkExecutor =
+            new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS,
+                    new java.util.concurrent.LinkedBlockingQueue<>(),
+                    new ThreadPoolExecutor.AbortPolicy());
+    private boolean tvSeriesAppendingShows = false;
+    private int tvSeriesGridColumns = 4;
+    private int tvSeriesGridColumn = 0;
+    private LinearLayout tvSeriesCurrentGridRow;
     private String tvSeriesSelectedCategoryName = "";
 
     private ExoPlayer previewPlayer;
@@ -1867,14 +1879,23 @@ public class MainActivity extends Activity {
         body.addView(tvSeriesCategoryScroll, new LinearLayout.LayoutParams(
                 dp(190), LinearLayout.LayoutParams.MATCH_PARENT));
 
-        ScrollView gridScroll = new ScrollView(this);
+        tvSeriesGridScroll = new ScrollView(this);
         tvSeriesGrid = new LinearLayout(this);
         tvSeriesGrid.setOrientation(LinearLayout.VERTICAL);
         tvSeriesGrid.setPadding(dp(5), dp(5), dp(5), dp(5));
-        gridScroll.addView(tvSeriesGrid);
+        tvSeriesGridScroll.addView(tvSeriesGrid);
 
-        body.addView(gridScroll, new LinearLayout.LayoutParams(
+        body.addView(tvSeriesGridScroll, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
+        tvSeriesGridScroll.setOnScrollChangeListener(
+                (View v, int x, int y, int oldX, int oldY) -> {
+            View content = tvSeriesGridScroll.getChildAt(0);
+            if (content != null
+                    && y + tvSeriesGridScroll.getHeight()
+                    >= content.getHeight() - dp(500)) {
+                appendTvSeriesShowBatch();
+            }
+        });
 
         setContentView(screen);
 
@@ -1979,10 +2000,22 @@ public class MainActivity extends Activity {
     private void loadTvSeriesGrid(
             String categoryId, String categoryName,
             String base, String user, String pass) {
+        tvSeriesArtworkExecutor.shutdownNow();
+        tvSeriesArtworkExecutor = new ThreadPoolExecutor(
+                2, 2, 0L, TimeUnit.MILLISECONDS,
+                new java.util.concurrent.LinkedBlockingQueue<>(),
+                new ThreadPoolExecutor.AbortPolicy());
+
+        final int generation = ++tvSeriesLoadGeneration;
         tvSeriesSelectedCategoryId = categoryId;
         tvSeriesSelectedCategoryName = categoryName;
         tvSeriesStatus.setText("Loading " + categoryName + "...");
         tvSeriesGrid.removeAllViews();
+        tvSeriesLoadedShows.clear();
+        tvSeriesNextShowIndex = 0;
+        tvSeriesGridColumn = 0;
+        tvSeriesCurrentGridRow = null;
+        tvSeriesAppendingShows = false;
 
         new Thread(() -> {
             ArrayList<Channel> loaded = new ArrayList<>();
@@ -2016,6 +2049,12 @@ public class MainActivity extends Activity {
 
             final String error = failure;
             runOnUiThread(() -> {
+                if (generation != tvSeriesLoadGeneration
+                        || !showingTvSeries
+                        || !categoryId.equals(tvSeriesSelectedCategoryId)) {
+                    return;
+                }
+
                 tvSeriesGrid.removeAllViews();
                 if (error != null) {
                     tvSeriesStatus.setText("Unable to load shows: " + error);
@@ -2032,35 +2071,73 @@ public class MainActivity extends Activity {
                 }
 
                 int width = getResources().getConfiguration().screenWidthDp;
-                int columns = Math.max(3, Math.min(7, width / 170));
-                LinearLayout gridRow = null;
-                int column = 0;
-
-                for (Channel series : loaded) {
-                    if (column == 0) {
-                        gridRow = new LinearLayout(this);
-                        gridRow.setOrientation(LinearLayout.HORIZONTAL);
-                        gridRow.setGravity(Gravity.TOP);
-                        tvSeriesGrid.addView(gridRow,
-                                new LinearLayout.LayoutParams(
-                                        LinearLayout.LayoutParams.MATCH_PARENT,
-                                        LinearLayout.LayoutParams.WRAP_CONTENT));
-                    }
-
-                    LinearLayout card = createSeriesPosterCard(
-                            series, base, user, pass);
-                    LinearLayout.LayoutParams cardParams =
-                            new LinearLayout.LayoutParams(
-                                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-                    cardParams.setMargins(dp(4), dp(5), dp(4), dp(8));
-                    gridRow.addView(card, cardParams);
-
-                    column++;
-                    if (column >= columns) column = 0;
-                }
+                tvSeriesGridColumns = Math.max(3, Math.min(7, width / 170));
+                tvSeriesLoadedShows = loaded;
+                appendTvSeriesShowBatch();
                 focusFirstTvSeriesPoster();
             });
         }).start();
+    }
+
+    private void appendTvSeriesShowBatch() {
+        if (tvSeriesAppendingShows
+                || tvSeriesLoadedShows.isEmpty()
+                || tvSeriesNextShowIndex >= tvSeriesLoadedShows.size()
+                || !showingTvSeries) {
+            return;
+        }
+
+        tvSeriesAppendingShows = true;
+        int end = Math.min(
+                tvSeriesNextShowIndex + 40, tvSeriesLoadedShows.size());
+
+        while (tvSeriesNextShowIndex < end) {
+            Channel series = tvSeriesLoadedShows.get(tvSeriesNextShowIndex);
+
+            if (tvSeriesGridColumn == 0) {
+                tvSeriesCurrentGridRow = new LinearLayout(this);
+                tvSeriesCurrentGridRow.setOrientation(
+                        LinearLayout.HORIZONTAL);
+                tvSeriesCurrentGridRow.setGravity(Gravity.TOP);
+                tvSeriesGrid.addView(tvSeriesCurrentGridRow,
+                        new LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+
+            LinearLayout card = createSeriesPosterCard(
+                    series,
+                    getPreferences(MODE_PRIVATE).getString(
+                            "xtream_server", ""),
+                    getPreferences(MODE_PRIVATE).getString(
+                            "xtream_username", ""),
+                    getPreferences(MODE_PRIVATE).getString(
+                            "xtream_password", ""));
+
+            LinearLayout.LayoutParams cardParams =
+                    new LinearLayout.LayoutParams(
+                            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            cardParams.setMargins(dp(4), dp(5), dp(4), dp(8));
+            tvSeriesCurrentGridRow.addView(card, cardParams);
+
+            tvSeriesGridColumn++;
+            if (tvSeriesGridColumn >= tvSeriesGridColumns) {
+                tvSeriesGridColumn = 0;
+                tvSeriesCurrentGridRow = null;
+            }
+            tvSeriesNextShowIndex++;
+        }
+
+        tvSeriesAppendingShows = false;
+        tvSeriesGridScroll.post(() -> {
+            View content = tvSeriesGridScroll.getChildAt(0);
+            if (content != null
+                    && tvSeriesNextShowIndex < tvSeriesLoadedShows.size()
+                    && content.getHeight()
+                    <= tvSeriesGridScroll.getHeight() + dp(500)) {
+                appendTvSeriesShowBatch();
+            }
+        });
     }
 
     private LinearLayout createSeriesPosterCard(
@@ -2091,7 +2168,7 @@ public class MainActivity extends Activity {
         }
 
         if (series.logoUrl != null && !series.logoUrl.isEmpty()) {
-            loadChannelLogo(poster, series.logoUrl);
+            loadChannelLogo(poster, series.logoUrl, 300, tvSeriesArtworkExecutor);
         }
 
         card.addView(poster);
@@ -2268,6 +2345,8 @@ public class MainActivity extends Activity {
 
     private void showSeriesEpisodes(Channel series, String base, String user, String pass) {
         releaseGuidePreview();
+        tvSeriesLoadGeneration++;
+        tvSeriesArtworkExecutor.shutdownNow();
         showingTvSeriesEpisodes = isTelevisionDevice();
         showingTvSeries = false;
         showingLiveTv = false;
@@ -4850,9 +4929,14 @@ if (categoryPrograms == null) {
     private void loadChannelLogo(
             android.widget.ImageView imageView, String logoUrl,
             int maxDimension) {
-        imageView.setTag(logoUrl);
+        loadChannelLogo(imageView, logoUrl, maxDimension, logoExecutor);
+    }
 
-        logoExecutor.execute(() -> {
+    private void loadChannelLogo(
+            android.widget.ImageView imageView, String logoUrl,
+            int maxDimension, ThreadPoolExecutor executor) {
+        imageView.setTag(logoUrl);
+        executor.execute(() -> {
             java.net.HttpURLConnection connection = null;
             java.io.File tempFile = null;
 
@@ -4877,6 +4961,9 @@ if (categoryPrograms == null) {
 
                     int count;
                     while ((count = stream.read(buffer)) != -1) {
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
                         totalBytes += count;
                         if (totalBytes > 10 * 1024 * 1024) {
                             throw new java.io.IOException(
@@ -4886,7 +4973,9 @@ if (categoryPrograms == null) {
                     }
                 }
 
-                android.graphics.BitmapFactory.Options bounds =
+                if (Thread.currentThread().isInterrupted()) return;
+
+            android.graphics.BitmapFactory.Options bounds =
                         new android.graphics.BitmapFactory.Options();
                 bounds.inJustDecodeBounds = true;
                 android.graphics.BitmapFactory.decodeFile(
@@ -4912,6 +5001,10 @@ if (categoryPrograms == null) {
                         android.graphics.BitmapFactory.decodeFile(
                                 tempFile.getAbsolutePath(), options);
 
+                if (Thread.currentThread().isInterrupted()) {
+                    if (bitmap != null) bitmap.recycle();
+                    return;
+                }
                 if (bitmap != null) {
                     boolean posted = imageView.post(() -> {
                         if (logoUrl.equals(imageView.getTag())) {
@@ -4927,7 +5020,7 @@ if (categoryPrograms == null) {
                 }
 
             } catch (Exception e) {
-                android.util.Log.d("StreamNest",
+            android.util.Log.d("StreamNest",
                         "Channel logo unavailable: " + logoUrl);
             } finally {
                 if (connection != null) {
