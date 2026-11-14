@@ -1459,7 +1459,8 @@ public class MainActivity extends Activity {
                     new android.widget.FrameLayout.LayoutParams(-1, -1));
         }
         if (tvDetails) {
-            int fadeSize = dp(100);
+            int leftFadeWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.40f);
+            int bottomFadeHeight = dp(220);
 
             View leftFade = new View(this);
             leftFade.setBackground(new android.graphics.drawable.GradientDrawable(
@@ -1467,7 +1468,7 @@ public class MainActivity extends Activity {
                     new int[]{NAVY, Color.TRANSPARENT}));
             android.widget.FrameLayout.LayoutParams leftParams =
                     new android.widget.FrameLayout.LayoutParams(
-                            fadeSize, -1, Gravity.LEFT);
+                            leftFadeWidth, -1, Gravity.LEFT);
             hero.addView(leftFade, leftParams);
 
             View bottomFade = new View(this);
@@ -1476,7 +1477,7 @@ public class MainActivity extends Activity {
                     new int[]{Color.TRANSPARENT, NAVY}));
             android.widget.FrameLayout.LayoutParams bottomParams =
                     new android.widget.FrameLayout.LayoutParams(
-                            -1, fadeSize, Gravity.BOTTOM);
+                            -1, bottomFadeHeight, Gravity.BOTTOM);
             hero.addView(bottomFade, bottomParams);
         }
         if (!tvDetails) {
@@ -1588,7 +1589,7 @@ public class MainActivity extends Activity {
         if (tvDetails) {
             android.widget.FrameLayout tvBody = new android.widget.FrameLayout(this);
             tvBody.addView(hero, new android.widget.FrameLayout.LayoutParams(-1, -1));
-            int detailsWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.30f);
+            int detailsWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.45f);
             tvBody.addView(scroll, new android.widget.FrameLayout.LayoutParams(
                     detailsWidth, -1, Gravity.LEFT | Gravity.TOP));
             detailsScreen.addView(tvBody,
@@ -2383,7 +2384,7 @@ public class MainActivity extends Activity {
             View leftOverlay = new View(this);
             leftOverlay.setBackground(leftFade);
             heroFrame.addView(leftOverlay, new FrameLayout.LayoutParams(
-                    dp(140), -1, Gravity.LEFT));
+                    (int) (getResources().getDisplayMetrics().widthPixels * 0.40f), -1, Gravity.LEFT));
 
 
             GradientDrawable bottomFade = new GradientDrawable(
@@ -2392,7 +2393,7 @@ public class MainActivity extends Activity {
             View bottomOverlay = new View(this);
             bottomOverlay.setBackground(bottomFade);
             heroFrame.addView(bottomOverlay, new FrameLayout.LayoutParams(
-                    -1, dp(115), Gravity.BOTTOM));
+                    -1, dp(170), Gravity.BOTTOM));
 
             LinearLayout details = new LinearLayout(this);
             details.setOrientation(LinearLayout.VERTICAL);
@@ -2459,7 +2460,7 @@ public class MainActivity extends Activity {
             details.addView(actions, actionsParams);
 
             FrameLayout.LayoutParams detailsParams = new FrameLayout.LayoutParams(
-                    (int) (getResources().getDisplayMetrics().widthPixels * 0.30f),
+                    (int) (getResources().getDisplayMetrics().widthPixels * 0.45f),
                     -1, Gravity.LEFT | Gravity.TOP);
             heroFrame.addView(details, detailsParams);
             LinearLayout.LayoutParams heroParams =
