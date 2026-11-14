@@ -1459,13 +1459,13 @@ public class MainActivity extends Activity {
                     new android.widget.FrameLayout.LayoutParams(-1, -1));
         }
         if (tvDetails) {
-            int leftFadeWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.40f);
-            int bottomFadeHeight = dp(220);
+            int leftFadeWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.75f);
+            int bottomFadeHeight = dp(170);
 
             View leftFade = new View(this);
             leftFade.setBackground(new android.graphics.drawable.GradientDrawable(
                     android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                    new int[]{NAVY, Color.TRANSPARENT}));
+                    new int[]{NAVY, NAVY, 0xFF101629, 0xCC101629, Color.TRANSPARENT}));
             android.widget.FrameLayout.LayoutParams leftParams =
                     new android.widget.FrameLayout.LayoutParams(
                             leftFadeWidth, -1, Gravity.LEFT);
