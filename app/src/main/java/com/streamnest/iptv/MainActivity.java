@@ -1444,7 +1444,7 @@ public class MainActivity extends Activity {
         hero.setBackgroundColor(tvDetails ? NAVY : Color.rgb(25, 35, 50));
         android.widget.ImageView backdrop = new android.widget.ImageView(this);
         if (tvDetails) {
-            backdrop.setScaleType(android.widget.ImageView.ScaleType.FIT_START);
+            backdrop.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
             int artworkWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.75f);
             hero.addView(backdrop, new android.widget.FrameLayout.LayoutParams(
                     artworkWidth, -1, Gravity.RIGHT | Gravity.TOP));
@@ -1460,12 +1460,12 @@ public class MainActivity extends Activity {
         }
         if (tvDetails) {
             int leftFadeWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.75f);
-            int bottomFadeHeight = dp(230);
+            int bottomFadeHeight = dp(170);
 
             View leftFade = new View(this);
             leftFade.setBackground(new android.graphics.drawable.GradientDrawable(
                     android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                    new int[]{NAVY, NAVY, 0xFF202B40, 0xCC202B40, Color.TRANSPARENT}));
+                    new int[]{NAVY, NAVY, 0xFF101629, 0xCC101629, Color.TRANSPARENT}));
             android.widget.FrameLayout.LayoutParams leftParams =
                     new android.widget.FrameLayout.LayoutParams(
                             leftFadeWidth, -1, Gravity.LEFT);
@@ -1585,19 +1585,39 @@ public class MainActivity extends Activity {
         }
 
         scroll.addView(content);
-
         if (tvDetails) {
-            android.widget.FrameLayout tvBody = new android.widget.FrameLayout(this);
-            tvBody.addView(hero, new android.widget.FrameLayout.LayoutParams(-1, -1));
+            content.removeView(hero);
+            content.removeView(title);
+            content.removeView(meta);
+            content.removeView(plot);
+
+            View actions = content.getChildAt(content.getChildCount() - 1);
+            content.removeView(actions);
+
+            LinearLayout details = new LinearLayout(this);
+            details.setOrientation(LinearLayout.VERTICAL);
+            details.setPadding(dp(24), dp(12), 0, dp(8));
+            details.addView(title);
+            details.addView(meta);
+            details.addView(plot);
+            LinearLayout.LayoutParams actionParams =
+                    new LinearLayout.LayoutParams(-1, -2);
+            actionParams.setMargins(0, dp(18), 0, dp(8));
+            details.addView(actions, actionParams);
+
             int detailsWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.45f);
-            tvBody.addView(scroll, new android.widget.FrameLayout.LayoutParams(
+            hero.addView(details, new android.widget.FrameLayout.LayoutParams(
                     detailsWidth, -1, Gravity.LEFT | Gravity.TOP));
-            detailsScreen.addView(tvBody,
+
+            detailsScreen.addView(hero,
+                    new LinearLayout.LayoutParams(-1, dp(340)));
+            detailsScreen.addView(scroll,
                     new LinearLayout.LayoutParams(-1, 0, 1f));
         } else {
             detailsScreen.addView(scroll,
                     new LinearLayout.LayoutParams(-1, 0, 1f));
         }
+
         screen = detailsScreen;
         setContentView(screen);
 
