@@ -1431,9 +1431,15 @@ public class MainActivity extends Activity {
         android.widget.FrameLayout hero = new android.widget.FrameLayout(this);
         hero.setBackgroundColor(tvDetails ? NAVY : Color.rgb(25, 35, 50));
         android.widget.ImageView backdrop = new android.widget.ImageView(this);
-        backdrop.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-        hero.addView(backdrop, new android.widget.FrameLayout.LayoutParams(
-                -1, -1));
+        if (tvDetails) {
+            backdrop.setScaleType(android.widget.ImageView.ScaleType.FIT_START);
+            int artworkWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.42f);
+            hero.addView(backdrop, new android.widget.FrameLayout.LayoutParams(
+                    artworkWidth, -1, Gravity.RIGHT | Gravity.TOP));
+        } else {
+            backdrop.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            hero.addView(backdrop, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        }
         if (!tvDetails) {
             View shade = new View(this);
             shade.setBackgroundColor(0x77000000);
@@ -1451,24 +1457,6 @@ public class MainActivity extends Activity {
                     new android.widget.FrameLayout.LayoutParams(
                             fadeSize, -1, Gravity.LEFT);
             hero.addView(leftFade, leftParams);
-
-            View rightFade = new View(this);
-            rightFade.setBackground(new android.graphics.drawable.GradientDrawable(
-                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                    new int[]{Color.TRANSPARENT, NAVY}));
-            android.widget.FrameLayout.LayoutParams rightParams =
-                    new android.widget.FrameLayout.LayoutParams(
-                            fadeSize, -1, Gravity.RIGHT);
-            hero.addView(rightFade, rightParams);
-
-            View topFade = new View(this);
-            topFade.setBackground(new android.graphics.drawable.GradientDrawable(
-                    android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{NAVY, Color.TRANSPARENT}));
-            android.widget.FrameLayout.LayoutParams topParams =
-                    new android.widget.FrameLayout.LayoutParams(
-                            -1, fadeSize, Gravity.TOP);
-            hero.addView(topFade, topParams);
 
             View bottomFade = new View(this);
             bottomFade.setBackground(new android.graphics.drawable.GradientDrawable(
@@ -2310,8 +2298,9 @@ public class MainActivity extends Activity {
             FrameLayout heroFrame = new FrameLayout(this);
             ImageView backdrop = new ImageView(this);
             seriesBackdropView[0] = backdrop;
-            backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            heroFrame.addView(backdrop, new FrameLayout.LayoutParams(-1, -1));
+            backdrop.setScaleType(ImageView.ScaleType.FIT_START);
+            int artworkWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.52f);
+            heroFrame.addView(backdrop, new FrameLayout.LayoutParams(artworkWidth, -1, Gravity.RIGHT | Gravity.TOP));
             loadMovieBackdrop(backdrop, series.logoUrl);
 
             GradientDrawable leftFade = new GradientDrawable(
@@ -2322,13 +2311,6 @@ public class MainActivity extends Activity {
             heroFrame.addView(leftOverlay, new FrameLayout.LayoutParams(
                     -1, -1));
 
-            GradientDrawable topFade = new GradientDrawable(
-                    GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{NAVY, Color.TRANSPARENT});
-            View topOverlay = new View(this);
-            topOverlay.setBackground(topFade);
-            heroFrame.addView(topOverlay, new FrameLayout.LayoutParams(
-                    -1, dp(55), Gravity.TOP));
 
             GradientDrawable bottomFade = new GradientDrawable(
                     GradientDrawable.Orientation.TOP_BOTTOM,
