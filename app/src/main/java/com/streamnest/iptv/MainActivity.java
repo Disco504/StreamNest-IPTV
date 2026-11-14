@@ -2359,6 +2359,7 @@ public class MainActivity extends Activity {
         screen.setPadding(dp(12), dp(8), dp(12), dp(8));
 
         boolean tvLayout = isTelevisionDevice();
+        if (tvLayout) screen.setPadding(0, 0, 0, 0);
         TextView seriesPlot = label("Loading description...", 16);
         seriesPlot.setTextColor(Color.WHITE);
         seriesPlot.setMaxLines(8);
@@ -2373,18 +2374,18 @@ public class MainActivity extends Activity {
             FrameLayout heroFrame = new FrameLayout(this);
             ImageView backdrop = new ImageView(this);
             seriesBackdropView[0] = backdrop;
-            backdrop.setScaleType(ImageView.ScaleType.FIT_START);
-            int artworkWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.75f);
+            backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            int artworkWidth = (int) (getResources().getDisplayMetrics().widthPixels * 1.0f);
             heroFrame.addView(backdrop, new FrameLayout.LayoutParams(artworkWidth, -1, Gravity.RIGHT | Gravity.TOP));
             loadMovieBackdrop(backdrop, series.logoUrl);
 
             GradientDrawable leftFade = new GradientDrawable(
                     GradientDrawable.Orientation.LEFT_RIGHT,
-                    new int[]{NAVY, NAVY, Color.TRANSPARENT});
+                    new int[]{NAVY, NAVY, 0xFF101629, 0xCC101629, Color.TRANSPARENT});
             View leftOverlay = new View(this);
             leftOverlay.setBackground(leftFade);
             heroFrame.addView(leftOverlay, new FrameLayout.LayoutParams(
-                    (int) (getResources().getDisplayMetrics().widthPixels * 0.40f), -1, Gravity.LEFT));
+                    (int) (getResources().getDisplayMetrics().widthPixels * 0.75f), -1, Gravity.LEFT));
 
 
             GradientDrawable bottomFade = new GradientDrawable(
