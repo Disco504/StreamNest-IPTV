@@ -1600,10 +1600,10 @@ public class MainActivity extends Activity {
             details.addView(title);
             details.addView(meta);
             details.addView(plot);
-            LinearLayout.LayoutParams actionParams =
+            LinearLayout.LayoutParams heroActionParams =
                     new LinearLayout.LayoutParams(-1, -2);
-            actionParams.setMargins(0, dp(18), 0, dp(8));
-            details.addView(actions, actionParams);
+            heroActionParams.setMargins(0, dp(18), 0, dp(8));
+            details.addView(actions, heroActionParams);
 
             int detailsWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.45f);
             hero.addView(details, new android.widget.FrameLayout.LayoutParams(
