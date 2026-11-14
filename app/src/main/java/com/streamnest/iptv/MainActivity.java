@@ -94,6 +94,7 @@ public class MainActivity extends Activity {
     private TextView phoneCategoryButton;
     private LinearLayout channelPanel;
     private ArrayList<Channel> channels = new ArrayList<>();
+    private CatalogDatabase catalogDatabase;
     private Set<String> favorites = new LinkedHashSet<>();
     private String selectedCategory = "All Channels";
     private boolean showingLiveTv = false;
@@ -197,6 +198,7 @@ public class MainActivity extends Activity {
         screen.setBackgroundColor(NAVY);
         setContentView(screen);
 
+        catalogDatabase = new CatalogDatabase(getApplicationContext());
         restoreSavedConnection();
     }
 
@@ -3324,6 +3326,7 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             ArrayList<Channel> loaded = new ArrayList<>();
             String failure = null;
+            long refreshId = -1;
 
             try {
                 String api = base + "/player_api.php?username="
@@ -3332,41 +3335,41 @@ public class MainActivity extends Activity {
 
                 JSONArray categories = getXtreamArray(
                         api + "&action=get_live_categories");
-
                 Map<String, String> groupNames = new HashMap<>();
                 for (int i = 0; i < categories.length(); i++) {
                     JSONObject item = categories.getJSONObject(i);
                     String id = item.optString("category_id", "");
                     String name = item.optString(
                             "category_name", "Uncategorized");
-                    if (!id.isEmpty()) {
-                        groupNames.put(id, name);
-                    }
+                    if (!id.isEmpty()) groupNames.put(id, name);
                 }
 
-                JSONArray streams = getXtreamArray(
-                        api + "&action=get_live_streams");
+                String providerKey = CatalogDatabase.makeProviderKey(
+                        base + "|" + username);
+                refreshId = catalogDatabase.beginRefresh(
+                        providerKey, "live");
+                final long batchRefreshId = refreshId;
 
-                for (int i = 0; i < streams.length(); i++) {
-                    JSONObject item = streams.getJSONObject(i);
-                    String id = item.optString("stream_id", "");
-                    if (id.isEmpty()) {
-                        continue;
-                    }
+                ArrayList<CatalogDatabase.CatalogItem> batch =
+                        new ArrayList<>();
 
-                    String name = item.optString("name", "Channel");
-                    String categoryId =
-                            item.optString("category_id", "");
+                forEachXtreamObject(
+                        api + "&action=get_live_streams", item -> {
+                    String id = seriesJsonString(item, "stream_id", "");
+                    if (id.isEmpty()) return;
+
+                    String name = seriesJsonString(
+                            item, "name", "Channel");
+                    String categoryId = seriesJsonString(
+                            item, "category_id", "");
                     String group = groupNames.get(categoryId);
                     if (group == null || group.isEmpty()) {
                         group = "Uncategorized";
                     }
 
-                    String extension = item.optString(
-                            "container_extension", "ts");
-                    if (extension.isEmpty()) {
-                        extension = "ts";
-                    }
+                    String extension = seriesJsonString(
+                            item, "container_extension", "ts");
+                    if (extension.isEmpty()) extension = "ts";
 
                     String streamUrl = base + "/live/"
                             + Uri.encode(username) + "/"
@@ -3374,17 +3377,48 @@ public class MainActivity extends Activity {
                             + Uri.encode(id) + "."
                             + Uri.encode(extension);
 
-                    String tvgId = item.optString(
-                            "epg_channel_id", "");
+                    String tvgId = seriesJsonString(
+                            item, "epg_channel_id", "");
+                    String logoUrl = seriesJsonString(
+                            item, "stream_icon", "");
 
-                    String logoUrl = item.optString("stream_icon", "");
                     loaded.add(new Channel(
                             name, streamUrl, group, tvgId, logoUrl));
+
+                    batch.add(new CatalogDatabase.CatalogItem(
+                            "live", id, name, id, group,
+                            tvgId, logoUrl, extension));
+
+                    if (batch.size() >= 200) {
+                        catalogDatabase.insertBatch(
+                                providerKey, "live", batchRefreshId, batch);
+                        batch.clear();
+                    }
+                });
+
+                if (!loaded.isEmpty()) {
+                    if (!batch.isEmpty()) {
+                        catalogDatabase.insertBatch(
+                                providerKey, "live", batchRefreshId, batch);
+                    }
+                    catalogDatabase.finishRefresh(refreshId);
+                    refreshId = -1;
+                } else {
+                    catalogDatabase.abandonRefresh(refreshId);
+                    refreshId = -1;
                 }
             } catch (Exception e) {
                 android.util.Log.e("StreamNest",
                         "Xtream connection failed", e);
                 failure = e.getMessage();
+                if (refreshId >= 0) {
+                    try {
+                        catalogDatabase.abandonRefresh(refreshId);
+                    } catch (Exception cleanupError) {
+                        android.util.Log.e("StreamNest",
+                                "Catalog cleanup failed", cleanupError);
+                    }
+                }
             }
 
             final String error = failure;
@@ -3400,13 +3434,9 @@ public class MainActivity extends Activity {
                 } else {
                     channels = loaded;
                     selectedCategory = "All Channels";
-                    if (launchAfterLoad) {
-                        showTvGuide();
-
-                    }
+                    if (launchAfterLoad) showTvGuide();
                     Toast.makeText(this,
-                            "Loaded " + channels.size()
-                                    + " live channels",
+                            "Loaded " + channels.size() + " live channels",
                             Toast.LENGTH_LONG).show();
                 }
             });
