@@ -2417,6 +2417,7 @@ public class MainActivity extends Activity {
         heading.setTypeface(null, Typeface.BOLD);
 
         final Channel[] firstSeriesEpisode = {null};
+        LinearLayout seriesActions = null;
         final ImageView[] seriesBackdropView = {null};
         if (tvLayout) {
             FrameLayout heroFrame = new FrameLayout(this);
@@ -2483,30 +2484,45 @@ public class MainActivity extends Activity {
                 updateMyListText.run();
             });
 
-            TextView back = label("‹  BACK", 16);
-            back.setTextColor(MUTED);
-            back.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
-            back.setFocusable(true);
-            back.setClickable(true);
-            back.setPadding(0, dp(14), 0, dp(14));
-            back.setBackgroundColor(Color.TRANSPARENT);
-            back.setOnFocusChangeListener((v, focused) ->
-                    back.setTextColor(focused ? Color.YELLOW : MUTED));
-            back.setOnClickListener(v -> onBackPressed());
+            TextView external = label("EXTERNAL PLAYER", 16);
+            external.setTextColor(Color.WHITE);
+            external.setGravity(Gravity.CENTER);
+            external.setFocusable(true);
+            external.setClickable(true);
+            external.setOnClickListener(v -> {
+                if (firstSeriesEpisode[0] != null) {
+                    playVodExternal(firstSeriesEpisode[0]);
+                }
+            });
 
-            LinearLayout actions = new LinearLayout(this);
-            actions.setOrientation(LinearLayout.HORIZONTAL);
-            actions.setGravity(Gravity.CENTER_VERTICAL);
-            TextView[] actionViews = {play, myList, back};
+            seriesActions = new LinearLayout(this);
+            seriesActions.setOrientation(LinearLayout.HORIZONTAL);
+            seriesActions.setGravity(Gravity.CENTER_VERTICAL);
+            seriesActions.setPadding(dp(24), 0, 0, 0);
+
+            TextView[] actionViews = {myList, play, external};
             for (TextView action : actionViews) {
                 action.setGravity(Gravity.CENTER);
                 action.setTextSize(14);
-                action.setPadding(dp(4), dp(12), dp(4), dp(12));
-                actions.addView(action, new LinearLayout.LayoutParams(0, -2, 1f));
+                action.setTextColor(Color.WHITE);
+                action.setPadding(dp(12), dp(12), dp(12), dp(12));
+                action.setOnFocusChangeListener((v, focused) -> {
+                    if (focused) {
+                        GradientDrawable selected = new GradientDrawable();
+                        selected.setColor(0xFF1769C2);
+                        selected.setCornerRadius(dp(6));
+                        selected.setStroke(dp(2), 0xFF55A5FF);
+                        action.setBackground(selected);
+                    } else {
+                        action.setBackgroundColor(Color.TRANSPARENT);
+                    }
+                });
+                LinearLayout.LayoutParams actionParams =
+                        new LinearLayout.LayoutParams(-2, -2);
+                actionParams.setMargins(0, 0, dp(10), 0);
+                seriesActions.addView(action, actionParams);
             }
-            LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, -2);
-            actionsParams.setMargins(0, dp(18), 0, dp(8));
-            details.addView(actions, actionsParams);
+            seriesActions.setFocusable(false);
 
             FrameLayout.LayoutParams detailsParams = new FrameLayout.LayoutParams(
                     (int) (getResources().getDisplayMetrics().widthPixels * 0.45f),
@@ -2521,6 +2537,10 @@ public class MainActivity extends Activity {
         }
         TextView status = label("Loading seasons and episodes...", 15);
         screen.addView(status);
+        if (tvLayout && seriesActions != null) {
+            screen.addView(seriesActions,
+                    new LinearLayout.LayoutParams(-1, -2));
+        }
 
         ScrollView scroll = new ScrollView(this);
         LinearLayout list = new LinearLayout(this);
