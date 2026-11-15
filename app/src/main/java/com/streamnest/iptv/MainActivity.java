@@ -132,6 +132,9 @@ public class MainActivity extends Activity {
     private LinearLayout tvSeriesCategoryList;
     private LinearLayout tvSeriesGrid;
     private ScrollView tvSeriesGridScroll;
+    private LinearLayout tvSeriesGridScreen;
+    private View tvSeriesReturnFocus;
+    private int tvSeriesReturnScrollY;
     private TextView tvSeriesStatus;
     private String tvSeriesSelectedCategoryId = "";
     private ArrayList<Channel> tvSeriesLoadedShows = new ArrayList<>();
@@ -527,7 +530,19 @@ public class MainActivity extends Activity {
             return;
         } else if (showingTvSeriesEpisodes) {
             showingTvSeriesEpisodes = false;
-            showSeries();
+            showingTvSeries = true;
+            if (tvSeriesGridScreen != null) {
+                screen = tvSeriesGridScreen;
+                setContentView(tvSeriesGridScreen);
+                tvSeriesGridScroll.post(() -> {
+                    tvSeriesGridScroll.scrollTo(0, tvSeriesReturnScrollY);
+                    if (tvSeriesReturnFocus != null) {
+                        tvSeriesReturnFocus.requestFocus();
+                    }
+                });
+            } else {
+                showSeries();
+            }
             return;
         } else if (showingTvSeries) {
             if (tvSeriesCategoryScroll != null
@@ -1973,6 +1988,7 @@ public class MainActivity extends Activity {
             }
         });
 
+        tvSeriesGridScreen = screen;
         setContentView(screen);
 
         new Thread(() -> {
@@ -2272,8 +2288,12 @@ public class MainActivity extends Activity {
             name.setSelected(tv && focused);
         });
 
-        card.setOnClickListener(v ->
-                showSeriesEpisodes(series, base, user, pass));
+        card.setOnClickListener(v -> {
+            tvSeriesReturnFocus = v;
+            tvSeriesReturnScrollY = tvSeriesGridScroll != null
+                    ? tvSeriesGridScroll.getScrollY() : 0;
+            showSeriesEpisodes(series, base, user, pass);
+        });
 
         return card;
     }
@@ -2422,7 +2442,6 @@ public class MainActivity extends Activity {
     private void showSeriesEpisodes(Channel series, String base, String user, String pass) {
         releaseGuidePreview();
         tvSeriesLoadGeneration++;
-        tvSeriesArtworkExecutor.shutdownNow();
         showingTvSeriesEpisodes = isTelevisionDevice();
         showingTvSeries = false;
         showingLiveTv = false;
