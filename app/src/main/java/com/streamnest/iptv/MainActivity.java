@@ -1786,6 +1786,7 @@ public class MainActivity extends Activity {
         Intent intent = new Intent(this, PlayerActivity.class);
         intent.putExtra("channel_name", item.name);
         intent.putExtra("stream_url", item.url);
+        intent.putExtra("is_live_stream", false);
         startActivity(intent);
     }
 
@@ -1809,6 +1810,7 @@ public class MainActivity extends Activity {
         Intent intent = new Intent(this, PlayerActivity.class);
         intent.putExtra("channel_name", names.get(0));
         intent.putExtra("stream_url", urls.get(0));
+        intent.putExtra("is_live_stream", false);
         intent.putStringArrayListExtra("series_episode_urls", urls);
         intent.putStringArrayListExtra("series_episode_names", names);
         intent.putExtra("auto_play_next_episode",
@@ -5464,6 +5466,7 @@ private void playChannel(Channel channel) {
         Intent intent = new Intent(this, PlayerActivity.class);
         intent.putExtra("channel_name", channel.name);
         intent.putExtra("stream_url", channel.url);
+        intent.putExtra("is_live_stream", true);
         startActivity(intent);
     }
 }

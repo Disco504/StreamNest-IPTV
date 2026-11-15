@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.ui.PlayerView;
 
 public class PlayerActivity extends Activity {
@@ -68,7 +69,17 @@ public class PlayerActivity extends Activity {
         }
 
         try {
-            player = new ExoPlayer.Builder(this).build();
+            boolean isLiveStream = getIntent().getBooleanExtra("is_live_stream", true);
+            DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(
+                            isLiveStream ? 10000 : 20000,
+                            isLiveStream ? 30000 : 60000,
+                            isLiveStream ? 1500 : 2500,
+                            isLiveStream ? 4000 : 8000)
+                    .build();
+            player = new ExoPlayer.Builder(this)
+                    .setLoadControl(loadControl)
+                    .build();
             playerView.setPlayer(player);
 
             player.addListener(new Player.Listener() {
