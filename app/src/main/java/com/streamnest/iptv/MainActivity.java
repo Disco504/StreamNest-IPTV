@@ -1560,6 +1560,13 @@ public class MainActivity extends Activity {
         back.setOnClickListener(v -> onBackPressed());
         content.addView(back);
 
+        TextView external = label("EXTERNAL PLAYER", 16);
+        external.setTextColor(Color.WHITE);
+        external.setGravity(Gravity.CENTER);
+        external.setFocusable(true);
+        external.setClickable(true);
+        external.setOnClickListener(v -> playVodExternal(movie));
+
         if (tvDetails) {
             content.removeView(play);
             content.removeView(myList);
@@ -1569,19 +1576,29 @@ public class MainActivity extends Activity {
             actions.setOrientation(LinearLayout.HORIZONTAL);
             actions.setGravity(Gravity.CENTER_VERTICAL);
 
-            TextView[] actionViews = {play, myList, back};
+            TextView[] actionViews = {myList, play, external};
             for (TextView action : actionViews) {
                 action.setGravity(Gravity.CENTER);
                 action.setTextSize(14);
                 action.setPadding(dp(4), dp(12), dp(4), dp(12));
+                action.setTextColor(Color.WHITE);
+                action.setOnFocusChangeListener((v, focused) -> {
+                    if (focused) {
+                        GradientDrawable selected = new GradientDrawable();
+                        selected.setColor(0xFF1769C2);
+                        selected.setCornerRadius(dp(6));
+                        selected.setStroke(dp(2), 0xFF55A5FF);
+                        action.setBackground(selected);
+                    } else {
+                        action.setBackgroundColor(Color.TRANSPARENT);
+                    }
+                });
                 actions.addView(action,
                         new LinearLayout.LayoutParams(0, -2, 1f));
             }
 
-            LinearLayout.LayoutParams actionsParams =
-                    new LinearLayout.LayoutParams(-1, -2);
-            actionsParams.setMargins(0, dp(18), 0, dp(8));
-            content.addView(actions, actionsParams);
+            actions.setFocusable(false);
+            content.addView(actions);
         }
 
         scroll.addView(content);
@@ -1722,6 +1739,17 @@ public class MainActivity extends Activity {
         startActivity(intent);
     }
 
+    private void playVodExternal(Channel item) {
+        if (item == null || item.url == null || item.url.trim().isEmpty()) return;
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(Uri.parse(item.url), "video/*");
+            startActivity(Intent.createChooser(intent, "Play movie with"));
+        } catch (Exception e) {
+            Toast.makeText(this, "No compatible external player found.",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
 
     private void showSeries() {
         if (isTelevisionDevice()) {
