@@ -3181,12 +3181,39 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void addGuideMenuItem(LinearLayout menu, String title) {
-        TextView item = label(title, 16);
+    private void addHomeSection(LinearLayout menu, String title, String subtitle) {
+        String symbol;
+        switch (title) {
+            case "SEARCH": symbol = "⌕"; break;
+            case "TV GUIDE": symbol = "▤"; break;
+            case "MOVIES": symbol = "▣"; break;
+            case "TV SERIES": symbol = "▥"; break;
+            case "CATCH-UP": symbol = "↶"; break;
+            default: symbol = "⚙"; break;
+        }
+
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.HORIZONTAL);
+        item.setGravity(Gravity.CENTER_VERTICAL);
+        item.setPadding(dp(10), dp(9), dp(8), dp(9));
+        item.setBackgroundColor(0x00000000);
         item.setFocusable(true);
         item.setClickable(true);
+
+        TextView icon = label(symbol, 20);
+        icon.setTextColor(WHITE);
+        item.addView(icon, new LinearLayout.LayoutParams(dp(30),
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView text = label(title, 16);
+        text.setTextColor(WHITE);
+        item.addView(text, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
         item.setOnFocusChangeListener((v, focused) ->
-                item.setTextColor(focused ? BLUE : WHITE));
+                v.setBackgroundColor(focused ? BLUE : 0x00000000));
+
         item.setOnClickListener(v -> {
             if ("SETTINGS".equals(title)) {
                 showSettingsDialog();
@@ -3203,38 +3230,6 @@ public class MainActivity extends Activity {
                         Toast.LENGTH_SHORT).show();
             }
         });
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-        params.setMargins(0, dp(7), 0, 0);
-        menu.addView(item, params);
-    }
-
-    private void addHomeSection(LinearLayout menu, String title,
-                                String subtitle) {
-        TextView item = label(title + "\n" + subtitle, 16);
-        item.setBackgroundColor(PANEL);
-        item.setFocusable(true);
-        item.setClickable(true);
-        item.setOnFocusChangeListener((v, focused) ->
-                v.setBackgroundColor(focused ? BLUE : PANEL));
-
-        item.setOnClickListener(v -> {
-            if ("SETTINGS".equals(title)) {
-                showSettingsDialog();
-            } else if ("SEARCH".equals(title)) {
-                showSearchDialog();
-            } else if ("TV GUIDE".equals(title)) {
-                showTvGuide();
-            } else if ("MOVIES".equals(title)) {
-                showMovies();
-            } else if ("TV SERIES".equals(title)) {
-                showSeries();
-            } else {
-                Toast.makeText(this, title + " — coming next",
-                        Toast.LENGTH_SHORT).show();
-            }
-        });
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -3242,7 +3237,6 @@ public class MainActivity extends Activity {
         params.setMargins(0, dp(7), 0, 0);
         menu.addView(item, params);
     }
-
 
     private void showSettingsDialog() {
         android.content.SharedPreferences prefs =
@@ -4148,12 +4142,12 @@ public class MainActivity extends Activity {
             LinearLayout guideMainMenu = new LinearLayout(this);
             guideMainMenu.setOrientation(LinearLayout.VERTICAL);
             guideMainMenu.setPadding(dp(5), dp(5), dp(5), dp(5));
-            addGuideMenuItem(guideMainMenu, "SEARCH");
-            addGuideMenuItem(guideMainMenu, "TV GUIDE");
-            addGuideMenuItem(guideMainMenu, "MOVIES");
-            addGuideMenuItem(guideMainMenu, "TV SERIES");
-            addGuideMenuItem(guideMainMenu, "CATCH-UP");
-            addGuideMenuItem(guideMainMenu, "SETTINGS");
+            addHomeSection(guideMainMenu, "SEARCH", "Find live TV channels");
+            addHomeSection(guideMainMenu, "TV GUIDE", "Browse the TV schedule");
+            addHomeSection(guideMainMenu, "MOVIES", "Browse movies");
+            addHomeSection(guideMainMenu, "TV SERIES", "Browse TV series");
+            addHomeSection(guideMainMenu, "CATCH-UP", "Recently aired programs");
+            addHomeSection(guideMainMenu, "SETTINGS", "Playlist and app settings");
 
             guideMainMenuScroll.addView(guideMainMenu);
             guideContent.addView(guideMainMenuScroll,
