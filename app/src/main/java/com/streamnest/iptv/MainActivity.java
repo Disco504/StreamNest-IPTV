@@ -3200,10 +3200,14 @@ public class MainActivity extends Activity {
         item.setFocusable(true);
         item.setClickable(true);
 
-        TextView icon = label(symbol, 20);
+        TextView icon = new TextView(this);
+        icon.setText(symbol);
+        icon.setTextSize(20);
         icon.setTextColor(WHITE);
-        item.addView(icon, new LinearLayout.LayoutParams(dp(30),
-                LinearLayout.LayoutParams.WRAP_CONTENT));
+        icon.setGravity(Gravity.CENTER);
+        icon.setIncludeFontPadding(false);
+        item.addView(icon, new LinearLayout.LayoutParams(dp(34),
+                dp(30)));
 
         TextView text = label(title, 16);
         text.setTextColor(WHITE);
@@ -3211,8 +3215,17 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        item.setOnFocusChangeListener((v, focused) ->
-                v.setBackgroundColor(focused ? BLUE : 0x00000000));
+        item.setOnFocusChangeListener((v, focused) -> {
+            if (focused) {
+                GradientDrawable selected = new GradientDrawable();
+                selected.setColor(0xFF1769C2);
+                selected.setCornerRadius(dp(6));
+                selected.setStroke(dp(2), 0xFF55A5FF);
+                item.setBackground(selected);
+            } else {
+                item.setBackgroundColor(Color.TRANSPARENT);
+            }
+        });
 
         item.setOnClickListener(v -> {
             if ("SETTINGS".equals(title)) {
