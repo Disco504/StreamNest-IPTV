@@ -9,6 +9,8 @@ import android.graphics.Color;
 import android.util.Log;
 
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.MediaMetadata;
+import java.util.ArrayList;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
@@ -82,7 +84,41 @@ public class PlayerActivity extends Activity {
                 }
             });
 
-            player.setMediaItem(MediaItem.fromUri(streamUrl));
+            boolean autoPlayNext = getIntent().getBooleanExtra(
+                    "auto_play_next_episode", false);
+            ArrayList<String> episodeUrls =
+                    getIntent().getStringArrayListExtra("series_episode_urls");
+            ArrayList<String> episodeNames =
+                    getIntent().getStringArrayListExtra("series_episode_names");
+
+            if (autoPlayNext && episodeUrls != null && !episodeUrls.isEmpty()) {
+                ArrayList<MediaItem> playlist = new ArrayList<>();
+                for (int i = 0; i < episodeUrls.size(); i++) {
+                    String url = episodeUrls.get(i);
+                    if (url == null || url.trim().isEmpty()) continue;
+
+                    String title = episodeNames != null && i < episodeNames.size()
+                            ? episodeNames.get(i) : "Episode";
+
+                    MediaMetadata metadata = new MediaMetadata.Builder()
+                            .setTitle(title)
+                            .build();
+
+                    playlist.add(new MediaItem.Builder()
+                            .setUri(url)
+                            .setMediaMetadata(metadata)
+                            .build());
+                }
+
+                if (!playlist.isEmpty()) {
+                    player.setMediaItems(playlist);
+                } else {
+                    player.setMediaItem(MediaItem.fromUri(streamUrl));
+                }
+            } else {
+                player.setMediaItem(MediaItem.fromUri(streamUrl));
+            }
+
             player.prepare();
             player.play();
             playerView.requestFocus();

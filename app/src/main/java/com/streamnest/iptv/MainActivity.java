@@ -1739,6 +1739,33 @@ public class MainActivity extends Activity {
         startActivity(intent);
     }
 
+    private void playSeriesEpisode(ArrayList<Channel> episodes, int index) {
+        if (episodes == null || index < 0 || index >= episodes.size()) return;
+
+        ArrayList<String> urls = new ArrayList<>();
+        ArrayList<String> names = new ArrayList<>();
+
+        for (int i = index; i < episodes.size(); i++) {
+            Channel episode = episodes.get(i);
+            if (episode == null || episode.url == null
+                    || episode.url.trim().isEmpty()) continue;
+            urls.add(episode.url);
+            names.add(episode.name == null ? "Episode" : episode.name);
+        }
+
+        if (urls.isEmpty()) return;
+
+        releaseGuidePreviewPlayer();
+        Intent intent = new Intent(this, PlayerActivity.class);
+        intent.putExtra("channel_name", names.get(0));
+        intent.putExtra("stream_url", urls.get(0));
+        intent.putStringArrayListExtra("series_episode_urls", urls);
+        intent.putStringArrayListExtra("series_episode_names", names);
+        intent.putExtra("auto_play_next_episode",
+                getPreferences(MODE_PRIVATE).getBoolean("auto_play_next_episode", false));
+        startActivity(intent);
+    }
+
     private void playVodExternal(Channel item) {
         if (item == null || item.url == null || item.url.trim().isEmpty()) return;
         try {
@@ -2417,6 +2444,7 @@ public class MainActivity extends Activity {
         heading.setTypeface(null, Typeface.BOLD);
 
         final Channel[] firstSeriesEpisode = {null};
+        ArrayList<Channel> episodes = new ArrayList<>();
         LinearLayout seriesActions = null;
         final ImageView[] seriesBackdropView = {null};
         if (tvLayout) {
@@ -2463,7 +2491,7 @@ public class MainActivity extends Activity {
             play.setOnFocusChangeListener((v, focused) ->
                     play.setTextColor(focused ? Color.YELLOW : Color.WHITE));
             play.setOnClickListener(v -> {
-                if (firstSeriesEpisode[0] != null) playVodItem(firstSeriesEpisode[0]);
+                if (!episodes.isEmpty()) playSeriesEpisode(episodes, 0);
             });
 
             TextView myList = label("", 16);
@@ -2554,7 +2582,6 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             String failure = null;
             ArrayList<String> seasonLabels = new ArrayList<>();
-            ArrayList<Channel> episodes = new ArrayList<>();
             String[] seriesDescription = {""};
 
             try {
@@ -2597,7 +2624,9 @@ public class MainActivity extends Activity {
                 HorizontalScrollView seasonScroll = null;
                 LinearLayout seasonRow = null;
 
-                for (Channel episode : episodes) {
+                for (int episodeIndex = 0; episodeIndex < episodes.size(); episodeIndex++) {
+                    final int selectedEpisodeIndex = episodeIndex;
+                    Channel episode = episodes.get(episodeIndex);
                     String season = episode.group == null ? "" : episode.group;
                     if (!season.equals(currentSeason)) {
                         currentSeason = season;
@@ -2658,7 +2687,7 @@ public class MainActivity extends Activity {
 
                         card.setOnFocusChangeListener((v, focused) ->
                                 v.setBackgroundColor(focused ? BLUE : PANEL));
-                        card.setOnClickListener(v -> playVodItem(episode));
+                        card.setOnClickListener(v -> playSeriesEpisode(episodes, selectedEpisodeIndex));
 
                         LinearLayout.LayoutParams cardParams =
                                 new LinearLayout.LayoutParams(
@@ -2707,7 +2736,7 @@ public class MainActivity extends Activity {
                                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
                         row.setOnFocusChangeListener((v, focused) ->
                                 v.setBackgroundColor(focused ? BLUE : PANEL));
-                        row.setOnClickListener(v -> playVodItem(episode));
+                        row.setOnClickListener(v -> playSeriesEpisode(episodes, selectedEpisodeIndex));
 
                         LinearLayout.LayoutParams params =
                                 new LinearLayout.LayoutParams(
@@ -3167,21 +3196,23 @@ public class MainActivity extends Activity {
 
         String[] options = {
                 "Launch Live TV on app boot",
-                "Launch Live TV after playlist change"
+                "Launch Live TV after playlist change",
+                "Auto Play Next Episode"
         };
 
         boolean[] checked = {
                 prefs.getBoolean("launch_live_tv_on_boot", true),
-                prefs.getBoolean("launch_live_tv_on_change", true)
+                prefs.getBoolean("launch_live_tv_on_change", true),
+                prefs.getBoolean("auto_play_next_episode", false)
         };
 
         new AlertDialog.Builder(this)
                 .setTitle("Settings")
                 .setMultiChoiceItems(options, checked,
                         (dialog, which, isChecked) -> {
-                            String key = which == 0
-                                    ? "launch_live_tv_on_boot"
-                                    : "launch_live_tv_on_change";
+                            String key = which == 0 ? "launch_live_tv_on_boot"
+                                    : which == 1 ? "launch_live_tv_on_change"
+                                    : "auto_play_next_episode";
                             prefs.edit().putBoolean(key, isChecked).apply();
                         })
                 .setNeutralButton("Add / Change Playlist",
