@@ -1617,10 +1617,6 @@ public class MainActivity extends Activity {
             details.addView(title);
             details.addView(meta);
             details.addView(plot);
-            LinearLayout.LayoutParams heroActionParams =
-                    new LinearLayout.LayoutParams(-1, -2);
-            heroActionParams.setMargins(0, dp(18), 0, dp(8));
-            details.addView(actions, heroActionParams);
 
             int detailsWidth = (int) (getResources().getDisplayMetrics().widthPixels * 0.45f);
             hero.addView(details, new android.widget.FrameLayout.LayoutParams(
@@ -1630,6 +1626,10 @@ public class MainActivity extends Activity {
                     new LinearLayout.LayoutParams(-1, dp(340)));
             detailsScreen.addView(scroll,
                     new LinearLayout.LayoutParams(-1, 0, 1f));
+            LinearLayout.LayoutParams bottomActionsParams =
+                    new LinearLayout.LayoutParams(-1, dp(64));
+            bottomActionsParams.setMargins(dp(24), 0, dp(24), dp(12));
+            detailsScreen.addView(actions, bottomActionsParams);
         } else {
             detailsScreen.addView(scroll,
                     new LinearLayout.LayoutParams(-1, 0, 1f));
