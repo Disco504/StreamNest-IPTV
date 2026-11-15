@@ -128,6 +128,8 @@ public class MainActivity extends Activity {
     private boolean showingTvSeries = false;
     private boolean showingTvSeriesEpisodes = false;
     private ScrollView tvSeriesCategoryScroll;
+    private int tvSeriesCategoryScrollY;
+    private View tvSeriesCategoryReturnFocus;
     private ScrollView tvSeriesMainMenuScroll;
     private LinearLayout tvSeriesCategoryList;
     private LinearLayout tvSeriesGrid;
@@ -547,11 +549,20 @@ public class MainActivity extends Activity {
         } else if (showingTvSeries) {
             if (tvSeriesCategoryScroll != null
                     && tvSeriesCategoryScroll.getVisibility() == View.VISIBLE) {
+                tvSeriesCategoryScrollY = tvSeriesCategoryScroll.getScrollY();
+                tvSeriesCategoryReturnFocus = tvSeriesCategoryList.findFocus();
                 tvSeriesCategoryScroll.setVisibility(View.GONE);
                 focusFirstTvSeriesPoster();
             } else if (tvSeriesCategoryScroll != null) {
                 tvSeriesCategoryScroll.setVisibility(View.VISIBLE);
-                focusTvSeriesSelectedCategory();
+                tvSeriesCategoryScroll.post(() -> {
+                    if (tvSeriesCategoryReturnFocus != null) {
+                        tvSeriesCategoryReturnFocus.requestFocus();
+                    } else {
+                        focusTvSeriesSelectedCategory();
+                    }
+                    tvSeriesCategoryScroll.scrollTo(0, tvSeriesCategoryScrollY);
+                });
             }
             return;
         } else if (showingTvGuide && guideCategoryScrollView != null) {
