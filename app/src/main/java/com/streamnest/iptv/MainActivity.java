@@ -110,6 +110,7 @@ public class MainActivity extends Activity {
     private boolean showingMovieDetails = false;
     private LinearLayout movieGridScreen;
     private View movieReturnFocus;
+    private View tvVodPosterReturnFocus;
     private ScrollView tvVodMainMenuScroll;
     private ScrollView tvVodCategoryScroll;
     private LinearLayout tvVodCategoryList;
@@ -383,6 +384,7 @@ public class MainActivity extends Activity {
                     if (tvVodCategoryScroll != null
                             && tvVodCategoryScroll.getVisibility() != View.VISIBLE
                             && isAtLeftEdgeOfPosterRow(focused, tvVodMovieGrid)) {
+                        tvVodPosterReturnFocus = focused;
                         tvVodCategoryScroll.setVisibility(View.VISIBLE);
                         focusTvVodSelectedCategory();
                         return true;
@@ -477,7 +479,12 @@ public class MainActivity extends Activity {
                     if (tvVodCategoryScroll != null
                             && tvVodCategoryScroll.getVisibility() == View.VISIBLE) {
                         tvVodCategoryScroll.setVisibility(View.GONE);
-                        focusFirstTvVodPoster();
+                        if (tvVodPosterReturnFocus != null
+                                && tvVodPosterReturnFocus.getParent() != null) {
+                            tvVodPosterReturnFocus.requestFocus();
+                        } else {
+                            focusFirstTvVodPoster();
+                        }
                         return true;
                     }
                 }
@@ -531,7 +538,12 @@ public class MainActivity extends Activity {
             if (tvVodCategoryScroll != null
                     && tvVodCategoryScroll.getVisibility() == View.VISIBLE) {
                 tvVodCategoryScroll.setVisibility(View.GONE);
-                focusFirstTvVodPoster();
+                if (tvVodPosterReturnFocus != null
+                        && tvVodPosterReturnFocus.getParent() != null) {
+                    tvVodPosterReturnFocus.requestFocus();
+                } else {
+                    focusFirstTvVodPoster();
+                }
             } else if (tvVodCategoryScroll != null) {
                 tvVodCategoryScroll.setVisibility(View.VISIBLE);
                 focusTvVodSelectedCategory();
