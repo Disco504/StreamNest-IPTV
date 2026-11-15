@@ -129,6 +129,7 @@ public class MainActivity extends Activity {
     private boolean showingTvSeriesEpisodes = false;
     private ScrollView tvSeriesCategoryScroll;
     private int tvSeriesCategoryScrollY;
+    private View tvSeriesPosterReturnFocus;
     private View tvSeriesCategoryReturnFocus;
     private ScrollView tvSeriesMainMenuScroll;
     private LinearLayout tvSeriesCategoryList;
@@ -356,6 +357,7 @@ public class MainActivity extends Activity {
                         && tvSeriesCategoryScroll != null
                         && tvSeriesCategoryScroll.getVisibility() != View.VISIBLE
                         && isAtLeftEdgeOfPosterRow(focused, tvSeriesGrid)) {
+                    tvSeriesPosterReturnFocus = focused;
                     tvSeriesCategoryScroll.setVisibility(View.VISIBLE);
                     focusTvSeriesSelectedCategory();
                     return true;
@@ -455,7 +457,12 @@ public class MainActivity extends Activity {
                         && tvSeriesCategoryScroll != null
                         && tvSeriesCategoryScroll.getVisibility() == View.VISIBLE) {
                     tvSeriesCategoryScroll.setVisibility(View.GONE);
-                    focusFirstTvSeriesPoster();
+                    if (tvSeriesPosterReturnFocus != null
+                            && tvSeriesPosterReturnFocus.getParent() != null) {
+                        tvSeriesPosterReturnFocus.requestFocus();
+                    } else {
+                        focusFirstTvSeriesPoster();
+                    }
                     return true;
                 }
 
@@ -552,7 +559,12 @@ public class MainActivity extends Activity {
                 tvSeriesCategoryScrollY = tvSeriesCategoryScroll.getScrollY();
                 tvSeriesCategoryReturnFocus = tvSeriesCategoryList.findFocus();
                 tvSeriesCategoryScroll.setVisibility(View.GONE);
-                focusFirstTvSeriesPoster();
+                if (tvSeriesPosterReturnFocus != null
+                        && tvSeriesPosterReturnFocus.getParent() != null) {
+                    tvSeriesPosterReturnFocus.requestFocus();
+                } else {
+                    focusFirstTvSeriesPoster();
+                }
             } else if (tvSeriesCategoryScroll != null) {
                 tvSeriesCategoryScroll.setVisibility(View.VISIBLE);
                 tvSeriesCategoryScroll.post(() -> {
