@@ -57,6 +57,9 @@ import java.util.ArrayList;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -183,6 +186,7 @@ public class MainActivity extends Activity {
         String group;
         String tvgId;
         String logoUrl;
+        String xtreamStreamId = "";
         String vodId = "";
         String vodExtension = "mp4";
         String seriesBackdrop = "";
@@ -200,6 +204,12 @@ public class MainActivity extends Activity {
             this.group = group;
             this.tvgId = tvgId;
             this.logoUrl = logoUrl;
+        }
+
+        Channel(String name, String url, String group, String tvgId,
+                String logoUrl, String xtreamStreamId) {
+            this(name, url, group, tvgId, logoUrl);
+            this.xtreamStreamId = xtreamStreamId;
         }
     }
 
@@ -3966,7 +3976,7 @@ public class MainActivity extends Activity {
                             item, "stream_icon", "");
 
                     loaded.add(new Channel(
-                            name, streamUrl, group, tvgId, logoUrl));
+                            name, streamUrl, group, tvgId, logoUrl, id));
 
                     batch.add(new CatalogDatabase.CatalogItem(
                             "live", id, name, id, group,
@@ -3979,6 +3989,11 @@ public class MainActivity extends Activity {
                     }
                 });
 
+                int epgIdCount = 0;
+                for (Channel channel : loaded) {
+                    if (channel.tvgId != null && !channel.tvgId.trim().isEmpty()) epgIdCount++;
+                }
+                android.util.Log.i("StreamNest", "Xtream live channels: " + loaded.size() + ", with EPG IDs: " + epgIdCount);
                 if (!loaded.isEmpty()) {
                     if (!batch.isEmpty()) {
                         catalogDatabase.insertBatch(
@@ -4631,7 +4646,60 @@ public class MainActivity extends Activity {
         }
 
         if (epgUrl.trim().isEmpty()) {
-            renderGuidePrograms(new ArrayList<>(), channelMap, status, categoryList, results);
+            android.content.SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+            String connectionType = prefs.getString("last_connection", "");
+            if ("xtream".equals(connectionType)) {
+                final ArrayList<Channel> guideChannels = new ArrayList<>(channels);
+                final String server = prefs.getString("xtream_server", "");
+                final String username = prefs.getString("xtream_username", "");
+                final String password = prefs.getString("xtream_password", "");
+                Thread worker = new Thread(() -> {
+                    ArrayList<EpgProgram> programs = new ArrayList<>();
+                    ExecutorService pool = Executors.newFixedThreadPool(4);
+                    try {
+                        if (server.isEmpty() || username.isEmpty() || password.isEmpty()) {
+                            throw new Exception("Xtream connection details are missing");
+                        }
+                        String base = server.endsWith("/")
+                                ? server.substring(0, server.length() - 1) : server;
+                        String api = base + "/player_api.php?username="
+                                + apiEncode(username) + "&password=" + apiEncode(password);
+
+                        for (int offset = 0; offset < guideChannels.size(); offset += 4) {
+                            ArrayList<Future<ArrayList<EpgProgram>>> batch = new ArrayList<>();
+                            int end = Math.min(offset + 4, guideChannels.size());
+                            for (int i = offset; i < end; i++) {
+                                Channel channel = guideChannels.get(i);
+                                if (channel.xtreamStreamId != null
+                                        && !channel.xtreamStreamId.isEmpty()
+                                        && channel.tvgId != null && !channel.tvgId.isEmpty()) {
+                                    batch.add(pool.submit(
+                                            () -> loadXtreamChannelEpg(api, channel)));
+                                }
+                            }
+                            for (Future<ArrayList<EpgProgram>> future : batch) {
+                                try {
+                                    programs.addAll(future.get());
+                                } catch (Exception e) {
+                                    android.util.Log.w("StreamNest", "Xtream EPG request failed", e);
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        android.util.Log.w("StreamNest", "Unable to load Xtream EPG", e);
+                    } finally {
+                        pool.shutdownNow();
+                    }
+                    final ArrayList<EpgProgram> loaded = programs;
+                    runOnUiThread(() -> {
+                        guidePrograms = loaded;
+                        renderGuidePrograms(loaded, channelMap, status, categoryList, results);
+                    });
+                });
+                worker.start();
+            } else {
+                renderGuidePrograms(new ArrayList<>(), channelMap, status, categoryList, results);
+            }
         } else {
         Thread worker = new Thread(() -> {
             HttpURLConnection connection = null;
@@ -4710,6 +4778,103 @@ public class MainActivity extends Activity {
             }
         });
         worker.start();
+        }
+    }
+
+    private ArrayList<EpgProgram> loadXtreamChannelEpg(
+            String api, Channel channel) throws Exception {
+        ArrayList<EpgProgram> programs = new ArrayList<>();
+        if (channel.xtreamStreamId == null
+                || channel.xtreamStreamId.isEmpty()
+                || channel.tvgId == null || channel.tvgId.isEmpty()) {
+            return programs;
+        }
+
+        String url = api + "&action=get_short_epg&stream_id="
+                + Uri.encode(channel.xtreamStreamId) + "&limit=6";
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(url).openConnection();
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(15000);
+            connection.setRequestProperty("User-Agent", "StreamNestIPTV/1.0");
+
+            if (connection.getResponseCode() < 200
+                    || connection.getResponseCode() >= 300) {
+                return programs;
+            }
+
+            StringBuilder json = new StringBuilder();
+            try (InputStream input = connection.getInputStream();
+                 BufferedReader reader = new BufferedReader(
+                         new InputStreamReader(input, StandardCharsets.UTF_8))) {
+                char[] buffer = new char[4096];
+                int count;
+                while ((count = reader.read(buffer)) != -1) {
+                    json.append(buffer, 0, count);
+                }
+            }
+
+            JSONObject response = new JSONObject(json.toString());
+            JSONArray listings = response.optJSONArray("epg_listings");
+            if (listings == null) {
+                listings = response.optJSONArray("data");
+            }
+            if (listings == null) return programs;
+
+            for (int i = 0; i < listings.length(); i++) {
+                JSONObject item = listings.optJSONObject(i);
+                if (item == null) continue;
+
+                String encodedTitle = item.optString("title", "");
+                String title = encodedTitle;
+                try {
+                    byte[] decoded = android.util.Base64.decode(
+                            encodedTitle, android.util.Base64.DEFAULT);
+                    String decodedTitle = new String(
+                            decoded, StandardCharsets.UTF_8).trim();
+                    if (!decodedTitle.isEmpty()) title = decodedTitle;
+                } catch (IllegalArgumentException ignored) {
+                }
+
+                long start = normalizeXtreamTimestamp(item.optLong("start_timestamp", 0));
+                long stop = normalizeXtreamTimestamp(item.optLong("stop_timestamp", 0));
+                if (start <= 0) start = parseXtreamEpgTime(
+                        item.optString("start", ""));
+                if (stop <= 0) stop = parseXtreamEpgTime(
+                        item.optString("end", ""));
+                if (title != null && !title.trim().isEmpty()
+                        && start > 0 && stop > start) {
+                    programs.add(new EpgProgram(
+                            channel.tvgId, title.trim(), start, stop));
+                }
+            }
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+        return programs;
+    }
+
+    private long normalizeXtreamTimestamp(long timestamp) {
+        if (timestamp <= 0) return 0;
+        return timestamp >= 100000000000L ? timestamp : timestamp * 1000L;
+    }
+
+    private long parseXtreamEpgTime(String value) {
+        if (value == null || value.trim().isEmpty()) return 0;
+        try {
+            long timestamp = Long.parseLong(value.trim());
+            return normalizeXtreamTimestamp(timestamp);
+        } catch (NumberFormatException ignored) {
+        }
+        try {
+            SimpleDateFormat format = new SimpleDateFormat(
+                    "yyyy-MM-dd HH:mm:ss", Locale.US);
+            format.setLenient(false);
+            Date date = format.parse(value.trim());
+            return date == null ? 0 : date.getTime();
+        } catch (ParseException ignored) {
+            return 0;
         }
     }
 
