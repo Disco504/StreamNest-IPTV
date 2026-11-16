@@ -4467,13 +4467,6 @@ public class MainActivity extends Activity {
         showingTvVod = false;
         showingTvGuide = true;
         String epgUrl = getPreferences(MODE_PRIVATE).getString("epg_url", "");
-        if (epgUrl.trim().isEmpty()) {
-            startupGuidePending = false;
-            startupPreviewSuppressed = false;
-            Toast.makeText(this, "Open Settings to enter your XMLTV EPG URL.",
-                    Toast.LENGTH_LONG).show();
-            return;
-        }
         if (channels.isEmpty()) {
             startupGuidePending = false;
             startupPreviewSuppressed = false;
@@ -4631,6 +4624,9 @@ public class MainActivity extends Activity {
                             android.view.ViewGroup.LayoutParams.MATCH_PARENT));
         }
 
+        if (epgUrl.trim().isEmpty()) {
+            renderGuidePrograms(new ArrayList<>(), channelMap, status, categoryList, results);
+        } else {
         Thread worker = new Thread(() -> {
             HttpURLConnection connection = null;
             try {
@@ -4708,6 +4704,7 @@ public class MainActivity extends Activity {
             }
         });
         worker.start();
+        }
     }
 
     private String normalizeEpgId(String value) {
