@@ -3462,40 +3462,60 @@ public class MainActivity extends Activity {
     }
 
 
+    private void setPlaylistFocusStyle(TextView view) {
+        view.setBackgroundColor(Color.TRANSPARENT);
+        view.setOnFocusChangeListener((v, focused) -> {
+            if (focused) {
+                GradientDrawable selected = new GradientDrawable();
+                selected.setColor(0xFF1769C2);
+                selected.setCornerRadius(dp(6));
+                selected.setStroke(dp(2), 0xFF55A5FF);
+                view.setBackground(selected);
+            } else {
+                view.setBackgroundColor(Color.TRANSPARENT);
+            }
+        });
+    }
+
     private void showWelcomeScreen() {
         screen.removeAllViews();
         screen.setGravity(Gravity.CENTER);
         screen.setPadding(dp(24), dp(24), dp(24), dp(24));
 
-        TextView title = label("StreamNest", 36);
-        title.setGravity(Gravity.CENTER);
-        screen.addView(title);
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.streamnest_splash);
+        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        logo.setAdjustViewBounds(true);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(
+                Math.min(dp(620), getResources().getDisplayMetrics().widthPixels - dp(48)),
+                dp(250));
+        logoParams.gravity = Gravity.CENTER_HORIZONTAL;
+        screen.addView(logo, logoParams);
 
-        TextView subtitle = label("IPTV", 18);
-        subtitle.setGravity(Gravity.CENTER);
-        screen.addView(subtitle);
+        int buttonWidth = Math.min(dp(420),
+                getResources().getDisplayMetrics().widthPixels - dp(48));
 
         TextView manage = label("MY PLAYLISTS", 20);
         manage.setGravity(Gravity.CENTER);
-        manage.setBackgroundColor(Color.TRANSPARENT);
         manage.setFocusable(true);
-        manage.setOnFocusChangeListener((v, focused) ->
-                v.setBackgroundColor(focused ? BLUE : Color.TRANSPARENT));
+        setPlaylistFocusStyle(manage);
         manage.setOnClickListener(v -> showPlaylistManager());
-        screen.addView(manage, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(64)));
+        LinearLayout.LayoutParams manageParams = new LinearLayout.LayoutParams(
+                buttonWidth, dp(64));
+        manageParams.gravity = Gravity.CENTER_HORIZONTAL;
+        screen.addView(manage, manageParams);
 
         TextView add = label("ADD PLAYLIST", 20);
         add.setGravity(Gravity.CENTER);
-        add.setBackgroundColor(Color.TRANSPARENT);
         add.setFocusable(true);
-        add.setOnFocusChangeListener((v, focused) ->
-                v.setBackgroundColor(focused ? BLUE : Color.TRANSPARENT));
+        setPlaylistFocusStyle(add);
         add.setOnClickListener(v -> showConnectionDialog());
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(64));
-        params.topMargin = dp(12);
-        screen.addView(add, params);
+        LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(
+                buttonWidth, dp(64));
+        addParams.gravity = Gravity.CENTER_HORIZONTAL;
+        addParams.topMargin = dp(12);
+        screen.addView(add, addParams);
+
         manage.requestFocus();
     }
 
@@ -3505,11 +3525,17 @@ public class MainActivity extends Activity {
         screen.setOrientation(LinearLayout.VERTICAL);
         screen.setPadding(dp(20), dp(12), dp(20), dp(12));
 
+        int availableWidth = getResources().getDisplayMetrics().widthPixels - dp(40);
+        int rowWidth = Math.min(dp(520), availableWidth);
+        int buttonWidth = Math.min(dp(420), availableWidth);
+
         TextView title = label("MY PLAYLISTS", 26);
+        title.setGravity(Gravity.CENTER);
         screen.addView(title);
 
         TextView subtitle = label(
                 "Select a playlist to load, or add a new connection.", 14);
+        subtitle.setGravity(Gravity.CENTER);
         screen.addView(subtitle);
 
         ScrollView scroll = new ScrollView(this);
@@ -3518,7 +3544,9 @@ public class MainActivity extends Activity {
         scroll.addView(list);
 
         if (savedPlaylists.isEmpty()) {
-            list.addView(label("No playlists saved yet.", 17));
+            TextView empty = label("No playlists saved yet.", 17);
+            empty.setGravity(Gravity.CENTER);
+            list.addView(empty);
         }
 
         for (PlaylistProfile profile : savedPlaylists) {
@@ -3528,41 +3556,41 @@ public class MainActivity extends Activity {
                     ? "  • ACTIVE" : "";
             TextView item = label(
                     profile.name + selected + "\n" + type, 18);
-            item.setBackgroundColor(Color.TRANSPARENT);
+            item.setGravity(Gravity.CENTER);
             item.setFocusable(true);
+            setPlaylistFocusStyle(item);
             item.setClickable(true);
-            LinearLayout.LayoutParams params =
-                    new LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT,
-                            dp(68));
+
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    rowWidth, dp(68));
+            params.gravity = Gravity.CENTER_HORIZONTAL;
             params.bottomMargin = dp(8);
             list.addView(item, params);
             item.setOnClickListener(v -> showPlaylistActions(profile));
-            item.setOnFocusChangeListener((v, focused) ->
-                    item.setBackgroundColor(focused
-                            ? BLUE : Color.TRANSPARENT));
         }
 
         screen.addView(scroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
 
         TextView add = label("+  ADD PLAYLIST", 18);
-        add.setBackgroundColor(Color.TRANSPARENT);
+        add.setGravity(Gravity.CENTER);
         add.setFocusable(true);
-        add.setOnFocusChangeListener((v, focused) ->
-                v.setBackgroundColor(focused ? BLUE : Color.TRANSPARENT));
+        setPlaylistFocusStyle(add);
         add.setOnClickListener(v -> showConnectionDialog());
-        screen.addView(add, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(58)));
+        LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(
+                buttonWidth, dp(58));
+        addParams.gravity = Gravity.CENTER_HORIZONTAL;
+        screen.addView(add, addParams);
 
         TextView back = label("BACK TO TV GUIDE", 16);
-        back.setBackgroundColor(Color.TRANSPARENT);
+        back.setGravity(Gravity.CENTER);
         back.setFocusable(true);
-        back.setOnFocusChangeListener((v, focused) ->
-                v.setBackgroundColor(focused ? BLUE : Color.TRANSPARENT));
+        setPlaylistFocusStyle(back);
         back.setOnClickListener(v -> showHomeScreen());
-        screen.addView(back, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+        LinearLayout.LayoutParams backParams = new LinearLayout.LayoutParams(
+                buttonWidth, dp(52));
+        backParams.gravity = Gravity.CENTER_HORIZONTAL;
+        screen.addView(back, backParams);
     }
 
     private void showPlaylistActions(PlaylistProfile profile) {
@@ -3575,10 +3603,9 @@ public class MainActivity extends Activity {
                         activePlaylistId = profile.id;
                         syncActivePlaylistToConnection();
                         if ("m3u".equals(profile.type)) {
-                            loadPlaylist(profile.url);
+                            loadPlaylist(profile.url, true);
                         } else {
-                            loadXtreamChannels(profile.server,
-                                    profile.username, profile.password);
+                            loadXtreamChannels(profile.server, profile.username, profile.password, true);
                         }
                     } else if (which == 1) {
                         if ("m3u".equals(profile.type)) {
@@ -3614,10 +3641,9 @@ public class MainActivity extends Activity {
                                         syncActivePlaylistToConnection();
                                         PlaylistProfile next = savedPlaylists.get(0);
                                         if ("m3u".equals(next.type)) {
-                                            loadPlaylist(next.url);
+                                            loadPlaylist(next.url, true);
                                         } else {
-                                            loadXtreamChannels(next.server,
-                                                    next.username, next.password);
+                                            loadXtreamChannels(next.server, next.username, next.password, true);
                                         }
                                     } else {
                                         showPlaylistManager();
@@ -3741,7 +3767,7 @@ public class MainActivity extends Activity {
                             .putString("last_connection", "xtream")
                             .apply();
 
-                    loadXtreamChannels(base, user, pass);
+                    loadXtreamChannels(base, user, pass, true);
                 })
                 .create();
         loginDialog.setOnShowListener(v -> {
@@ -4058,7 +4084,7 @@ public class MainActivity extends Activity {
                             .apply();
                     Toast.makeText(this, "Loading playlist...",
                             Toast.LENGTH_SHORT).show();
-                    loadPlaylist(url);
+                    loadPlaylist(url, true);
                 })
                 .show();
     }
