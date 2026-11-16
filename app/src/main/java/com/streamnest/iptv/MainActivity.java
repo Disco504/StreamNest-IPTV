@@ -4511,6 +4511,9 @@ public class MainActivity extends Activity {
                 androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM);
         previewPlayerView.setFocusable(false);
         previewPlayerView.setBackgroundColor(Color.BLACK);
+        if (previewPlayer != null) {
+            previewPlayerView.setPlayer(previewPlayer);
+        }
         previewRow.addView(previewPlayerView, new LinearLayout.LayoutParams(
                 0, previewHeight, phoneGuideLayout ? 1.2f : 0.35f));
 
@@ -4528,6 +4531,9 @@ public class MainActivity extends Activity {
 
         screen.addView(previewRow, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, previewHeight));
+        if (guidePreviewChannel != null && previewPlayer != null) {
+            playGuidePreview(guidePreviewChannel);
+        }
 
         LinearLayout guideContent = new LinearLayout(this);
         guideContent.setOrientation(LinearLayout.HORIZONTAL);
