@@ -3477,16 +3477,20 @@ public class MainActivity extends Activity {
 
         TextView manage = label("MY PLAYLISTS", 20);
         manage.setGravity(Gravity.CENTER);
-        manage.setBackgroundColor(PANEL);
+        manage.setBackgroundColor(Color.TRANSPARENT);
         manage.setFocusable(true);
+        manage.setOnFocusChangeListener((v, focused) ->
+                v.setBackgroundColor(focused ? BLUE : Color.TRANSPARENT));
         manage.setOnClickListener(v -> showPlaylistManager());
         screen.addView(manage, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(64)));
 
         TextView add = label("ADD PLAYLIST", 20);
         add.setGravity(Gravity.CENTER);
-        add.setBackgroundColor(PANEL);
+        add.setBackgroundColor(Color.TRANSPARENT);
         add.setFocusable(true);
+        add.setOnFocusChangeListener((v, focused) ->
+                v.setBackgroundColor(focused ? BLUE : Color.TRANSPARENT));
         add.setOnClickListener(v -> showConnectionDialog());
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(64));
@@ -3524,7 +3528,7 @@ public class MainActivity extends Activity {
                     ? "  • ACTIVE" : "";
             TextView item = label(
                     profile.name + selected + "\n" + type, 18);
-            item.setBackgroundColor(PANEL);
+            item.setBackgroundColor(Color.TRANSPARENT);
             item.setFocusable(true);
             item.setClickable(true);
             LinearLayout.LayoutParams params =
@@ -3536,21 +3540,26 @@ public class MainActivity extends Activity {
             item.setOnClickListener(v -> showPlaylistActions(profile));
             item.setOnFocusChangeListener((v, focused) ->
                     item.setBackgroundColor(focused
-                            ? Color.rgb(35, 75, 125) : PANEL));
+                            ? BLUE : Color.TRANSPARENT));
         }
 
         screen.addView(scroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
 
         TextView add = label("+  ADD PLAYLIST", 18);
-        add.setBackgroundColor(PANEL);
+        add.setBackgroundColor(Color.TRANSPARENT);
         add.setFocusable(true);
+        add.setOnFocusChangeListener((v, focused) ->
+                v.setBackgroundColor(focused ? BLUE : Color.TRANSPARENT));
         add.setOnClickListener(v -> showConnectionDialog());
         screen.addView(add, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(58)));
 
         TextView back = label("BACK TO TV GUIDE", 16);
+        back.setBackgroundColor(Color.TRANSPARENT);
         back.setFocusable(true);
+        back.setOnFocusChangeListener((v, focused) ->
+                v.setBackgroundColor(focused ? BLUE : Color.TRANSPARENT));
         back.setOnClickListener(v -> showHomeScreen());
         screen.addView(back, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
