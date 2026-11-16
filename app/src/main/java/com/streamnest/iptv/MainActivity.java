@@ -4649,6 +4649,7 @@ public class MainActivity extends Activity {
             android.content.SharedPreferences prefs = getPreferences(MODE_PRIVATE);
             String connectionType = prefs.getString("last_connection", "");
             if ("xtream".equals(connectionType)) {
+                renderGuidePrograms(new ArrayList<>(), channelMap, status, categoryList, results);
                 final ArrayList<Channel> guideChannels = new ArrayList<>(channels);
                 final String server = prefs.getString("xtream_server", "");
                 final String username = prefs.getString("xtream_username", "");
