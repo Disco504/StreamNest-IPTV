@@ -62,6 +62,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.TreeSet;
+import java.util.UUID;
 
 public class MainActivity extends Activity {
     private boolean isTelevisionDevice() {
@@ -88,6 +89,10 @@ public class MainActivity extends Activity {
     private static final int BLUE = Color.rgb(25, 115, 190);
     private static final int WHITE = Color.WHITE;
     private static final int MUTED = Color.rgb(175, 190, 210);
+
+    private static final String PREF_SAVED_PLAYLISTS = "saved_playlists";
+    private ArrayList<PlaylistProfile> savedPlaylists = new ArrayList<>();
+    private String activePlaylistId = "";
 
     private LinearLayout screen;
     private LinearLayout categoryPanel;
@@ -162,6 +167,16 @@ public class MainActivity extends Activity {
     private Runnable guideAppendMoreRows;
     private static final int GUIDE_CHANNEL_BATCH_SIZE = 40;
     private final ArrayList<View> guideChannelNameCells = new ArrayList<>();
+    private static class PlaylistProfile {
+        String id;
+        String name;
+        String type;
+        String url = "";
+        String server = "";
+        String username = "";
+        String password = "";
+    }
+
     private static class Channel {
         String name;
         String url;
@@ -218,7 +233,134 @@ public class MainActivity extends Activity {
         setContentView(screen);
 
         catalogDatabase = new CatalogDatabase(getApplicationContext());
-        restoreSavedConnection();
+        loadSavedPlaylists();
+        if (savedPlaylists.isEmpty()) {
+            showWelcomeScreen();
+        } else {
+            syncActivePlaylistToConnection();
+            restoreSavedConnection();
+        }
+    }
+
+    private void saveSavedPlaylists() {
+        JSONArray array = new JSONArray();
+        try {
+            for (PlaylistProfile profile : savedPlaylists) {
+                JSONObject item = new JSONObject();
+                item.put("id", profile.id);
+                item.put("name", profile.name);
+                item.put("type", profile.type);
+                item.put("url", profile.url);
+                item.put("server", profile.server);
+                item.put("username", profile.username);
+                item.put("password", profile.password);
+                array.put(item);
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "Could not save playlists",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        getPreferences(MODE_PRIVATE).edit()
+                .putString(PREF_SAVED_PLAYLISTS, array.toString())
+                .putString("active_playlist_id", activePlaylistId)
+                .apply();
+    }
+
+    private void loadSavedPlaylists() {
+        android.content.SharedPreferences prefs =
+                getPreferences(MODE_PRIVATE);
+        savedPlaylists.clear();
+
+        String stored = prefs.getString(PREF_SAVED_PLAYLISTS, "");
+        if (!stored.isEmpty()) {
+            try {
+                JSONArray array = new JSONArray(stored);
+                for (int i = 0; i < array.length(); i++) {
+                    JSONObject item = array.getJSONObject(i);
+                    PlaylistProfile profile = new PlaylistProfile();
+                    profile.id = item.optString("id", "");
+                    profile.name = item.optString("name", "My Playlist");
+                    profile.type = item.optString("type", "");
+                    profile.url = item.optString("url", "");
+                    profile.server = item.optString("server", "");
+                    profile.username = item.optString("username", "");
+                    profile.password = item.optString("password", "");
+                    if (!profile.id.isEmpty()
+                            && ("m3u".equals(profile.type)
+                            || "xtream".equals(profile.type))) {
+                        savedPlaylists.add(profile);
+                    }
+                }
+            } catch (Exception e) {
+                savedPlaylists.clear();
+            }
+        }
+
+        activePlaylistId = prefs.getString("active_playlist_id", "");
+
+        if (savedPlaylists.isEmpty()) {
+            String type = prefs.getString("last_connection", "");
+            PlaylistProfile profile = new PlaylistProfile();
+            profile.id = UUID.randomUUID().toString();
+            profile.type = type;
+
+            if ("xtream".equals(type)) {
+                profile.server = prefs.getString("xtream_server", "");
+                profile.username = prefs.getString("xtream_username", "");
+                profile.password = prefs.getString("xtream_password", "");
+                profile.name = profile.username.isEmpty()
+                        ? "Xtream Playlist" : profile.username;
+                if (profile.server.isEmpty() || profile.username.isEmpty()
+                        || profile.password.isEmpty()) return;
+            } else if ("m3u".equals(type)
+                    || (type.isEmpty()
+                    && !prefs.getString("playlist_url", "").isEmpty())) {
+                profile.type = "m3u";
+                profile.url = prefs.getString("playlist_url", "");
+                profile.name = "M3U Playlist";
+                if (profile.url.isEmpty()) return;
+            } else {
+                return;
+            }
+
+            savedPlaylists.add(profile);
+            activePlaylistId = profile.id;
+            saveSavedPlaylists();
+        } else if (activePlaylistId.isEmpty()) {
+            activePlaylistId = savedPlaylists.get(0).id;
+            saveSavedPlaylists();
+        }
+    }
+
+    private void syncActivePlaylistToConnection() {
+        PlaylistProfile active = null;
+        for (PlaylistProfile profile : savedPlaylists) {
+            if (profile.id.equals(activePlaylistId)) {
+                active = profile;
+                break;
+            }
+        }
+
+        if (active == null && !savedPlaylists.isEmpty()) {
+            active = savedPlaylists.get(0);
+            activePlaylistId = active.id;
+        }
+        if (active == null) return;
+
+        android.content.SharedPreferences.Editor editor =
+                getPreferences(MODE_PRIVATE).edit();
+        editor.putString("last_connection", active.type);
+
+        if ("m3u".equals(active.type)) {
+            editor.putString("playlist_url", active.url);
+        } else if ("xtream".equals(active.type)) {
+            editor.putString("xtream_server", active.server);
+            editor.putString("xtream_username", active.username);
+            editor.putString("xtream_password", active.password);
+        }
+
+        editor.putString("active_playlist_id", activePlaylistId).apply();
     }
 
     private void restoreSavedConnection() {
@@ -3278,8 +3420,8 @@ public class MainActivity extends Activity {
                                     : "auto_play_next_episode";
                             prefs.edit().putBoolean(key, isChecked).apply();
                         })
-                .setNeutralButton("Add / Change Playlist",
-                        (dialog, which) -> showConnectionDialog())
+                .setNeutralButton("My Playlists",
+                        (dialog, which) -> showPlaylistManager())
                 .setPositiveButton("XMLTV EPG URL",
                         (dialog, which) -> showEpgDialog())
                 .setNegativeButton("Done", null)
@@ -3320,6 +3462,165 @@ public class MainActivity extends Activity {
     }
 
 
+    private void showWelcomeScreen() {
+        screen.removeAllViews();
+        screen.setGravity(Gravity.CENTER);
+        screen.setPadding(dp(24), dp(24), dp(24), dp(24));
+
+        TextView title = label("StreamNest", 36);
+        title.setGravity(Gravity.CENTER);
+        screen.addView(title);
+
+        TextView subtitle = label("IPTV", 18);
+        subtitle.setGravity(Gravity.CENTER);
+        screen.addView(subtitle);
+
+        TextView manage = label("MY PLAYLISTS", 20);
+        manage.setGravity(Gravity.CENTER);
+        manage.setBackgroundColor(PANEL);
+        manage.setFocusable(true);
+        manage.setOnClickListener(v -> showPlaylistManager());
+        screen.addView(manage, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(64)));
+
+        TextView add = label("ADD PLAYLIST", 20);
+        add.setGravity(Gravity.CENTER);
+        add.setBackgroundColor(PANEL);
+        add.setFocusable(true);
+        add.setOnClickListener(v -> showConnectionDialog());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(64));
+        params.topMargin = dp(12);
+        screen.addView(add, params);
+        manage.requestFocus();
+    }
+
+    private void showPlaylistManager() {
+        screen.removeAllViews();
+        screen.setGravity(Gravity.TOP);
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.setPadding(dp(20), dp(12), dp(20), dp(12));
+
+        TextView title = label("MY PLAYLISTS", 26);
+        screen.addView(title);
+
+        TextView subtitle = label(
+                "Select a playlist to load, or add a new connection.", 14);
+        screen.addView(subtitle);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(list);
+
+        if (savedPlaylists.isEmpty()) {
+            list.addView(label("No playlists saved yet.", 17));
+        }
+
+        for (PlaylistProfile profile : savedPlaylists) {
+            String type = "m3u".equals(profile.type)
+                    ? "M3U PLAYLIST" : "XTREAM CODES";
+            String selected = profile.id.equals(activePlaylistId)
+                    ? "  • ACTIVE" : "";
+            TextView item = label(
+                    profile.name + selected + "\n" + type, 18);
+            item.setBackgroundColor(PANEL);
+            item.setFocusable(true);
+            item.setClickable(true);
+            LinearLayout.LayoutParams params =
+                    new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            dp(68));
+            params.bottomMargin = dp(8);
+            list.addView(item, params);
+            item.setOnClickListener(v -> showPlaylistActions(profile));
+            item.setOnFocusChangeListener((v, focused) ->
+                    item.setBackgroundColor(focused
+                            ? Color.rgb(35, 75, 125) : PANEL));
+        }
+
+        screen.addView(scroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
+
+        TextView add = label("+  ADD PLAYLIST", 18);
+        add.setBackgroundColor(PANEL);
+        add.setFocusable(true);
+        add.setOnClickListener(v -> showConnectionDialog());
+        screen.addView(add, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(58)));
+
+        TextView back = label("BACK TO TV GUIDE", 16);
+        back.setFocusable(true);
+        back.setOnClickListener(v -> showHomeScreen());
+        screen.addView(back, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+    }
+
+    private void showPlaylistActions(PlaylistProfile profile) {
+        new AlertDialog.Builder(this)
+                .setTitle(profile.name)
+                .setItems(new String[]{
+                        "Load Playlist", "Edit Playlist", "Delete Playlist"
+                }, (dialog, which) -> {
+                    if (which == 0) {
+                        activePlaylistId = profile.id;
+                        syncActivePlaylistToConnection();
+                        if ("m3u".equals(profile.type)) {
+                            loadPlaylist(profile.url);
+                        } else {
+                            loadXtreamChannels(profile.server,
+                                    profile.username, profile.password);
+                        }
+                    } else if (which == 1) {
+                        if ("m3u".equals(profile.type)) {
+                            showPlaylistDialog(profile);
+                        } else {
+                            showXtreamDialog(profile);
+                        }
+                    } else {
+                        new AlertDialog.Builder(this)
+                                .setTitle("Delete Playlist")
+                                .setMessage("Delete " + profile.name + "?")
+                                .setNegativeButton("Cancel", null)
+                                .setPositiveButton("Delete", (d, w) -> {
+                                    boolean wasActive =
+                                            profile.id.equals(activePlaylistId);
+                                    savedPlaylists.remove(profile);
+                                    if (wasActive) {
+                                        activePlaylistId = savedPlaylists.isEmpty()
+                                                ? "" : savedPlaylists.get(0).id;
+                                    }
+                                    saveSavedPlaylists();
+
+                                    if (savedPlaylists.isEmpty()) {
+                                        getPreferences(MODE_PRIVATE).edit()
+                                                .remove("playlist_url")
+                                                .remove("xtream_server")
+                                                .remove("xtream_username")
+                                                .remove("xtream_password")
+                                                .remove("last_connection")
+                                                .apply();
+                                        showWelcomeScreen();
+                                    } else if (wasActive) {
+                                        syncActivePlaylistToConnection();
+                                        PlaylistProfile next = savedPlaylists.get(0);
+                                        if ("m3u".equals(next.type)) {
+                                            loadPlaylist(next.url);
+                                        } else {
+                                            loadXtreamChannels(next.server,
+                                                    next.username, next.password);
+                                        }
+                                    } else {
+                                        showPlaylistManager();
+                                    }
+                                })
+                                .show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     private void showConnectionDialog() {
         new AlertDialog.Builder(this)
                 .setTitle("Connect Playlist")
@@ -3338,18 +3639,28 @@ public class MainActivity extends Activity {
     }
 
     private void showXtreamDialog() {
+        showXtreamDialog(null);
+    }
+
+    private void showXtreamDialog(PlaylistProfile editing) {
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
         int pad = dp(8);
         form.setPadding(pad, pad, pad, pad);
+
+        EditText profileName = new EditText(this);
+        profileName.setSingleLine(true);
+        profileName.setHint("Playlist name");
+        if (editing != null) profileName.setText(editing.name);
+        form.addView(profileName);
 
         EditText server = new EditText(this);
         server.setSingleLine(true);
         server.setHint("Server URL (https://host:port)");
         server.setInputType(InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_VARIATION_URI);
-        server.setText(getPreferences(MODE_PRIVATE)
-                .getString("xtream_server", ""));
+        server.setText(editing != null ? editing.server
+                : getPreferences(MODE_PRIVATE).getString("xtream_server", ""));
         form.addView(server);
 
         EditText username = new EditText(this);
@@ -3357,8 +3668,8 @@ public class MainActivity extends Activity {
         username.setHint("Username");
         username.setInputType(InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
-        username.setText(getPreferences(MODE_PRIVATE)
-                .getString("xtream_username", ""));
+        username.setText(editing != null ? editing.username
+                : getPreferences(MODE_PRIVATE).getString("xtream_username", ""));
         form.addView(username);
 
         EditText password = new EditText(this);
@@ -3366,16 +3677,20 @@ public class MainActivity extends Activity {
         password.setHint("Password");
         password.setInputType(InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        if (editing != null) password.setText(editing.password);
         form.addView(password);
 
         ScrollView scroll = new ScrollView(this);
         scroll.addView(form);
 
         AlertDialog loginDialog = new AlertDialog.Builder(this)
-                .setTitle("Xtream Codes Login")
+                .setTitle(editing == null ? "Xtream Codes Login"
+                        : "Edit Xtream Playlist")
                 .setView(scroll)
                 .setNegativeButton("Cancel", null)
-                .setPositiveButton("Login", (dialog, which) -> {
+                .setPositiveButton(editing == null ? "Login" : "Save",
+                        (dialog, which) -> {
+                    String name = profileName.getText().toString().trim();
                     String base = server.getText().toString().trim();
                     String user = username.getText().toString().trim();
                     String pass = password.getText().toString();
@@ -3387,7 +3702,6 @@ public class MainActivity extends Activity {
                         base = base.substring(0,
                                 base.length() - "/player_api.php".length());
                     }
-
                     if ((!base.startsWith("https://")
                             && !base.startsWith("http://"))
                             || user.isEmpty() || pass.isEmpty()) {
@@ -3396,6 +3710,20 @@ public class MainActivity extends Activity {
                                 Toast.LENGTH_LONG).show();
                         return;
                     }
+
+                    PlaylistProfile profile = editing == null
+                            ? new PlaylistProfile() : editing;
+                    if (editing == null) {
+                        profile.id = UUID.randomUUID().toString();
+                        savedPlaylists.add(profile);
+                    }
+                    profile.name = name.isEmpty() ? user : name;
+                    profile.type = "xtream";
+                    profile.server = base;
+                    profile.username = user;
+                    profile.password = pass;
+                    activePlaylistId = profile.id;
+                    saveSavedPlaylists();
 
                     getPreferences(MODE_PRIVATE).edit()
                             .putString("xtream_server", base)
@@ -3410,7 +3738,7 @@ public class MainActivity extends Activity {
         loginDialog.setOnShowListener(v -> {
             if (loginDialog.getWindow() != null) {
                 loginDialog.getWindow().setSoftInputMode(
-                    android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                        android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
                 );
             }
         });
@@ -3664,22 +3992,37 @@ public class MainActivity extends Activity {
     }
 
     private void showPlaylistDialog() {
+        showPlaylistDialog(null);
+    }
+
+    private void showPlaylistDialog(PlaylistProfile editing) {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(8);
+        form.setPadding(pad, pad, pad, pad);
+
+        EditText profileName = new EditText(this);
+        profileName.setSingleLine(true);
+        profileName.setHint("Playlist name");
+        if (editing != null) profileName.setText(editing.name);
+        form.addView(profileName);
+
         EditText input = new EditText(this);
         input.setSingleLine(true);
         input.setHint("Enter M3U playlist URL");
         input.setInputType(InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_VARIATION_URI);
-        input.setText(getPreferences(MODE_PRIVATE)
-                .getString("playlist_url", ""));
+        input.setText(editing != null ? editing.url
+                : getPreferences(MODE_PRIVATE).getString("playlist_url", ""));
+        form.addView(input);
 
         new AlertDialog.Builder(this)
-                .setTitle("M3U Playlist")
-                .setMessage("Enter your IPTV playlist URL")
-                .setView(input)
+                .setTitle(editing == null ? "M3U Playlist" : "Edit M3U Playlist")
+                .setMessage("Enter a name and IPTV playlist URL")
+                .setView(form)
                 .setNegativeButton("Cancel", null)
-                .setPositiveButton("Load", (dialog, which) -> {
+                .setPositiveButton("Save", (dialog, which) -> {
                     String url = input.getText().toString().trim();
-
                     if (!url.startsWith("http://")
                             && !url.startsWith("https://")) {
                         Toast.makeText(this, "Enter a valid URL",
@@ -3687,11 +4030,23 @@ public class MainActivity extends Activity {
                         return;
                     }
 
+                    PlaylistProfile profile = editing == null
+                            ? new PlaylistProfile() : editing;
+                    if (editing == null) {
+                        profile.id = UUID.randomUUID().toString();
+                        savedPlaylists.add(profile);
+                    }
+                    String name = profileName.getText().toString().trim();
+                    profile.name = name.isEmpty() ? "M3U Playlist" : name;
+                    profile.type = "m3u";
+                    profile.url = url;
+                    activePlaylistId = profile.id;
+                    saveSavedPlaylists();
+
                     getPreferences(MODE_PRIVATE).edit()
                             .putString("playlist_url", url)
                             .putString("last_connection", "m3u")
                             .apply();
-
                     Toast.makeText(this, "Loading playlist...",
                             Toast.LENGTH_SHORT).show();
                     loadPlaylist(url);
