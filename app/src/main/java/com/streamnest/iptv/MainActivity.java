@@ -5084,6 +5084,8 @@ public class MainActivity extends Activity {
         int matched = 0;
         Map<String, ArrayList<EpgProgram>> grouped = new java.util.LinkedHashMap<>();
         Map<String, Integer> categoryCounts = new HashMap<>();
+            grouped.put("Favorites", new ArrayList<EpgProgram>());
+            categoryCounts.put("Favorites", favorites.size());
 
         for (Channel channel : channels) {
             String category = channel.group;
@@ -5115,6 +5117,10 @@ public class MainActivity extends Activity {
                             grouped.put(category, new ArrayList<>());
                         }
                         grouped.get(category).add(program);
+                                    if (favorites.contains(channel.url)
+                                            && addedCategories.add("Favorites")) {
+                                        grouped.get("Favorites").add(program);
+                                    }
                     }
                 }
             }
@@ -5335,7 +5341,11 @@ if (categoryPrograms == null) {
         for (Channel channel : channels) {
             String cat = channel.group;
             if (cat == null || cat.trim().isEmpty()) cat = "Uncategorized";
-            if (!category.equals(cat)) continue;
+            if ("Favorites".equals(category)) {
+                if (channel.url == null || !favorites.contains(channel.url)) continue;
+            } else if (!category.equals(cat)) {
+                continue;
+            }
             rowChannels.add(channel);
             byChannel.put(channel, new ArrayList<>());
         }
@@ -5463,6 +5473,7 @@ if (categoryPrograms == null) {
                 continue;
             }
             long cursor = gridStart;
+
             for (EpgProgram program : programs) {
                 long startTime = Math.max(program.startMillis, gridStart);
                 long stopTime = Math.min(program.stopMillis, gridEnd);
