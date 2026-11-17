@@ -148,6 +148,14 @@ public class PlayerActivity extends Activity {
 
     private int dp(float v) { return (int)(v * getResources().getDisplayMetrics().density + 0.5f); }
 
+    private GradientDrawable recentRowBackground(boolean selected) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(selected ? 0xFF1769C2 : PANEL);
+        d.setCornerRadius(dp(6));
+        if (selected) d.setStroke(dp(2), 0xFF55A5FF);
+        return d;
+    }
+
     private GradientDrawable panelBackground(int color) {
         GradientDrawable d = new GradientDrawable();
         d.setColor(color);
@@ -202,7 +210,7 @@ public class PlayerActivity extends Activity {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(10), dp(5), dp(8), dp(5));
-        row.setBackground(panelBackground(index == selectedRecentIndex ? BLUE : PANEL));
+        row.setBackground(recentRowBackground(index == selectedRecentIndex));
 
         ImageView logo = new ImageView(this);
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -287,7 +295,7 @@ public class PlayerActivity extends Activity {
         for (int i = 0; i < recentChannels.size(); i++) addRecentRow(list, i);
         scroll.addView(list);
         panel.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        int w = Math.min(dp(420), getResources().getDisplayMetrics().widthPixels * 42 / 100);
+        int w = Math.min(dp(340), getResources().getDisplayMetrics().widthPixels * 32 / 100);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(w, -1, Gravity.END);
         lp.setMargins(0, dp(24), dp(24), dp(24));
         rootLayout.addView(panel, lp);
