@@ -1944,6 +1944,8 @@ public class MainActivity extends Activity {
         intent.putExtra("channel_name", item.name);
         intent.putExtra("stream_url", item.url);
         intent.putExtra("is_live_stream", false);
+        intent.putExtra("show_on_screen_clock",
+                getPreferences(MODE_PRIVATE).getBoolean("show_on_screen_clock", true));
         startActivity(intent);
     }
 
@@ -1968,6 +1970,8 @@ public class MainActivity extends Activity {
         intent.putExtra("channel_name", names.get(0));
         intent.putExtra("stream_url", urls.get(0));
         intent.putExtra("is_live_stream", false);
+        intent.putExtra("show_on_screen_clock",
+                getPreferences(MODE_PRIVATE).getBoolean("show_on_screen_clock", true));
         intent.putStringArrayListExtra("series_episode_urls", urls);
         intent.putStringArrayListExtra("series_episode_names", names);
         intent.putExtra("auto_play_next_episode",
@@ -3411,36 +3415,92 @@ public class MainActivity extends Activity {
     }
 
     private void showSettingsDialog() {
-        android.content.SharedPreferences prefs =
-                getPreferences(MODE_PRIVATE);
+        android.content.SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+        AlertDialog dialog = new AlertDialog.Builder(this).create();
 
-        String[] options = {
-                "Launch Live TV on app boot",
-                "Launch Live TV after playlist change",
-                "Auto Play Next Episode"
-        };
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(22), dp(24), dp(22), dp(18));
+        panel.setBackgroundColor(NAVY);
 
-        boolean[] checked = {
-                prefs.getBoolean("launch_live_tv_on_boot", true),
-                prefs.getBoolean("launch_live_tv_on_change", true),
-                prefs.getBoolean("auto_play_next_episode", false)
-        };
+        TextView heading = label("SETTINGS", 22);
+        heading.setTypeface(null, Typeface.BOLD);
+        panel.addView(heading);
 
-        new AlertDialog.Builder(this)
-                .setTitle("Settings")
-                .setMultiChoiceItems(options, checked,
-                        (dialog, which, isChecked) -> {
-                            String key = which == 0 ? "launch_live_tv_on_boot"
-                                    : which == 1 ? "launch_live_tv_on_change"
-                                    : "auto_play_next_episode";
-                            prefs.edit().putBoolean(key, isChecked).apply();
-                        })
-                .setNeutralButton("My Playlists",
-                        (dialog, which) -> showPlaylistManager())
-                .setPositiveButton("XMLTV EPG URL",
-                        (dialog, which) -> showEpgDialog())
-                .setNegativeButton("Done", null)
-                .show();
+        addSettingsSwitch(panel, prefs, "Launch Live TV on app boot",
+                "launch_live_tv_on_boot", true);
+        addSettingsSwitch(panel, prefs, "Launch Live TV after playlist change",
+                "launch_live_tv_on_change", true);
+        addSettingsSwitch(panel, prefs, "Auto Play Next Episode",
+                "auto_play_next_episode", false);
+        addSettingsSwitch(panel, prefs, "On Screen Clock",
+                "show_on_screen_clock", true);
+
+        View spacer = new View(this);
+        panel.addView(spacer, new LinearLayout.LayoutParams(1, dp(12)));
+
+        TextView playlists = label("MY PLAYLISTS", 16);
+        setPlaylistFocusStyle(playlists);
+        playlists.setFocusable(true);
+        playlists.setOnClickListener(v -> {
+            dialog.dismiss();
+            showPlaylistManager();
+        });
+        panel.addView(playlists);
+
+        TextView epg = label("XMLTV EPG URL", 16);
+        setPlaylistFocusStyle(epg);
+        epg.setFocusable(true);
+        epg.setOnClickListener(v -> {
+            dialog.dismiss();
+            showEpgDialog();
+        });
+        panel.addView(epg);
+
+        TextView done = label("DONE", 16);
+        done.setGravity(Gravity.CENTER);
+        done.setBackgroundColor(BLUE);
+        done.setFocusable(true);
+        done.setOnClickListener(v -> dialog.dismiss());
+        LinearLayout.LayoutParams doneParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48));
+        doneParams.topMargin = dp(12);
+        panel.addView(done, doneParams);
+
+        dialog.setView(panel);
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(
+                    android.R.color.transparent);
+            dialog.getWindow().setGravity(Gravity.END);
+            int width = Math.min(dp(420),
+                    (int) (getResources().getDisplayMetrics().widthPixels * 0.88f));
+            dialog.getWindow().setLayout(width,
+                    LinearLayout.LayoutParams.MATCH_PARENT);
+        }
+        playlists.requestFocus();
+    }
+
+    private void addSettingsSwitch(LinearLayout panel,
+            android.content.SharedPreferences prefs, String title,
+            String key, boolean defaultValue) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(8), dp(5), dp(4), dp(5));
+
+        TextView name = label(title, 15);
+        row.addView(name, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        android.widget.Switch toggle = new android.widget.Switch(this);
+        toggle.setChecked(prefs.getBoolean(key, defaultValue));
+        toggle.setOnCheckedChangeListener((button, checked) ->
+                prefs.edit().putBoolean(key, checked).apply());
+        row.addView(toggle);
+        panel.addView(row);
     }
 
     private void showEpgDialog() {
@@ -6362,6 +6422,8 @@ private void playChannel(Channel channel) {
         intent.putExtra("channel_logo", channel.logoUrl);
         intent.putExtra("stream_url", channel.url);
         intent.putExtra("is_live_stream", true);
+        intent.putExtra("show_on_screen_clock",
+                getPreferences(MODE_PRIVATE).getBoolean("show_on_screen_clock", true));
         startActivity(intent);
     }
 }

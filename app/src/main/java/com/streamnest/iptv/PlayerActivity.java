@@ -32,6 +32,9 @@ import android.util.Log;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.Locale;
+import java.text.SimpleDateFormat;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
@@ -49,6 +52,16 @@ public class PlayerActivity extends Activity {
     private FrameLayout rootLayout;
     private View recentPanel;
     private boolean recentPanelOpen = false;
+    private TextView clockView;
+    private final Handler clockHandler = new Handler(Looper.getMainLooper());
+    private final Runnable clockRunnable = new Runnable() {
+        @Override public void run() {
+            if (clockView == null) return;
+            clockView.setText(new SimpleDateFormat("h:mm a",
+                    Locale.getDefault()).format(new Date()));
+            clockHandler.postDelayed(this, 1000);
+        }
+    };
     private int selectedRecentIndex = 0;
     private final ArrayList<RecentChannel> recentChannels = new ArrayList<>();
     private final ThreadPoolExecutor recentLogoExecutor = new ThreadPoolExecutor(2, 2, 30L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(20), new ThreadPoolExecutor.DiscardOldestPolicy());
@@ -110,6 +123,22 @@ public class PlayerActivity extends Activity {
         rootLayout.addView(playerView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
+
+        clockView = new TextView(this);
+        clockView.setTextColor(Color.WHITE);
+        clockView.setTextSize(22);
+        clockView.setGravity(Gravity.CENTER);
+        clockView.setBackgroundColor(Color.TRANSPARENT);
+        clockView.setPadding(dp(8), dp(4), dp(8), dp(4));
+        clockView.setClickable(false);
+        clockView.setFocusable(false);
+        FrameLayout.LayoutParams clockParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.END);
+        clockParams.setMargins(0, dp(18), dp(24), 0);
+        clockView.setVisibility(View.GONE);
+        rootLayout.addView(clockView, clockParams);
 
         setContentView(rootLayout);
     }
@@ -252,6 +281,10 @@ public class PlayerActivity extends Activity {
         if (recentPanel != null) rootLayout.removeView(recentPanel);
         recentPanel = null;
         recentPanelOpen = false;
+        if (clockView != null
+                && getIntent().getBooleanExtra("show_on_screen_clock", true)) {
+            clockView.setVisibility(View.VISIBLE);
+        }
         rightLongPressTriggered = false;
         if (playerView != null) playerView.requestFocus();
     }
@@ -279,6 +312,7 @@ public class PlayerActivity extends Activity {
         loadRecentChannels();
         if (recentChannels.isEmpty()) return;
         recentPanelOpen = true;
+        if (clockView != null) clockView.setVisibility(View.GONE);
         selectedRecentIndex = 0;
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
@@ -309,6 +343,15 @@ public class PlayerActivity extends Activity {
 
         if (streamUrl == null || playerView == null) {
             return;
+        }
+
+        if (getIntent().getBooleanExtra("show_on_screen_clock", true)) {
+            clockView.setVisibility(View.VISIBLE);
+            clockHandler.removeCallbacks(clockRunnable);
+            clockRunnable.run();
+        } else {
+            clockView.setVisibility(View.GONE);
+            clockHandler.removeCallbacks(clockRunnable);
         }
 
         try {
@@ -430,6 +473,8 @@ public class PlayerActivity extends Activity {
 
     @Override
     protected void onStop() {
+        clockHandler.removeCallbacks(clockRunnable);
+        if (clockView != null) clockView.setVisibility(View.GONE);
         if (playerView != null) {
             playerView.setPlayer(null);
         }
