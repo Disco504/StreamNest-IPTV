@@ -168,6 +168,8 @@ public class MainActivity extends Activity {
     private Channel guidePreviewChannel;
     private int guideRenderGeneration = 0;
     private Runnable guideAppendMoreRows;
+    private String guidePendingMoveChannelKey = "";
+    private int guidePendingMoveScrollY = -1;
     private static final int GUIDE_CHANNEL_BATCH_SIZE = 40;
     private final ArrayList<View> guideChannelNameCells = new ArrayList<>();
     private static class PlaylistProfile {
@@ -4924,6 +4926,139 @@ public class MainActivity extends Activity {
         return 0;
     }
 
+    private void applySavedGuideCategoryOrder(java.util.List<String> categories) {
+        try {
+            JSONArray saved = new JSONArray(getPreferences(MODE_PRIVATE)
+                    .getString("guide_category_order", "[]"));
+            ArrayList<String> ordered = new ArrayList<>();
+            for (int i = 0; i < saved.length(); i++) {
+                String name = saved.optString(i, "");
+                if (categories.remove(name)) ordered.add(name);
+            }
+            ordered.addAll(categories);
+            categories.clear();
+            categories.addAll(ordered);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void saveGuideCategoryOrder(LinearLayout list) {
+        JSONArray saved = new JSONArray();
+        for (int i = 0; i < list.getChildCount(); i++) {
+            Object tag = list.getChildAt(i).getTag();
+            if (tag instanceof String) saved.put((String) tag);
+        }
+        getPreferences(MODE_PRIVATE).edit()
+                .putString("guide_category_order", saved.toString()).apply();
+    }
+
+    private void showGuideCategoryMoveMenu(TextView item, LinearLayout list) {
+        android.widget.PopupMenu menu = new android.widget.PopupMenu(this, item);
+        String[] actions = {"Move Up", "Move Down", "Move to Top", "Move to Bottom"};
+        for (String action : actions) menu.getMenu().add(action);
+        menu.setOnMenuItemClickListener(selected -> {
+            int from = list.indexOfChild(item);
+            int to = from;
+            String action = selected.getTitle().toString();
+            if (action.equals("Move Up")) to--;
+            else if (action.equals("Move Down")) to++;
+            else if (action.equals("Move to Top")) to = 0;
+            else if (action.equals("Move to Bottom")) to = list.getChildCount() - 1;
+            if (to < 0 || to >= list.getChildCount() || to == from) return true;
+            list.removeViewAt(from);
+            list.addView(item, to);
+            saveGuideCategoryOrder(list);
+            if (guideCategoryScrollView != null) {
+                int scrollY = guideCategoryScrollView.getScrollY();
+                guideCategoryScrollView.post(() -> {
+                    guideCategoryScrollView.scrollTo(0, scrollY);
+                    item.requestFocus();
+                });
+            }
+            return true;
+        });
+        menu.show();
+    }
+
+    private String guideChannelOrderKey(Channel channel) {
+        return (channel.name == null ? "" : channel.name) + "\u001f"
+                + (channel.url == null ? "" : channel.url) + "\u001f"
+                + (channel.tvgId == null ? "" : channel.tvgId) + "\u001f"
+                + (channel.xtreamStreamId == null ? "" : channel.xtreamStreamId);
+    }
+
+    private void applySavedGuideChannelOrder(String category, ArrayList<Channel> channels) {
+        try {
+            JSONObject saved = new JSONObject(getPreferences(MODE_PRIVATE)
+                    .getString("guide_channel_orders", "{}"));
+            JSONArray order = saved.optJSONArray(category);
+            if (order == null) return;
+            ArrayList<Channel> ordered = new ArrayList<>();
+            for (int i = 0; i < order.length(); i++) {
+                String key = order.optString(i, "");
+                for (Channel channel : channels) {
+                    if (key.equals(guideChannelOrderKey(channel)) && !ordered.contains(channel)) {
+                        ordered.add(channel);
+                        break;
+                    }
+                }
+            }
+            for (Channel channel : channels) {
+                if (!ordered.contains(channel)) ordered.add(channel);
+            }
+            channels.clear();
+            channels.addAll(ordered);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void saveGuideChannelOrder(String category, ArrayList<Channel> channels) {
+        try {
+            JSONObject saved = new JSONObject(getPreferences(MODE_PRIVATE)
+                    .getString("guide_channel_orders", "{}"));
+            JSONArray order = new JSONArray();
+            for (Channel channel : channels) {
+                order.put(guideChannelOrderKey(channel));
+            }
+            saved.put(category, order);
+            getPreferences(MODE_PRIVATE).edit()
+                    .putString("guide_channel_orders", saved.toString()).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void showGuideChannelMoveMenu(View anchor, Channel channel, String category,
+            ArrayList<Channel> channels,
+            Map<String, ArrayList<EpgProgram>> grouped,
+            Map<String, ArrayList<Channel>> channelMap, LinearLayout results) {
+        android.widget.PopupMenu menu = new android.widget.PopupMenu(this, anchor);
+        String[] actions = {"Move Up", "Move Down", "Move to Top", "Move to Bottom"};
+        for (String action : actions) menu.getMenu().add(action);
+        menu.setOnMenuItemClickListener(selected -> {
+            int from = channels.indexOf(channel);
+            int to = from;
+            String action = selected.getTitle().toString();
+            if (action.equals("Move Up")) to--;
+            else if (action.equals("Move Down")) to++;
+            else if (action.equals("Move to Top")) to = 0;
+            else if (action.equals("Move to Bottom")) to = channels.size() - 1;
+            if (from < 0 || to < 0 || to >= channels.size() || to == from) return true;
+            android.view.ViewParent parent = anchor.getParent();
+            while (parent != null && !(parent instanceof ScrollView)) {
+                parent = parent.getParent();
+            }
+            guidePendingMoveScrollY = parent instanceof ScrollView
+                    ? ((ScrollView) parent).getScrollY() : 0;
+            guidePendingMoveChannelKey = guideChannelOrderKey(channel);
+            channels.remove(from);
+            channels.add(to, channel);
+            saveGuideChannelOrder(category, channels);
+            renderGuideCategoryPrograms(category, grouped, channelMap, results);
+            return true;
+        });
+        menu.show();
+    }
+
     private void updateGuideCategoryItemStyle(View view) {
         boolean selected = view.isSelected();
         boolean focused = view.hasFocus();
@@ -5021,6 +5156,7 @@ public class MainActivity extends Activity {
         }
 
         java.util.List<String> categories = new ArrayList<>(grouped.keySet());
+        applySavedGuideCategoryOrder(categories);
 
         for (String category : categories) {
             Integer savedCount = categoryCounts.get(category);
@@ -5029,6 +5165,12 @@ public class MainActivity extends Activity {
             item.setPadding(dp(10), dp(14), dp(8), dp(14));
             item.setFocusable(true);
             item.setClickable(true);
+            item.setLongClickable(true);
+            item.setTag(category);
+            item.setOnLongClickListener(v -> {
+                showGuideCategoryMoveMenu(item, categoryList);
+                return true;
+            });
             item.setSelected(false);
             item.setOnFocusChangeListener((v, focused) ->
                     updateGuideCategoryItemStyle(v));
@@ -5199,6 +5341,7 @@ if (categoryPrograms == null) {
         }
         Collections.sort(rowChannels, (x, y) ->
                 (x.name == null ? "" : x.name).compareTo(y.name == null ? "" : y.name));
+        applySavedGuideChannelOrder(category, rowChannels);
         for (EpgProgram program : categoryPrograms) {
             ArrayList<Channel> matches = channelMap.get(normalizeEpgId(program.channelId));
             if (matches == null) continue;
@@ -5246,12 +5389,18 @@ if (categoryPrograms == null) {
             channelCell.setPadding(dp(5), dp(3), dp(5), dp(3));
             channelCell.setFocusable(true);
             channelCell.setClickable(true);
-            channelCell.setTag(rowChannel.url);
+            channelCell.setTag(rowChannel);
             channelCell.setOnFocusChangeListener((v, focused) ->
                     updateGuideChannelNameCell(v, rowChannel, focused));
             guideChannelNameCells.add(channelCell);
             updateGuideChannelNameCell(channelCell, rowChannel, false);
             channelCell.setOnClickListener(v -> playGuidePreview(rowChannel));
+            channelCell.setLongClickable(true);
+            channelCell.setOnLongClickListener(v -> {
+                showGuideChannelMoveMenu(channelCell, rowChannel, category,
+                        rowChannels, grouped, channelMap, results);
+                return true;
+            });
 
             android.widget.ImageView logoView =
                     new android.widget.ImageView(this);
@@ -5434,7 +5583,8 @@ if (categoryPrograms == null) {
             if (!isPhoneLayout() && lastWatchedRow[0] != null
                     && rowScrollRef[0] != null
                     && rowScrollRef[0].isAttachedToWindow()
-                    && !lastWatchedScrollScheduled[0]) {
+                    && !lastWatchedScrollScheduled[0]
+                    && guidePendingMoveChannelKey.isEmpty()) {
                 lastWatchedScrollScheduled[0] = true;
                 rowScrollRef[0].post(() -> rowScrollRef[0].smoothScrollTo(
                         0, lastWatchedRow[0].getTop()));
@@ -5601,7 +5751,8 @@ if (categoryPrograms == null) {
         });
 
         final View targetLastWatchedRow = lastWatchedRow[0];
-        if (!isPhoneLayout() && targetLastWatchedRow != null) {
+        if (!isPhoneLayout() && targetLastWatchedRow != null
+                && guidePendingMoveChannelKey.isEmpty()) {
             rowVerticalScroll.post(() ->
                     rowVerticalScroll.smoothScrollTo(0, targetLastWatchedRow.getTop()));
         }
@@ -5629,7 +5780,11 @@ if (categoryPrograms == null) {
         results.addView(timeline, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        if (findLastWatchedRow && lastWatchedRow[0] == null) {
+        if (!guidePendingMoveChannelKey.isEmpty()) {
+            restoreMovedGuideChannel(rowVerticalScroll, renderGeneration);
+        }
+        if (findLastWatchedRow && lastWatchedRow[0] == null
+                && guidePendingMoveChannelKey.isEmpty()) {
             rowVerticalScroll.post(new Runnable() {
                 @Override
                 public void run() {
@@ -5641,6 +5796,33 @@ if (categoryPrograms == null) {
                     }
                 }
             });
+        }
+    }
+
+    private void restoreMovedGuideChannel(ScrollView rowScroll, int generation) {
+        if (generation != guideRenderGeneration) return;
+        String targetUrl = guidePendingMoveChannelKey;
+        if (targetUrl.isEmpty()) return;
+        for (View cell : guideChannelNameCells) {
+            if (cell.getTag() instanceof Channel
+                    && targetUrl.equals(guideChannelOrderKey((Channel) cell.getTag()))) {
+                int scrollY = guidePendingMoveScrollY;
+                guidePendingMoveChannelKey = "";
+                guidePendingMoveScrollY = -1;
+                rowScroll.post(() -> {
+                    if (generation != guideRenderGeneration) return;
+                    rowScroll.scrollTo(0, Math.max(0, scrollY));
+                    cell.requestFocus();
+                });
+                return;
+            }
+        }
+        if (guideAppendMoreRows != null) {
+            guideAppendMoreRows.run();
+            rowScroll.post(() -> restoreMovedGuideChannel(rowScroll, generation));
+        } else {
+            guidePendingMoveChannelKey = "";
+            guidePendingMoveScrollY = -1;
         }
     }
 
