@@ -5031,32 +5031,171 @@ public class MainActivity extends Activity {
             ArrayList<Channel> channels,
             Map<String, ArrayList<EpgProgram>> grouped,
             Map<String, ArrayList<Channel>> channelMap, LinearLayout results) {
-        android.widget.PopupMenu menu = new android.widget.PopupMenu(this, anchor);
-        String[] actions = {"Move Up", "Move Down", "Move to Top", "Move to Bottom"};
-        for (String action : actions) menu.getMenu().add(action);
-        menu.setOnMenuItemClickListener(selected -> {
-            int from = channels.indexOf(channel);
-            int to = from;
-            String action = selected.getTitle().toString();
-            if (action.equals("Move Up")) to--;
-            else if (action.equals("Move Down")) to++;
-            else if (action.equals("Move to Top")) to = 0;
-            else if (action.equals("Move to Bottom")) to = channels.size() - 1;
-            if (from < 0 || to < 0 || to >= channels.size() || to == from) return true;
-            android.view.ViewParent parent = anchor.getParent();
-            while (parent != null && !(parent instanceof ScrollView)) {
-                parent = parent.getParent();
+
+        final int menuScrollY;
+        android.view.ViewParent parent = anchor.getParent();
+        while (parent != null && !(parent instanceof ScrollView)) {
+            parent = parent.getParent();
+        }
+        menuScrollY = parent instanceof ScrollView
+                ? ((ScrollView) parent).getScrollY() : 0;
+
+        android.app.Dialog dialog = new android.app.Dialog(this);
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(12), dp(10), dp(12), dp(10));
+        panel.setBackgroundColor(PANEL);
+
+        TextView heading = label("CHANNEL ORDER", 15);
+        heading.setGravity(android.view.Gravity.CENTER);
+        heading.setTextColor(Color.WHITE);
+        heading.setPadding(0, dp(4), 0, dp(10));
+        panel.addView(heading);
+
+        String[] actions = {"↑", "↓", "⇧", "⇩",
+                favorites.contains(channel.url) ? "★" : "☆"};
+        String[] descriptions = {"Move Up", "Move Down",
+                "Move to Top", "Move to Bottom",
+                favorites.contains(channel.url) ? "Remove from Favorites" : "Add to Favorites"};
+
+        for (int i = 0; i < actions.length; i++) {
+            final int actionIndex = i;
+            TextView button = label(actions[i], 29);
+            button.setTextColor(Color.WHITE);
+            button.setGravity(android.view.Gravity.CENTER);
+            button.setFocusable(true);
+            button.setClickable(true);
+            button.setContentDescription(descriptions[i]);
+            button.setPadding(dp(12), dp(5), dp(12), dp(5));
+
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(52));
+            params.setMargins(0, dp(3), 0, dp(3));
+            panel.addView(button, params);
+
+            button.setOnFocusChangeListener((v, focused) -> {
+                android.graphics.drawable.GradientDrawable bg =
+                        new android.graphics.drawable.GradientDrawable();
+                bg.setColor(focused ? BLUE : 0xFF26364F);
+                bg.setCornerRadius(dp(5));
+                bg.setStroke(dp(1), focused ? Color.WHITE : 0xFF667788);
+                v.setBackground(bg);
+            });
+
+            button.setOnClickListener(v -> {
+                if (actionIndex == 4) {
+                    boolean removing = favorites.contains(channel.url);
+                    if (channel.url == null) return;
+
+                    if (removing) {
+                        favorites.remove(channel.url);
+                    } else {
+                        favorites.add(channel.url);
+                    }
+
+                    getPreferences(MODE_PRIVATE).edit()
+                            .putStringSet("favorite_urls",
+                                    new LinkedHashSet<>(favorites))
+                            .apply();
+
+                    ArrayList<EpgProgram> favoritePrograms = grouped.get("Favorites");
+                    if (favoritePrograms != null) {
+                        if (removing) {
+                            java.util.Iterator<EpgProgram> iterator =
+                                    favoritePrograms.iterator();
+                            while (iterator.hasNext()) {
+                                EpgProgram program = iterator.next();
+                                ArrayList<Channel> matches =
+                                        channelMap.get(normalizeEpgId(program.channelId));
+                                if (matches != null && matches.contains(channel)) {
+                                    boolean stillFavorited = false;
+                                    for (Channel match : matches) {
+                                        if (match != channel && match.url != null
+                                                && favorites.contains(match.url)) {
+                                            stillFavorited = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!stillFavorited) iterator.remove();
+                                }
+                            }
+                        } else {
+                            String channelCategory = channel.group;
+                            if (channelCategory == null || channelCategory.trim().isEmpty()) {
+                                channelCategory = "Uncategorized";
+                            }
+                            ArrayList<EpgProgram> source = grouped.get(channelCategory);
+                            if (source != null) {
+                                for (EpgProgram program : source) {
+                                    ArrayList<Channel> matches =
+                                            channelMap.get(normalizeEpgId(program.channelId));
+                                    if (matches != null && matches.contains(channel)
+                                            && !favoritePrograms.contains(program)) {
+                                        favoritePrograms.add(program);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    button.setText(removing ? "☆" : "★");
+                    button.setContentDescription(removing
+                            ? "Add to Favorites" : "Remove from Favorites");
+
+                    if ("Favorites".equals(category)) {
+                        guidePendingMoveScrollY = menuScrollY;
+                        guidePendingMoveChannelKey = "";
+                        renderGuideCategoryPrograms(category, grouped, channelMap, results);
+                    }
+
+                    Toast.makeText(this,
+                            removing ? "Removed from Favorites" : "Added to Favorites",
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                int from = channels.indexOf(channel);
+                int to = from;
+                if (actionIndex == 0) to--;
+                else if (actionIndex == 1) to++;
+                else if (actionIndex == 2) to = 0;
+                else if (actionIndex == 3) to = channels.size() - 1;
+
+                if (from < 0 || to < 0 || to >= channels.size() || to == from) {
+                    return;
+                }
+
+                guidePendingMoveScrollY = menuScrollY;
+                guidePendingMoveChannelKey = guideChannelOrderKey(channel);
+                channels.remove(from);
+                channels.add(to, channel);
+                saveGuideChannelOrder(category, channels);
+                renderGuideCategoryPrograms(category, grouped, channelMap, results);
+                button.requestFocus();
+            });
+        }
+
+        dialog.setContentView(panel);
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.setOnDismissListener(d -> {
+            for (View cell : guideChannelNameCells) {
+                if (cell.getTag() == channel) {
+                    cell.requestFocus();
+                    break;
+                }
             }
-            guidePendingMoveScrollY = parent instanceof ScrollView
-                    ? ((ScrollView) parent).getScrollY() : 0;
-            guidePendingMoveChannelKey = guideChannelOrderKey(channel);
-            channels.remove(from);
-            channels.add(to, channel);
-            saveGuideChannelOrder(category, channels);
-            renderGuideCategoryPrograms(category, grouped, channelMap, results);
-            return true;
         });
-        menu.show();
+
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(
+                    android.R.color.transparent);
+            dialog.getWindow().setLayout(dp(230),
+                    android.view.WindowManager.LayoutParams.WRAP_CONTENT);
+        }
+
+        panel.getChildAt(1).requestFocus();
     }
 
     private void updateGuideCategoryItemStyle(View view) {
