@@ -6359,6 +6359,7 @@ private void playChannel(Channel channel) {
 
         Intent intent = new Intent(this, PlayerActivity.class);
         intent.putExtra("channel_name", channel.name);
+        intent.putExtra("channel_logo", channel.logoUrl);
         intent.putExtra("stream_url", channel.url);
         intent.putExtra("is_live_stream", true);
         startActivity(intent);
