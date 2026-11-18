@@ -1943,7 +1943,10 @@ public class MainActivity extends Activity {
         Intent intent = new Intent(this, PlayerActivity.class);
         intent.putExtra("channel_name", item.name);
         intent.putExtra("stream_url", item.url);
+        intent.putExtra("vod_id", item.vodId);
+        intent.putExtra("vod_artwork", item.logoUrl);
         intent.putExtra("is_live_stream", false);
+        intent.putExtra("active_playlist_id", getPreferences(MODE_PRIVATE).getString("active_playlist_id", ""));
         intent.putExtra("show_on_screen_clock",
                 getPreferences(MODE_PRIVATE).getBoolean("show_on_screen_clock", true));
         startActivity(intent);
@@ -1954,6 +1957,8 @@ public class MainActivity extends Activity {
 
         ArrayList<String> urls = new ArrayList<>();
         ArrayList<String> names = new ArrayList<>();
+        ArrayList<String> episodeIds = new ArrayList<>();
+        ArrayList<String> episodeArtwork = new ArrayList<>();
 
         for (int i = index; i < episodes.size(); i++) {
             Channel episode = episodes.get(i);
@@ -1961,6 +1966,9 @@ public class MainActivity extends Activity {
                     || episode.url.trim().isEmpty()) continue;
             urls.add(episode.url);
             names.add(episode.name == null ? "Episode" : episode.name);
+            episodeIds.add(episode.vodId == null ? "" : episode.vodId);
+            episodeArtwork.add(episode.episodeArtwork == null
+                    ? "" : episode.episodeArtwork);
         }
 
         if (urls.isEmpty()) return;
@@ -1970,10 +1978,14 @@ public class MainActivity extends Activity {
         intent.putExtra("channel_name", names.get(0));
         intent.putExtra("stream_url", urls.get(0));
         intent.putExtra("is_live_stream", false);
+        intent.putExtra("active_playlist_id", getPreferences(MODE_PRIVATE).getString("active_playlist_id", ""));
         intent.putExtra("show_on_screen_clock",
                 getPreferences(MODE_PRIVATE).getBoolean("show_on_screen_clock", true));
         intent.putStringArrayListExtra("series_episode_urls", urls);
         intent.putStringArrayListExtra("series_episode_names", names);
+        intent.putStringArrayListExtra("series_episode_ids", episodeIds);
+        intent.putStringArrayListExtra("series_episode_artwork", episodeArtwork);
+        intent.putExtra("series_id", episodes.get(index).xtreamStreamId);
         intent.putExtra("auto_play_next_episode",
                 getPreferences(MODE_PRIVATE).getBoolean("auto_play_next_episode", false));
         startActivity(intent);
@@ -3117,6 +3129,9 @@ public class MainActivity extends Activity {
         if (description.isEmpty()) description = seriesEpisodeString(ep, "description", "");
         if (description.isEmpty()) description = seriesEpisodeString(ep, "overview", "");
         Channel episode = new Channel(name, url, season.isEmpty() ? "Episodes" : "Season " + season, "", "");
+        episode.vodId = id;
+        episode.xtreamStreamId = series.url;
+        episode.vodExtension = extension;
         episode.episodeArtwork = artwork;
         episode.episodeDescription = description;
         episode.episodeNumber = episodeNumber;

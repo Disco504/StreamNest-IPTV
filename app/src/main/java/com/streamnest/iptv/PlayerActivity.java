@@ -49,6 +49,15 @@ public class PlayerActivity extends Activity {
     private String streamUrl;
     private String channelName;
     private String channelLogo;
+    private final Handler progressHandler = new Handler(Looper.getMainLooper());
+    private String activeProgressKey = "";
+    private static final long PROGRESS_SAVE_INTERVAL_MS = 5000;
+    private final Runnable progressRunnable = new Runnable() {
+        @Override public void run() {
+            saveCurrentVodProgress();
+            progressHandler.postDelayed(this, PROGRESS_SAVE_INTERVAL_MS);
+        }
+    };
     private FrameLayout rootLayout;
     private View recentPanel;
     private boolean recentPanelOpen = false;
@@ -371,6 +380,19 @@ public class PlayerActivity extends Activity {
 
             player.addListener(new Player.Listener() {
                 @Override
+                public void onPlaybackStateChanged(int playbackState) {
+                    if (playbackState == Player.STATE_READY) {
+                        restoreCurrentVodProgress();
+                    }
+                }
+
+                @Override
+                public void onMediaItemTransition(MediaItem mediaItem, int reason) {
+                    activeProgressKey = "";
+                    restoreCurrentVodProgress();
+                }
+
+                @Override
                 public void onPlayerError(PlaybackException error) {
                     Log.e(TAG, "Playback error: " + error.getErrorCodeName()
                             + ", code=" + error.errorCode, error);
@@ -419,12 +441,97 @@ public class PlayerActivity extends Activity {
 
             player.prepare();
             player.play();
+            if (!isLiveStream) {
+                progressHandler.removeCallbacks(progressRunnable);
+                progressHandler.postDelayed(progressRunnable,
+                        PROGRESS_SAVE_INTERVAL_MS);
+            }
             playerView.requestFocus();
 
         } catch (Exception e) {
             Log.e(TAG, "Player initialization failed", e);
             Toast.makeText(this, "Player error: " + e.getClass().getSimpleName(),
                     Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private String getProgressKey(int index) {
+        String playlist = getIntent().getStringExtra("active_playlist_id");
+        if (playlist == null || playlist.isEmpty()) playlist = "default";
+        ArrayList<String> ids = getIntent().getStringArrayListExtra("series_episode_ids");
+        String itemId = ids != null && index >= 0 && index < ids.size()
+                ? ids.get(index) : getIntent().getStringExtra("vod_id");
+        String seriesId = getIntent().getStringExtra("series_id");
+        if (itemId == null || itemId.isEmpty()) {
+            ArrayList<String> urls = getIntent().getStringArrayListExtra("series_episode_urls");
+            String url = urls != null && index >= 0 && index < urls.size()
+                    ? urls.get(index) : streamUrl;
+            itemId = String.valueOf(url == null ? 0 : url.hashCode());
+        }
+        return playlist + ":" + (seriesId == null ? "" : seriesId + ":") + itemId;
+    }
+
+    private JSONObject getProgressStore() {
+        try {
+            String saved = getSharedPreferences("vod_progress", MODE_PRIVATE)
+                    .getString("items", "{}");
+            return new JSONObject(saved);
+        } catch (Exception e) {
+            return new JSONObject();
+        }
+    }
+
+    private void saveCurrentVodProgress() {
+        if (player == null || getIntent().getBooleanExtra("is_live_stream", true)) return;
+        int index = player.getCurrentMediaItemIndex();
+        String key = getProgressKey(index);
+        long position = player.getCurrentPosition();
+        long duration = player.getDuration();
+        if (key.isEmpty() || position < 10000 || duration <= 0) return;
+
+        JSONObject store = getProgressStore();
+        if (position >= duration * 0.90) {
+            store.remove(key);
+        } else {
+            try {
+                JSONObject item = new JSONObject();
+                item.put("position", position);
+                item.put("duration", duration);
+                item.put("title", player.getCurrentMediaItem() != null
+                        && player.getCurrentMediaItem().mediaMetadata.title != null
+                        ? player.getCurrentMediaItem().mediaMetadata.title.toString()
+                        : channelName);
+                ArrayList<String> artwork = getIntent().getStringArrayListExtra(
+                        "series_episode_artwork");
+                String image = artwork != null && index >= 0 && index < artwork.size()
+                        ? artwork.get(index) : getIntent().getStringExtra("vod_artwork");
+                item.put("artwork", image == null ? "" : image);
+                item.put("updated", System.currentTimeMillis());
+                item.put("type", getIntent().hasExtra("series_id") ? "episode" : "movie");
+                store.put(key, item);
+            } catch (Exception e) {
+                Log.e(TAG, "Could not save VOD progress", e);
+                return;
+            }
+        }
+        getSharedPreferences("vod_progress", MODE_PRIVATE).edit()
+                .putString("items", store.toString()).apply();
+    }
+
+    private void restoreCurrentVodProgress() {
+        if (player == null || player.getPlaybackState() != Player.STATE_READY
+                || getIntent().getBooleanExtra("is_live_stream", true)) return;
+        int index = player.getCurrentMediaItemIndex();
+        String key = getProgressKey(index);
+        if (key.equals(activeProgressKey)) return;
+        activeProgressKey = key;
+        JSONObject item = getProgressStore().optJSONObject(key);
+        if (item == null) return;
+        long position = item.optLong("position", 0);
+        if (position > 0) {
+            player.seekTo(position);
+            Toast.makeText(this, "Resuming " + item.optString("title", channelName),
+                    Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -474,6 +581,8 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onStop() {
         clockHandler.removeCallbacks(clockRunnable);
+        progressHandler.removeCallbacks(progressRunnable);
+        saveCurrentVodProgress();
         if (clockView != null) clockView.setVisibility(View.GONE);
         if (playerView != null) {
             playerView.setPlayer(null);
