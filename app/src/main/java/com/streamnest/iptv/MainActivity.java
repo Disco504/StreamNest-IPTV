@@ -3472,6 +3472,15 @@ public class MainActivity extends Activity {
         });
         panel.addView(epg);
 
+        TextView subtitles = label("OPENSUBTITLES LOGIN", 16);
+        setPlaylistFocusStyle(subtitles);
+        subtitles.setFocusable(true);
+        subtitles.setOnClickListener(v -> {
+            dialog.dismiss();
+            showOpenSubtitlesDialog();
+        });
+        panel.addView(subtitles);
+
         TextView done = label("DONE", 16);
         done.setGravity(Gravity.CENTER);
         done.setBackgroundColor(BLUE);
@@ -3496,6 +3505,96 @@ public class MainActivity extends Activity {
                     LinearLayout.LayoutParams.MATCH_PARENT);
         }
         playlists.requestFocus();
+    }
+
+    private String decryptOpenSubtitlesValue(
+            android.content.SharedPreferences prefs, String key) throws Exception {
+        String value = prefs.getString(key, "");
+        return value.isEmpty() ? "" : CatalogCrypto.decrypt(value);
+    }
+
+    private void showOpenSubtitlesDialog() {
+        android.content.SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20), dp(8), dp(20), dp(8));
+
+        EditText apiKey = new EditText(this);
+        apiKey.setSingleLine(true);
+        apiKey.setHint("OpenSubtitles API key");
+        EditText username = new EditText(this);
+        username.setSingleLine(true);
+        username.setHint("OpenSubtitles username");
+        EditText password = new EditText(this);
+        password.setSingleLine(true);
+        password.setHint("OpenSubtitles password");
+        password.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+
+        try {
+            apiKey.setText(decryptOpenSubtitlesValue(prefs, "opensubtitles_api_enc"));
+            username.setText(decryptOpenSubtitlesValue(prefs, "opensubtitles_user_enc"));
+            password.setText(decryptOpenSubtitlesValue(prefs, "opensubtitles_pass_enc"));
+        } catch (Exception e) {
+            Toast.makeText(this, "Could not read saved OpenSubtitles settings",
+                    Toast.LENGTH_LONG).show();
+        }
+
+        form.addView(apiKey);
+        form.addView(username);
+        form.addView(password);
+
+        new AlertDialog.Builder(this)
+                .setTitle("OpenSubtitles Login")
+                .setMessage("Enter your API key and account details.")
+                .setView(form)
+                .setNegativeButton("Cancel", null)
+                 .setPositiveButton("Sign In", (dialog, which) -> {
+                    String key = apiKey.getText().toString().trim();
+                    String user = username.getText().toString().trim();
+                    String pass = password.getText().toString();
+                    if (key.isEmpty() || user.isEmpty() || pass.isEmpty()) {
+                        Toast.makeText(this, "Enter all three fields",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    try {
+                        prefs.edit()
+                                .putString("opensubtitles_api_enc", CatalogCrypto.encrypt(key))
+                                .putString("opensubtitles_user_enc", CatalogCrypto.encrypt(user))
+                                .putString("opensubtitles_pass_enc", CatalogCrypto.encrypt(pass))
+                                .apply();
+                    } catch (Exception e) {
+                        Toast.makeText(this, "Could not securely save credentials",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    Toast.makeText(this, "Signing in to OpenSubtitles...",
+                            Toast.LENGTH_SHORT).show();
+                    new Thread(() -> {
+                        try {
+                            org.json.JSONObject result =
+                                    OpenSubtitlesClient.login(key, user, pass);
+                            String token = result.getString("token");
+                            String baseUrl = result.optString(
+                                    "base_url", "https://api.opensubtitles.com");
+                            prefs.edit()
+                                    .putString("opensubtitles_token_enc",
+                                            CatalogCrypto.encrypt(token))
+                                    .putString("opensubtitles_base_url_enc",
+                                            CatalogCrypto.encrypt(baseUrl))
+                                    .apply();
+                            runOnUiThread(() -> Toast.makeText(this,
+                                    "OpenSubtitles login successful",
+                                    Toast.LENGTH_LONG).show());
+                        } catch (Exception e) {
+                            runOnUiThread(() -> Toast.makeText(this,
+                                    "OpenSubtitles login failed: " + e.getMessage(),
+                                    Toast.LENGTH_LONG).show());
+                        }
+                    }).start();
+                })
+                .show();
     }
 
     private void addSettingsSwitch(LinearLayout panel,
