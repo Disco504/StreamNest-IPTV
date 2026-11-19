@@ -507,7 +507,22 @@ public class PlayerActivity extends Activity {
                         ? artwork.get(index) : getIntent().getStringExtra("vod_artwork");
                 item.put("artwork", image == null ? "" : image);
                 item.put("updated", System.currentTimeMillis());
-                item.put("type", getIntent().hasExtra("series_id") ? "episode" : "movie");
+                boolean isEpisode = getIntent().hasExtra("series_id");
+                item.put("type", isEpisode ? "episode" : "movie");
+                if (isEpisode) {
+                    ArrayList<String> ids = getIntent().getStringArrayListExtra(
+                            "series_episode_ids");
+                    String episodeId = ids != null && index >= 0 && index < ids.size()
+                            ? ids.get(index) : "";
+                    item.put("episode_id", episodeId);
+                    item.put("series_id", getIntent().getStringExtra("series_id"));
+                    item.put("series_name", getIntent().getStringExtra("series_name"));
+                    item.put("series_artwork", getIntent().getStringExtra("series_artwork"));
+                } else {
+                    item.put("vod_id", getIntent().getStringExtra("vod_id"));
+                    item.put("extension", getIntent().getStringExtra("vod_extension"));
+                }
+                item.put("playlist_id", getIntent().getStringExtra("active_playlist_id"));
                 store.put(key, item);
             } catch (Exception e) {
                 Log.e(TAG, "Could not save VOD progress", e);

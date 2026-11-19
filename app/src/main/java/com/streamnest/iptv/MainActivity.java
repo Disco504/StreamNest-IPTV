@@ -195,6 +195,7 @@ public class MainActivity extends Activity {
         String episodeArtwork = "";
         String episodeDescription = "";
         String episodeNumber = "";
+        String resumeEpisodeId = "";
 
         Channel(String name, String url, String group, String tvgId) {
             this(name, url, group, tvgId, "");
@@ -877,6 +878,9 @@ public class MainActivity extends Activity {
 
         ArrayList<String[]> ordered = new ArrayList<>();
         ordered.add(new String[]{"__ALL_MOVIES__", "ALL MOVIES"});
+            if (getActiveMovieProgress().length() > 0) {
+                ordered.add(new String[]{"__CONTINUE_WATCHING__", "CONTINUE WATCHING"});
+            }
             ordered.add(new String[]{"__MY_LIST__", "MY LIST"});
 
         String[] releases = null;
@@ -1160,6 +1164,11 @@ public class MainActivity extends Activity {
                 }
                 tvVodCategoryList.addView(createTvVodCategoryItem(
                         "__ALL_MOVIES__", "ALL MOVIES", base, user, pass));
+                if (getActiveMovieProgress().length() > 0) {
+                    tvVodCategoryList.addView(createTvVodCategoryItem(
+                            "__CONTINUE_WATCHING__", "CONTINUE WATCHING",
+                            base, user, pass));
+                }
                 tvVodCategoryList.addView(createTvVodCategoryItem(
                         "__MY_LIST__", "MY LIST", base, user, pass));
 
@@ -1226,6 +1235,8 @@ public class MainActivity extends Activity {
             try {
                 if ("__MY_LIST__".equals(categoryId)) {
                     loaded.addAll(buildSavedMovieChannels(base, user, pass));
+                } else if ("__CONTINUE_WATCHING__".equals(categoryId)) {
+                    loaded.addAll(buildContinueWatchingMovies(base, user, pass));
                 } else {
                 String api = base + "/player_api.php?username="
                         + apiEncode(user) + "&password=" + apiEncode(pass);
@@ -1404,6 +1415,8 @@ public class MainActivity extends Activity {
             try {
                 if ("__MY_LIST__".equals(categoryId)) {
                     loaded.addAll(buildSavedMovieChannels(base, user, pass));
+                } else if ("__CONTINUE_WATCHING__".equals(categoryId)) {
+                    loaded.addAll(buildContinueWatchingMovies(base, user, pass));
                 } else {
                 String api = base + "/player_api.php?username="
                         + apiEncode(user) + "&password=" + apiEncode(pass);
@@ -1624,6 +1637,110 @@ public class MainActivity extends Activity {
         return movies;
     }
 
+
+    private JSONObject getActiveMovieProgress() {
+        JSONObject result = new JSONObject();
+        try {
+            String playlist = getPreferences(MODE_PRIVATE)
+                    .getString("active_playlist_id", "");
+            JSONObject store = new JSONObject(getSharedPreferences(
+                    "vod_progress", MODE_PRIVATE).getString("items", "{}"));
+            ArrayList<JSONObject> entries = new ArrayList<>();
+            java.util.Iterator<String> keys = store.keys();
+            while (keys.hasNext()) {
+                JSONObject item = store.optJSONObject(keys.next());
+                if (item == null || !"movie".equals(item.optString("type"))
+                        || !playlist.equals(item.optString("playlist_id"))
+                        || item.optString("vod_id").isEmpty()) continue;
+                entries.add(item);
+            }
+            Collections.sort(entries, (a, b) ->
+                    Long.compare(b.optLong("updated"), a.optLong("updated")));
+            for (int i = 0; i < entries.size(); i++) {
+                result.put(String.valueOf(i), entries.get(i));
+            }
+        } catch (Exception e) {
+            android.util.Log.e("StreamNest", "Could not read movie progress", e);
+        }
+        return result;
+    }
+
+    private ArrayList<Channel> buildContinueWatchingMovies(
+            String base, String user, String pass) {
+        ArrayList<Channel> movies = new ArrayList<>();
+        JSONObject progress = getActiveMovieProgress();
+        for (int i = 0; i < progress.length(); i++) {
+            JSONObject item = progress.optJSONObject(String.valueOf(i));
+            if (item == null) continue;
+            String id = item.optString("vod_id", "");
+            String extension = item.optString("extension", "mp4");
+            String url = base + "/movie/" + Uri.encode(user) + "/"
+                    + Uri.encode(pass) + "/" + Uri.encode(id) + "."
+                    + Uri.encode(extension);
+            Channel movie = new Channel(item.optString("title", "Movie"),
+                    url, "CONTINUE WATCHING", "",
+                    item.optString("artwork", ""));
+            movie.vodId = id;
+            movie.vodExtension = extension;
+            movies.add(movie);
+        }
+        return movies;
+    }
+
+    private ArrayList<JSONObject> getActiveSeriesProgress() {
+        ArrayList<JSONObject> entries = new ArrayList<>();
+        try {
+            String playlist = getPreferences(MODE_PRIVATE)
+                    .getString("active_playlist_id", "");
+            JSONObject store = new JSONObject(getSharedPreferences(
+                    "vod_progress", MODE_PRIVATE).getString("items", "{}"));
+            java.util.Iterator<String> keys = store.keys();
+            while (keys.hasNext()) {
+                JSONObject item = store.optJSONObject(keys.next());
+                if (item == null || !"episode".equals(item.optString("type"))
+                        || !playlist.equals(item.optString("playlist_id"))
+                        || item.optString("series_id").isEmpty()
+                        || item.optString("episode_id").isEmpty()) continue;
+                entries.add(item);
+            }
+            Collections.sort(entries, (a, b) ->
+                    Long.compare(b.optLong("updated"), a.optLong("updated")));
+            ArrayList<JSONObject> unique = new ArrayList<>();
+            java.util.HashSet<String> seen = new java.util.HashSet<>();
+            for (JSONObject item : entries) {
+                if (seen.add(item.optString("series_id"))) unique.add(item);
+            }
+            return unique;
+        } catch (Exception e) {
+            android.util.Log.e("StreamNest", "Could not read series progress", e);
+            return entries;
+        }
+    }
+
+    private ArrayList<Channel> buildContinueWatchingSeries() {
+        ArrayList<Channel> shows = new ArrayList<>();
+        for (JSONObject item : getActiveSeriesProgress()) {
+            Channel series = new Channel(item.optString("series_name", "Series"),
+                    item.optString("series_id"), "CONTINUE WATCHING", "",
+                    item.optString("series_artwork", ""));
+            series.resumeEpisodeId = item.optString("episode_id", "");
+            shows.add(series);
+        }
+        return shows;
+    }
+
+    private ArrayList<Channel> buildSavedSeriesChannels() {
+        ArrayList<Channel> shows = new ArrayList<>();
+        JSONArray saved = getSavedSeriesList();
+        for (int i = 0; i < saved.length(); i++) {
+            JSONObject item = saved.optJSONObject(i);
+            if (item == null || item.optString("id").isEmpty()) continue;
+            shows.add(new Channel(item.optString("name", "Series"),
+                    item.optString("id"), "FAVORITES", "",
+                    item.optString("logo", "")));
+        }
+        return shows;
+    }
 
     private void showMovieDetails(Channel movie, View returnFocus) {
         if (movie == null) return;
@@ -1944,6 +2061,7 @@ public class MainActivity extends Activity {
         intent.putExtra("channel_name", item.name);
         intent.putExtra("stream_url", item.url);
         intent.putExtra("vod_id", item.vodId);
+        intent.putExtra("vod_extension", item.vodExtension);
         intent.putExtra("vod_artwork", item.logoUrl);
         intent.putExtra("is_live_stream", false);
         intent.putExtra("active_playlist_id", getPreferences(MODE_PRIVATE).getString("active_playlist_id", ""));
@@ -1952,7 +2070,7 @@ public class MainActivity extends Activity {
         startActivity(intent);
     }
 
-    private void playSeriesEpisode(ArrayList<Channel> episodes, int index) {
+    private void playSeriesEpisode(Channel series, ArrayList<Channel> episodes, int index) {
         if (episodes == null || index < 0 || index >= episodes.size()) return;
 
         ArrayList<String> urls = new ArrayList<>();
@@ -1986,6 +2104,8 @@ public class MainActivity extends Activity {
         intent.putStringArrayListExtra("series_episode_ids", episodeIds);
         intent.putStringArrayListExtra("series_episode_artwork", episodeArtwork);
         intent.putExtra("series_id", episodes.get(index).xtreamStreamId);
+        intent.putExtra("series_name", series.name);
+        intent.putExtra("series_artwork", series.logoUrl);
         intent.putExtra("auto_play_next_episode",
                 getPreferences(MODE_PRIVATE).getBoolean("auto_play_next_episode", false));
         startActivity(intent);
@@ -2224,22 +2344,25 @@ public class MainActivity extends Activity {
             final String error = failure;
             runOnUiThread(() -> {
                 tvSeriesCategoryList.removeAllViews();
-                if (error != null) {
-                    tvSeriesStatus.setText("Unable to load categories: " + error);
-                    return;
+                ArrayList<String[]> allCategories = new ArrayList<>();
+                if (!getActiveSeriesProgress().isEmpty()) {
+                    allCategories.add(new String[]{
+                            "__SERIES_CONTINUE_WATCHING__", "CONTINUE WATCHING"});
                 }
-                if (categories.isEmpty()) {
-                    tvSeriesStatus.setText("No TV series categories were returned.");
-                    return;
+                allCategories.add(new String[]{"__SERIES_FAVORITES__", "FAVORITES"});
+                if (error == null) {
+                    allCategories.addAll(categories);
+                } else {
+                    tvSeriesStatus.setText("Unable to load provider categories: " + error);
                 }
 
-                for (String[] category : categories) {
+                for (String[] category : allCategories) {
                     tvSeriesCategoryList.addView(createTvSeriesCategoryItem(
                             category[0], category[1], base, user, pass));
                 }
 
-                String[] selected = categories.get(0);
-                for (String[] category : categories) {
+                String[] selected = allCategories.get(0);
+                for (String[] category : allCategories) {
                     if (category[0].equals(tvSeriesSelectedCategoryId)) {
                         selected = category;
                         break;
@@ -2323,28 +2446,34 @@ public class MainActivity extends Activity {
             ArrayList<Channel> loaded = new ArrayList<>();
             String failure = null;
             try {
-                String api = base + "/player_api.php?username="
-                        + apiEncode(user) + "&password=" + apiEncode(pass);
-                String streamsUrl = api + "&action=get_series&category_id="
-                        + apiEncode(categoryId);
+                    if ("__SERIES_CONTINUE_WATCHING__".equals(categoryId)) {
+                        loaded.addAll(buildContinueWatchingSeries());
+                    } else if ("__SERIES_FAVORITES__".equals(categoryId)) {
+                        loaded.addAll(buildSavedSeriesChannels());
+                    } else {
+                        String api = base + "/player_api.php?username="
+                                + apiEncode(user) + "&password=" + apiEncode(pass);
+                        String streamsUrl = api + "&action=get_series&category_id="
+                                + apiEncode(categoryId);
 
-                forEachXtreamObject(streamsUrl, item -> {
-                    String id = item.has("series_id")
-                            && !item.get("series_id").isJsonNull()
-                            ? item.get("series_id").getAsString() : "";
-                    if (id.isEmpty()) return;
+                        forEachXtreamObject(streamsUrl, item -> {
+                            String id = item.has("series_id")
+                                    && !item.get("series_id").isJsonNull()
+                                    ? item.get("series_id").getAsString() : "";
+                            if (id.isEmpty()) return;
 
-                    String name = item.has("name")
-                            && !item.get("name").isJsonNull()
-                            ? item.get("name").getAsString() : "Untitled series";
-                    String cover = item.has("cover")
-                            && !item.get("cover").isJsonNull()
-                            ? item.get("cover").getAsString() : "";
+                            String name = item.has("name")
+                                    && !item.get("name").isJsonNull()
+                                    ? item.get("name").getAsString() : "Untitled series";
+                            String cover = item.has("cover")
+                                    && !item.get("cover").isJsonNull()
+                                    ? item.get("cover").getAsString() : "";
 
-                    loaded.add(new Channel(
-                            name, id, categoryName, "", cover));
-                });
-            } catch (Exception e) {
+                            loaded.add(new Channel(
+                                    name, id, categoryName, "", cover));
+                        });
+                    }
+                } catch (Exception e) {
                 failure = e.getMessage() == null
                         ? "Could not load shows." : e.getMessage();
             }
@@ -2720,7 +2849,7 @@ public class MainActivity extends Activity {
             play.setOnFocusChangeListener((v, focused) ->
                     play.setTextColor(focused ? Color.YELLOW : Color.WHITE));
             play.setOnClickListener(v -> {
-                if (!episodes.isEmpty()) playSeriesEpisode(episodes, 0);
+                if (!episodes.isEmpty()) playSeriesEpisode(series, episodes, 0);
             });
 
             TextView myList = label("", 16);
@@ -2731,7 +2860,7 @@ public class MainActivity extends Activity {
             myList.setPadding(0, dp(13), 0, dp(13));
             myList.setBackgroundColor(Color.TRANSPARENT);
             Runnable updateMyListText = () -> myList.setText(
-                    isSeriesSaved(series.url) ? "✓  REMOVE FROM MY LIST" : "+  ADD TO MY LIST");
+                    isSeriesSaved(series.url) ? "✓  REMOVE FROM FAVORITES" : "+  ADD TO FAVORITES");
             updateMyListText.run();
             myList.setOnFocusChangeListener((v, focused) ->
                     myList.setTextColor(focused ? Color.YELLOW : Color.WHITE));
@@ -2848,6 +2977,16 @@ public class MainActivity extends Activity {
                     return;
                 }
 
+                if (series.resumeEpisodeId != null
+                        && !series.resumeEpisodeId.isEmpty()) {
+                    for (int i = 0; i < episodes.size(); i++) {
+                        if (series.resumeEpisodeId.equals(episodes.get(i).vodId)) {
+                            playSeriesEpisode(series, episodes, i);
+                            return;
+                        }
+                    }
+                }
+
                 String currentSeason = "";
                 View firstEpisodeView = null;
                 HorizontalScrollView seasonScroll = null;
@@ -2916,7 +3055,7 @@ public class MainActivity extends Activity {
 
                         card.setOnFocusChangeListener((v, focused) ->
                                 v.setBackgroundColor(focused ? BLUE : PANEL));
-                        card.setOnClickListener(v -> playSeriesEpisode(episodes, selectedEpisodeIndex));
+                        card.setOnClickListener(v -> playSeriesEpisode(series, episodes, selectedEpisodeIndex));
 
                         LinearLayout.LayoutParams cardParams =
                                 new LinearLayout.LayoutParams(
@@ -2965,7 +3104,7 @@ public class MainActivity extends Activity {
                                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
                         row.setOnFocusChangeListener((v, focused) ->
                                 v.setBackgroundColor(focused ? BLUE : PANEL));
-                        row.setOnClickListener(v -> playSeriesEpisode(episodes, selectedEpisodeIndex));
+                        row.setOnClickListener(v -> playSeriesEpisode(series, episodes, selectedEpisodeIndex));
 
                         LinearLayout.LayoutParams params =
                                 new LinearLayout.LayoutParams(
@@ -3142,12 +3281,43 @@ public class MainActivity extends Activity {
         showTvGuide();
     }
 
+    private void styleStreamNestDialog(AlertDialog dialog) {
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(NAVY);
+        background.setCornerRadius(dp(12));
+        background.setStroke(dp(2), BLUE);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(background);
+        }
+        int titleId = getResources().getIdentifier("alertTitle", "id", "android");
+        TextView title = dialog.findViewById(titleId);
+        if (title != null) title.setTextColor(WHITE);
+        int messageId = getResources().getIdentifier("message", "id", "android");
+        TextView message = dialog.findViewById(messageId);
+        if (message != null) message.setTextColor(MUTED);
+        for (int id : new int[]{AlertDialog.BUTTON_POSITIVE,
+                AlertDialog.BUTTON_NEGATIVE, AlertDialog.BUTTON_NEUTRAL}) {
+            if (dialog.getButton(id) != null) {
+                dialog.getButton(id).setTextColor(WHITE);
+            }
+        }
+    }
+
     private void showSearchDialog() {
         EditText input = new EditText(this);
         input.setSingleLine(true);
         input.setHint("Search channels, movies, or TV series");
+        input.setTextColor(WHITE);
+        input.setHintTextColor(MUTED);
+        input.setPadding(dp(12), dp(10), dp(12), dp(10));
+        GradientDrawable inputBg = new GradientDrawable();
+        inputBg.setColor(PANEL);
+        inputBg.setCornerRadius(dp(8));
+        inputBg.setStroke(dp(1), BLUE);
+        input.setBackground(inputBg);
+        input.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
 
-        new AlertDialog.Builder(this)
+        AlertDialog searchDialog = new AlertDialog.Builder(this)
                 .setTitle("Search StreamNest")
                 .setView(input)
                 .setPositiveButton("Search", (dialog, which) -> {
@@ -3182,6 +3352,7 @@ public class MainActivity extends Activity {
                             .setCancelable(false)
                             .create();
                     loadingDialog.show();
+                    styleStreamNestDialog(loadingDialog);
 
                     new Thread(() -> {
                         ArrayList<Channel> results = new ArrayList<>();
@@ -3204,7 +3375,6 @@ public class MainActivity extends Activity {
                             try {
                                 JSONArray movies = getXtreamArray(
                                         api + "&action=get_vod_streams");
-
                                 int movieCount = 0;
                                 for (int i = 0; i < movies.length(); i++) {
                                     JSONObject item = movies.getJSONObject(i);
@@ -3240,8 +3410,9 @@ public class MainActivity extends Activity {
                                 }
                             } catch (Exception e) {
                                 errors.append("Movies: ")
-                                        .append(e.getMessage()).append("\n");
+                                        .append(e.getMessage()).append("\\n");
                             }
+                        }
 
                             try {
                                 JSONArray seriesList = getXtreamArray(
@@ -3289,15 +3460,17 @@ public class MainActivity extends Activity {
                                     message += "\n" + errors;
                                 }
 
-                                new AlertDialog.Builder(this)
+                                AlertDialog emptyDialog = new AlertDialog.Builder(this)
                                         .setTitle("Search Results")
                                         .setMessage(message)
                                         .setPositiveButton("OK", null)
-                                        .show();
+                                .create();
+                        emptyDialog.show();
+                        styleStreamNestDialog(emptyDialog);
                                 return;
                             }
 
-                            new AlertDialog.Builder(this)
+                            AlertDialog resultsDialog = new AlertDialog.Builder(this)
                                     .setTitle("Search Results (" + names.size() + ")")
                                     .setItems(names.toArray(new String[0]),
                                             (resultDialog, index) -> {
@@ -3314,12 +3487,27 @@ public class MainActivity extends Activity {
                                                 }
                                             })
                                     .setNegativeButton("Close", null)
-                                    .show();
+                                .create();
+                        resultsDialog.show();
+                        styleStreamNestDialog(resultsDialog);
                         });
                     }).start();
                 })
                 .setNegativeButton("Cancel", null)
-                .show();
+                .create();
+
+        searchDialog.show();
+        styleStreamNestDialog(searchDialog);
+        input.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+                    || (event != null
+                    && event.getKeyCode() == android.view.KeyEvent.KEYCODE_ENTER
+                    && event.getAction() == android.view.KeyEvent.ACTION_DOWN)) {
+                searchDialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+                return true;
+            }
+            return false;
+        });
     }
 
     private void focusGuideSelectedCategory() {
@@ -3522,17 +3710,25 @@ public class MainActivity extends Activity {
         EditText input = new EditText(this);
         input.setSingleLine(true);
         input.setHint("Enter XMLTV EPG URL");
+        input.setTextColor(WHITE);
+        input.setHintTextColor(MUTED);
+        input.setPadding(dp(12), dp(10), dp(12), dp(10));
+        GradientDrawable inputBg = new GradientDrawable();
+        inputBg.setColor(PANEL);
+        inputBg.setCornerRadius(dp(8));
+        inputBg.setStroke(dp(1), BLUE);
+        input.setBackground(inputBg);
         input.setInputType(InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_VARIATION_URI);
         input.setText(getPreferences(MODE_PRIVATE)
                 .getString("epg_url", ""));
 
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("TV Guide (XMLTV)")
                 .setMessage("Enter the separate EPG/XMLTV URL from your provider.")
                 .setView(input)
                 .setNegativeButton("Cancel", null)
-                .setPositiveButton("Save", (dialog, which) -> {
+                .setPositiveButton("Save", (d, which) -> {
                     String url = input.getText().toString().trim();
                     if (!url.isEmpty()
                             && !url.startsWith("http://")
@@ -3541,16 +3737,31 @@ public class MainActivity extends Activity {
                                 Toast.LENGTH_LONG).show();
                         return;
                     }
-
                     getPreferences(MODE_PRIVATE).edit()
                             .putString("epg_url", url)
                             .apply();
                     Toast.makeText(this, "EPG URL saved",
                             Toast.LENGTH_SHORT).show();
                 })
-                .show();
-    }
+                .create();
 
+        dialog.setOnShowListener(v -> {
+            GradientDrawable background = new GradientDrawable();
+            background.setColor(NAVY);
+            background.setCornerRadius(dp(12));
+            background.setStroke(dp(2), BLUE);
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setBackgroundDrawable(background);
+            }
+            dialog.getButton(-1).setTextColor(WHITE);
+            dialog.getButton(-2).setTextColor(WHITE);
+            int messageId = getResources().getIdentifier(
+                    "message", "id", "android");
+            TextView message = dialog.findViewById(messageId);
+            if (message != null) message.setTextColor(MUTED);
+        });
+        dialog.show();
+    }
 
     private void setPlaylistFocusStyle(TextView view) {
         view.setBackgroundColor(Color.TRANSPARENT);
