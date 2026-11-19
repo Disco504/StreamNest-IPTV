@@ -3412,7 +3412,6 @@ public class MainActivity extends Activity {
                                 errors.append("Movies: ")
                                         .append(e.getMessage()).append("\\n");
                             }
-                        }
 
                             try {
                                 JSONArray seriesList = getXtreamArray(
