@@ -3401,6 +3401,8 @@ public class MainActivity extends Activity {
                                             "",
                                             item.optString("stream_icon", ""));
 
+                                    movie.vodId = id;
+                                    movie.vodExtension = extension;
                                     results.add(movie);
                                     types.add("MOVIE");
                                     names.add("[MOVIE] " + name);
@@ -3469,26 +3471,67 @@ public class MainActivity extends Activity {
                                 return;
                             }
 
-                            AlertDialog resultsDialog = new AlertDialog.Builder(this)
-                                    .setTitle("Search Results (" + names.size() + ")")
-                                    .setItems(names.toArray(new String[0]),
-                                            (resultDialog, index) -> {
-                                                Channel selected = results.get(index);
-                                                String type = types.get(index);
+                            android.widget.ListView resultList = new android.widget.ListView(this);
+                    resultList.setAdapter(new android.widget.ArrayAdapter<String>(
+                        this, android.R.layout.simple_list_item_1, names));
 
-                                                if ("LIVE TV".equals(type)) {
-                                                    playChannel(selected);
-                                                } else if ("MOVIE".equals(type)) {
-                                                    playVodItem(selected);
-                                                } else {
-                                                    showSeriesEpisodes(
-                                                            selected, base, user, pass);
-                                                }
-                                            })
-                                    .setNegativeButton("Close", null)
-                                .create();
-                        resultsDialog.show();
-                        styleStreamNestDialog(resultsDialog);
+                    AlertDialog resultsDialog = new AlertDialog.Builder(this)
+                        .setTitle("Search Results (" + names.size() + ")")
+                        .setView(resultList)
+                        .setNegativeButton("Close", null)
+                        .create();
+
+                    resultList.setOnItemClickListener((parent, view, index, id) -> {
+                        Channel selected = results.get(index);
+                        String type = types.get(index);
+                        resultsDialog.dismiss();
+
+                        if ("LIVE TV".equals(type)) {
+                            playChannel(selected);
+                        } else if ("MOVIE".equals(type)) {
+                            playVodItem(selected);
+                        } else {
+                            showSeriesEpisodes(selected, base, user, pass);
+                        }
+                    });
+
+                    resultList.setOnItemLongClickListener((parent, view, index, id) -> {
+                        Channel selected = results.get(index);
+                        String type = types.get(index);
+                        String message;
+
+                        if ("LIVE TV".equals(type)) {
+                            if (selected.url == null || selected.url.isEmpty()) {
+                                message = "Unable to add to Favorites";
+                            } else if (favorites.add(selected.url)) {
+                                getPreferences(MODE_PRIVATE).edit()
+                                    .putStringSet("favorite_urls",
+                                        new LinkedHashSet<>(favorites)).apply();
+                                message = "Added to Favorites";
+                            } else {
+                                message = "Already in Favorites";
+                            }
+                        } else if ("MOVIE".equals(type)) {
+                            boolean wasSaved = isMovieSaved(selected.vodId);
+                            saveMovieToList(selected);
+                            message = wasSaved ? "Already in MY LIST"
+                                : isMovieSaved(selected.vodId) ? "Added to MY LIST"
+                                : "Unable to add to MY LIST";
+                        } else {
+                            boolean wasSaved = isSeriesSaved(selected.url);
+                            saveSeriesToList(selected);
+                            message = wasSaved ? "Already in Series Favorites"
+                                : isSeriesSaved(selected.url) ? "Added to Series Favorites"
+                                : "Unable to add to Favorites";
+                        }
+
+                        android.widget.Toast.makeText(this, message,
+                            android.widget.Toast.LENGTH_SHORT).show();
+                        return true;
+                    });
+
+                    resultsDialog.show();
+                    styleStreamNestDialog(resultsDialog);
                         });
                     }).start();
                 })
