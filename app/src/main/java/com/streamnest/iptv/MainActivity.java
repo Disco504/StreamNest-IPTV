@@ -6142,7 +6142,7 @@ if (categoryPrograms == null) {
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT));
 
         android.view.View currentTimeMarker = new android.view.View(this);
-        currentTimeMarker.setBackgroundColor(Color.RED);
+        currentTimeMarker.setBackgroundColor(BLUE);
         currentTimeMarker.setElevation(dp(8));
         android.widget.FrameLayout.LayoutParams markerParams =
                 new android.widget.FrameLayout.LayoutParams(
