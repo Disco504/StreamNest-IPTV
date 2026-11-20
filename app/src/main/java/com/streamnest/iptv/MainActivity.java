@@ -1182,6 +1182,9 @@ public class MainActivity extends Activity {
                             category[0], category[1], base, user, pass));
                 }
 
+                int movieFixedCount = 0;
+                while (movieFixedCount < tvVodCategoryList.getChildCount() && String.valueOf(tvVodCategoryList.getChildAt(movieFixedCount).getTag()).startsWith("__")) movieFixedCount++;
+                applySavedCategoryOrder(tvVodCategoryList, "movie_category_order", movieFixedCount);
                 String[] first = loadedCategories.get(0);
                 loadTvVodMovieGrid(first[0], first[1], base, user, pass);
             });
@@ -1205,6 +1208,12 @@ public class MainActivity extends Activity {
             tvVodMainMenuScroll.setVisibility(View.GONE);
             tvVodCategoryScroll.setVisibility(View.GONE);
             loadTvVodMovieGrid(id, name, base, user, pass);
+        });
+        item.setOnLongClickListener(v -> {
+            int fixedCount = 0;
+            while (fixedCount < tvVodCategoryList.getChildCount() && String.valueOf(tvVodCategoryList.getChildAt(fixedCount).getTag()).startsWith("__")) fixedCount++;
+            showCategoryMoveMenu(item, tvVodCategoryList, tvVodCategoryScroll, "movie_category_order", fixedCount);
+            return true;
         });
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -2361,6 +2370,9 @@ public class MainActivity extends Activity {
                             category[0], category[1], base, user, pass));
                 }
 
+                int seriesFixedCount = 0;
+                while (seriesFixedCount < tvSeriesCategoryList.getChildCount() && String.valueOf(tvSeriesCategoryList.getChildAt(seriesFixedCount).getTag()).startsWith("__")) seriesFixedCount++;
+                applySavedCategoryOrder(tvSeriesCategoryList, "series_category_order", seriesFixedCount);
                 String[] selected = allCategories.get(0);
                 for (String[] category : allCategories) {
                     if (category[0].equals(tvSeriesSelectedCategoryId)) {
@@ -2391,6 +2403,12 @@ public class MainActivity extends Activity {
             loadTvSeriesGrid(id, name, base, user, pass);
         });
 
+        item.setOnLongClickListener(v -> {
+            int fixedCount = 0;
+            while (fixedCount < tvSeriesCategoryList.getChildCount() && String.valueOf(tvSeriesCategoryList.getChildAt(fixedCount).getTag()).startsWith("__")) fixedCount++;
+            showCategoryMoveMenu(item, tvSeriesCategoryList, tvSeriesCategoryScroll, "series_category_order", fixedCount);
+            return true;
+        });
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -5273,42 +5291,103 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void saveGuideCategoryOrder(LinearLayout list) {
-        JSONArray saved = new JSONArray();
-        for (int i = 0; i < list.getChildCount(); i++) {
-            Object tag = list.getChildAt(i).getTag();
-            if (tag instanceof String) saved.put((String) tag);
-        }
-        getPreferences(MODE_PRIVATE).edit()
-                .putString("guide_category_order", saved.toString()).apply();
+    private void applySavedCategoryOrder(LinearLayout list, String key, int fixedCount) {
+        try {
+            JSONArray saved = new JSONArray(getPreferences(MODE_PRIVATE).getString(key, "[]"));
+            ArrayList<View> movable = new ArrayList<>();
+            for (int i = fixedCount; i < list.getChildCount(); i++) movable.add(list.getChildAt(i));
+            ArrayList<View> ordered = new ArrayList<>();
+            for (int i = 0; i < saved.length(); i++) {
+                String id = saved.optString(i, "");
+                for (View child : movable) {
+                    if (id.equals(child.getTag()) && !ordered.contains(child)) { ordered.add(child); break; }
+                }
+            }
+            for (View child : movable) if (!ordered.contains(child)) ordered.add(child);
+            while (list.getChildCount() > fixedCount) list.removeViewAt(fixedCount);
+            for (View child : ordered) list.addView(child);
+        } catch (Exception ignored) {}
     }
 
-    private void showGuideCategoryMoveMenu(TextView item, LinearLayout list) {
-        android.widget.PopupMenu menu = new android.widget.PopupMenu(this, item);
-        String[] actions = {"Move Up", "Move Down", "Move to Top", "Move to Bottom"};
-        for (String action : actions) menu.getMenu().add(action);
-        menu.setOnMenuItemClickListener(selected -> {
-            int from = list.indexOfChild(item);
-            int to = from;
-            String action = selected.getTitle().toString();
-            if (action.equals("Move Up")) to--;
-            else if (action.equals("Move Down")) to++;
-            else if (action.equals("Move to Top")) to = 0;
-            else if (action.equals("Move to Bottom")) to = list.getChildCount() - 1;
-            if (to < 0 || to >= list.getChildCount() || to == from) return true;
-            list.removeViewAt(from);
-            list.addView(item, to);
-            saveGuideCategoryOrder(list);
-            if (guideCategoryScrollView != null) {
-                int scrollY = guideCategoryScrollView.getScrollY();
-                guideCategoryScrollView.post(() -> {
-                    guideCategoryScrollView.scrollTo(0, scrollY);
+    private void saveCategoryOrder(LinearLayout list, String key, int fixedCount) {
+        JSONArray order = new JSONArray();
+        for (int i = fixedCount; i < list.getChildCount(); i++) {
+            Object tag = list.getChildAt(i).getTag();
+            if (tag instanceof String) order.put((String) tag);
+        }
+        getPreferences(MODE_PRIVATE).edit().putString(key, order.toString()).apply();
+    }
+
+    private void showCategoryMoveMenu(TextView item, LinearLayout list, ScrollView scroll, String key, int fixedCount) {
+        int from = list.indexOfChild(item);
+        if (from < fixedCount) return;
+        Dialog dialog = new Dialog(this);
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(12, 10, 12, 10);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(PANEL);
+        bg.setCornerRadius(14 * getResources().getDisplayMetrics().density);
+        bg.setStroke(2, WHITE);
+        panel.setBackground(bg);
+        TextView heading = label("CATEGORY ORDER", 15);
+        heading.setTextColor(WHITE);
+        heading.setGravity(Gravity.CENTER);
+        panel.addView(heading, new LinearLayout.LayoutParams(-1, 42));
+        String[] arrows = {"↑", "↓", "⇧", "⇩"};
+        for (int a = 0; a < arrows.length; a++) {
+            final int action = a;
+            Button button = new Button(this);
+            button.setText(arrows[a]);
+            button.setTextSize(29);
+            button.setTextColor(WHITE);
+            button.setAllCaps(false);
+            GradientDrawable idle = new GradientDrawable();
+            idle.setColor(0xFF26364F);
+            idle.setCornerRadius(8);
+            idle.setStroke(1, 0xFF667788);
+            button.setBackground(idle);
+            button.setOnFocusChangeListener((v, focused) -> {
+                GradientDrawable shape = new GradientDrawable();
+                shape.setColor(focused ? BLUE : 0xFF26364F);
+                shape.setCornerRadius(8);
+                shape.setStroke(focused ? 3 : 1, focused ? WHITE : 0xFF667788);
+                button.setBackground(shape);
+            });
+            button.setOnClickListener(v -> {
+                int current = list.indexOfChild(item);
+                int target = current;
+                if (action == 0) target--;
+                if (action == 1) target++;
+                if (action == 2) target = fixedCount;
+                if (action == 3) target = list.getChildCount() - 1;
+                if (target >= fixedCount && target < list.getChildCount() && target != current) {
+                    list.removeViewAt(current);
+                    list.addView(item, target);
+                    saveCategoryOrder(list, key, fixedCount);
+                }
+                dialog.dismiss();
+                scroll.post(() -> {
+                    scroll.smoothScrollTo(0, item.getTop());
                     item.requestFocus();
                 });
-            }
-            return true;
-        });
-        menu.show();
+            });
+            LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, 52);
+            bp.topMargin = 5;
+            panel.addView(button, bp);
+        }
+        dialog.setContentView(panel);
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(false);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.setLayout((int)(230 * getResources().getDisplayMetrics().density), -2);
+        }
+        dialog.show();
+        window = dialog.getWindow();
+        if (window != null) window.setLayout((int)(230 * getResources().getDisplayMetrics().density), -2);
+        panel.getChildAt(1).requestFocus();
     }
 
     private String guideChannelOrderKey(Channel channel) {
@@ -5644,7 +5723,7 @@ public class MainActivity extends Activity {
             item.setLongClickable(true);
             item.setTag(category);
             item.setOnLongClickListener(v -> {
-                showGuideCategoryMoveMenu(item, categoryList);
+                showCategoryMoveMenu(item, categoryList, guideCategoryScrollView, "guide_category_order", 0);
                 return true;
             });
             item.setSelected(false);
