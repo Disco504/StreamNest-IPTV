@@ -36,6 +36,7 @@ import java.util.Date;
 import java.util.Locale;
 import java.text.SimpleDateFormat;
 import androidx.media3.common.PlaybackException;
+import androidx.media3.datasource.HttpDataSource;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.DefaultLoadControl;
@@ -396,6 +397,17 @@ public class PlayerActivity extends Activity {
                 public void onPlayerError(PlaybackException error) {
                     Log.e(TAG, "Playback error: " + error.getErrorCodeName()
                             + ", code=" + error.errorCode, error);
+                    Throwable cause = error;
+                    while (cause != null) {
+                        if (cause instanceof HttpDataSource.InvalidResponseCodeException) {
+                            HttpDataSource.InvalidResponseCodeException httpError =
+                                    (HttpDataSource.InvalidResponseCodeException) cause;
+                            Log.e(TAG, "VOD HTTP status=" + httpError.responseCode
+                                    + ", message=" + httpError.responseMessage);
+                            break;
+                        }
+                        cause = cause.getCause();
+                    }
 
                     runOnUiThread(() -> Toast.makeText(
                             PlayerActivity.this,
