@@ -5324,35 +5324,35 @@ public class MainActivity extends Activity {
         android.app.Dialog dialog = new android.app.Dialog(this);
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(12, 10, 12, 10);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(PANEL);
-        bg.setCornerRadius(14 * getResources().getDisplayMetrics().density);
-        bg.setStroke(2, WHITE);
-        panel.setBackground(bg);
+        panel.setPadding(dp(12), dp(10), dp(12), dp(10));
+        panel.setBackgroundColor(PANEL);
         TextView heading = label("CATEGORY ORDER", 15);
-        heading.setTextColor(WHITE);
-        heading.setGravity(Gravity.CENTER);
-        panel.addView(heading, new LinearLayout.LayoutParams(-1, 42));
+        heading.setGravity(android.view.Gravity.CENTER);
+        heading.setTextColor(Color.WHITE);
+        heading.setPadding(0, dp(4), 0, dp(10));
+        panel.addView(heading);
         String[] arrows = {"↑", "↓", "⇧", "⇩"};
         for (int a = 0; a < arrows.length; a++) {
             final int action = a;
-            android.widget.Button button = new android.widget.Button(this);
-            button.setText(arrows[a]);
-            button.setTextSize(29);
-            button.setTextColor(WHITE);
-            button.setAllCaps(false);
-            GradientDrawable idle = new GradientDrawable();
-            idle.setColor(0xFF26364F);
-            idle.setCornerRadius(8);
-            idle.setStroke(1, 0xFF667788);
-            button.setBackground(idle);
+            TextView button = label(arrows[a], 29);
+            button.setTextColor(Color.WHITE);
+            button.setGravity(android.view.Gravity.CENTER);
+            button.setFocusable(true);
+            button.setClickable(true);
+            String[] descriptions = {"Move Up", "Move Down", "Move to Top", "Move to Bottom"};
+            button.setContentDescription(descriptions[a]);
+            button.setPadding(dp(12), dp(5), dp(12), dp(5));
+            LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(52));
+            bp.setMargins(0, dp(3), 0, dp(3));
+            panel.addView(button, bp);
             button.setOnFocusChangeListener((v, focused) -> {
-                GradientDrawable shape = new GradientDrawable();
+                android.graphics.drawable.GradientDrawable shape =
+                        new android.graphics.drawable.GradientDrawable();
                 shape.setColor(focused ? BLUE : 0xFF26364F);
-                shape.setCornerRadius(8);
-                shape.setStroke(focused ? 3 : 1, focused ? WHITE : 0xFF667788);
-                button.setBackground(shape);
+                shape.setCornerRadius(dp(5));
+                shape.setStroke(dp(1), focused ? Color.WHITE : 0xFF667788);
+                v.setBackground(shape);
             });
             button.setOnClickListener(v -> {
                 int current = list.indexOfChild(item);
@@ -5372,9 +5372,6 @@ public class MainActivity extends Activity {
                     item.requestFocus();
                 });
             });
-            LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, 52);
-            bp.topMargin = 5;
-            panel.addView(button, bp);
         }
         dialog.setContentView(panel);
         dialog.setCancelable(true);
