@@ -5321,7 +5321,7 @@ public class MainActivity extends Activity {
     private void showCategoryMoveMenu(TextView item, LinearLayout list, ScrollView scroll, String key, int fixedCount) {
         int from = list.indexOfChild(item);
         if (from < fixedCount) return;
-        Dialog dialog = new Dialog(this);
+        android.app.Dialog dialog = new android.app.Dialog(this);
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(12, 10, 12, 10);
@@ -5337,7 +5337,7 @@ public class MainActivity extends Activity {
         String[] arrows = {"↑", "↓", "⇧", "⇩"};
         for (int a = 0; a < arrows.length; a++) {
             final int action = a;
-            Button button = new Button(this);
+            android.widget.Button button = new android.widget.Button(this);
             button.setText(arrows[a]);
             button.setTextSize(29);
             button.setTextColor(WHITE);
@@ -5379,7 +5379,7 @@ public class MainActivity extends Activity {
         dialog.setContentView(panel);
         dialog.setCancelable(true);
         dialog.setCanceledOnTouchOutside(false);
-        Window window = dialog.getWindow();
+        android.view.Window window = dialog.getWindow();
         if (window != null) {
             window.setBackgroundDrawableResource(android.R.color.transparent);
             window.setLayout((int)(230 * getResources().getDisplayMetrics().density), -2);
