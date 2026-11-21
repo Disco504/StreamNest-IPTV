@@ -237,8 +237,6 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(NAVY);
         getWindow().setNavigationBarColor(NAVY);
 
-        favorites = new LinkedHashSet<>(getPreferences(MODE_PRIVATE)
-                .getStringSet("favorite_urls", Collections.emptySet()));
 
         screen = new LinearLayout(this);
         screen.setOrientation(LinearLayout.VERTICAL);
@@ -248,6 +246,9 @@ public class MainActivity extends Activity {
         catalogDatabase = new CatalogDatabase(getApplicationContext());
         loadSavedPlaylists();
         migratePlaylistOrderPreferences();
+        migratePlaylistFavorites();
+        favorites = new LinkedHashSet<>(getPreferences(MODE_PRIVATE)
+                .getStringSet(playlistPreferenceKey("favorite_urls"), Collections.emptySet()));
         if (savedPlaylists.isEmpty()) {
             showWelcomeScreen();
         } else {
@@ -369,6 +370,25 @@ public class MainActivity extends Activity {
             }
         }
         if (changed) editor.apply();
+    }
+
+    private void migratePlaylistFavorites() {
+        if (activePlaylistId.isEmpty()) return;
+        android.content.SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+        if (prefs.contains("favorite_urls")) {
+            String scopedKey = playlistPreferenceKey("favorite_urls");
+            android.content.SharedPreferences.Editor editor = prefs.edit();
+            if (!prefs.contains(scopedKey)) {
+                editor.putStringSet(scopedKey,
+                        new LinkedHashSet<>(prefs.getStringSet("favorite_urls", Collections.emptySet())));
+            }
+            editor.remove("favorite_urls").apply();
+        }
+    }
+
+    private void loadPlaylistFavorites() {
+        favorites = new LinkedHashSet<>(getPreferences(MODE_PRIVATE)
+                .getStringSet(playlistPreferenceKey("favorite_urls"), Collections.emptySet()));
     }
 
     private void syncActivePlaylistToConnection() {
@@ -3548,7 +3568,7 @@ public class MainActivity extends Activity {
                                 message = "Unable to add to Favorites";
                             } else if (favorites.add(selected.url)) {
                                 getPreferences(MODE_PRIVATE).edit()
-                                    .putStringSet("favorite_urls",
+                                    .putStringSet(playlistPreferenceKey("favorite_urls"),
                                         new LinkedHashSet<>(favorites)).apply();
                                 message = "Added to Favorites";
                             } else {
@@ -4014,6 +4034,7 @@ public class MainActivity extends Activity {
                         (dialog, which) -> {
                     if (which == 0) {
                         activePlaylistId = profile.id;
+                        loadPlaylistFavorites();
                         syncActivePlaylistToConnection();
                         if ("m3u".equals(profile.type)) {
                             loadPlaylist(profile.url, true);
@@ -4033,6 +4054,8 @@ public class MainActivity extends Activity {
                                     savedPlaylists.remove(profile);
                                     if (wasActive) {
                                         activePlaylistId = savedPlaylists.isEmpty() ? "" : savedPlaylists.get(0).id;
+            if (activePlaylistId.isEmpty()) favorites.clear();
+            else loadPlaylistFavorites();
                                     }
                                     saveSavedPlaylists();
                                     if (savedPlaylists.isEmpty()) {
@@ -4163,6 +4186,7 @@ public class MainActivity extends Activity {
                     profile.username = user;
                     profile.password = pass;
                     activePlaylistId = profile.id;
+                    loadPlaylistFavorites();
                     saveSavedPlaylists();
 
                     getPreferences(MODE_PRIVATE).edit()
@@ -4486,6 +4510,7 @@ public class MainActivity extends Activity {
                     profile.type = "m3u";
                     profile.url = url;
                     activePlaylistId = profile.id;
+                    loadPlaylistFavorites();
                     saveSavedPlaylists();
 
                     getPreferences(MODE_PRIVATE).edit()
@@ -4809,7 +4834,7 @@ public class MainActivity extends Activity {
                 }
 
                 getPreferences(MODE_PRIVATE).edit()
-                        .putStringSet("favorite_urls",
+                        .putStringSet(playlistPreferenceKey("favorite_urls"),
                                 new LinkedHashSet<>(favorites))
                         .apply();
 
@@ -4832,7 +4857,7 @@ public class MainActivity extends Activity {
                 }
 
                 getPreferences(MODE_PRIVATE).edit()
-                        .putStringSet("favorite_urls",
+                        .putStringSet(playlistPreferenceKey("favorite_urls"),
                                 new LinkedHashSet<>(favorites))
                         .apply();
 
@@ -5545,7 +5570,7 @@ public class MainActivity extends Activity {
                     }
 
                     getPreferences(MODE_PRIVATE).edit()
-                            .putStringSet("favorite_urls",
+                            .putStringSet(playlistPreferenceKey("favorite_urls"),
                                     new LinkedHashSet<>(favorites))
                             .apply();
 
