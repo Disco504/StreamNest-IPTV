@@ -397,21 +397,23 @@ public class PlayerActivity extends Activity {
                 public void onPlayerError(PlaybackException error) {
                     Log.e(TAG, "Playback error: " + error.getErrorCodeName()
                             + ", code=" + error.errorCode, error);
+                    String failureDetails = "";
                     Throwable cause = error;
                     while (cause != null) {
                         if (cause instanceof HttpDataSource.InvalidResponseCodeException) {
                             HttpDataSource.InvalidResponseCodeException httpError =
                                     (HttpDataSource.InvalidResponseCodeException) cause;
-                            Log.e(TAG, "VOD HTTP status=" + httpError.responseCode
-                                    + ", message=" + httpError.responseMessage);
+                            failureDetails = "HTTP " + httpError.responseCode
+                                    + ": " + httpError.responseMessage;
                             break;
                         }
                         cause = cause.getCause();
                     }
-
+                    final String message = "Playback failed: "
+                            + error.getErrorCodeName()
+                            + (failureDetails.isEmpty() ? "" : "\n" + failureDetails);
                     runOnUiThread(() -> Toast.makeText(
-                            PlayerActivity.this,
-                            "Playback failed: " + error.getErrorCodeName(),
+                            PlayerActivity.this, message,
                             Toast.LENGTH_LONG).show());
                 }
             });
