@@ -1449,6 +1449,9 @@ public class MainActivity extends Activity {
             }
         }
 
+        if (tvVodNextMovieIndex >= tvVodLoadedMovies.size() && tvVodCurrentGridRow != null) {
+            keepIncompletePosterRowWidth(tvVodCurrentGridRow, tvVodGridColumns);
+        }
         tvVodAppendingMovies = false;
 
         tvVodMovieScroll.post(() -> {
@@ -1458,6 +1461,23 @@ public class MainActivity extends Activity {
                     && content.getHeight()
                     <= tvVodMovieScroll.getHeight() + dp(500)) {
                 appendTvVodMovieBatch();
+            }
+        });
+    }
+
+    private void keepIncompletePosterRowWidth(
+            LinearLayout row, int columns) {
+        if (row == null || columns <= 0) return;
+        row.post(() -> {
+            int cellWidth = row.getWidth() / columns - dp(8);
+            if (cellWidth <= 0) return;
+            for (int i = 0; i < row.getChildCount(); i++) {
+                View child = row.getChildAt(i);
+                LinearLayout.LayoutParams params =
+                        (LinearLayout.LayoutParams) child.getLayoutParams();
+                params.width = cellWidth;
+                params.weight = 0f;
+                child.setLayoutParams(params);
             }
         });
     }
@@ -2680,6 +2700,11 @@ public class MainActivity extends Activity {
             tvSeriesNextShowIndex++;
         }
 
+        if (tvSeriesNextShowIndex >= tvSeriesLoadedShows.size()
+                && tvSeriesCurrentGridRow != null) {
+            keepIncompletePosterRowWidth(
+                    tvSeriesCurrentGridRow, tvSeriesGridColumns);
+        }
         tvSeriesAppendingShows = false;
         tvSeriesGridScroll.post(() -> {
             View content = tvSeriesGridScroll.getChildAt(0);
