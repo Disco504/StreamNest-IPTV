@@ -247,6 +247,7 @@ public class MainActivity extends Activity {
 
         catalogDatabase = new CatalogDatabase(getApplicationContext());
         loadSavedPlaylists();
+        migratePlaylistOrderPreferences();
         if (savedPlaylists.isEmpty()) {
             showWelcomeScreen();
         } else {
@@ -344,6 +345,30 @@ public class MainActivity extends Activity {
             activePlaylistId = savedPlaylists.get(0).id;
             saveSavedPlaylists();
         }
+    }
+
+    private String playlistPreferenceKey(String key) {
+        return "playlist_" + activePlaylistId + "_" + key;
+    }
+
+    private void migratePlaylistOrderPreferences() {
+        if (activePlaylistId.isEmpty()) return;
+        android.content.SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+        String[] keys = {"movie_category_order", "series_category_order",
+                "guide_category_order", "guide_channel_orders"};
+        android.content.SharedPreferences.Editor editor = prefs.edit();
+        boolean changed = false;
+        for (String key : keys) {
+            if (prefs.contains(key)) {
+                String scopedKey = playlistPreferenceKey(key);
+                if (!prefs.contains(scopedKey)) {
+                    editor.putString(scopedKey, prefs.getString(key, ""));
+                }
+                editor.remove(key);
+                changed = true;
+            }
+        }
+        if (changed) editor.apply();
     }
 
     private void syncActivePlaylistToConnection() {
@@ -3954,12 +3979,39 @@ public class MainActivity extends Activity {
         screen.addView(back, backParams);
     }
 
+    private void stylePlaylistDialog(AlertDialog dialog) {
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(NAVY);
+        background.setCornerRadius(dp(12));
+        background.setStroke(dp(2), BLUE);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(background);
+        }
+        for (int button : new int[]{-1, -2, -3}) {
+            if (dialog.getButton(button) != null) {
+                dialog.getButton(button).setTextColor(WHITE);
+            }
+        }
+        int messageId = getResources().getIdentifier("message", "id", "android");
+        TextView message = dialog.findViewById(messageId);
+        if (message != null) message.setTextColor(MUTED);
+        android.widget.ListView list = dialog.getListView();
+        if (list != null) {
+            list.setBackgroundColor(NAVY);
+            for (int i = 0; i < list.getChildCount(); i++) {
+                View child = list.getChildAt(i);
+                if (child instanceof TextView) {
+                    ((TextView) child).setTextColor(WHITE);
+                }
+            }
+        }
+    }
+
     private void showPlaylistActions(PlaylistProfile profile) {
-        new AlertDialog.Builder(this)
+        AlertDialog actions = new AlertDialog.Builder(this)
                 .setTitle(profile.name)
-                .setItems(new String[]{
-                        "Load Playlist", "Edit Playlist", "Delete Playlist"
-                }, (dialog, which) -> {
+                .setItems(new String[]{"Load Playlist", "Edit Playlist", "Delete Playlist"},
+                        (dialog, which) -> {
                     if (which == 0) {
                         activePlaylistId = profile.id;
                         syncActivePlaylistToConnection();
@@ -3969,26 +4021,20 @@ public class MainActivity extends Activity {
                             loadXtreamChannels(profile.server, profile.username, profile.password, true);
                         }
                     } else if (which == 1) {
-                        if ("m3u".equals(profile.type)) {
-                            showPlaylistDialog(profile);
-                        } else {
-                            showXtreamDialog(profile);
-                        }
+                        if ("m3u".equals(profile.type)) showPlaylistDialog(profile);
+                        else showXtreamDialog(profile);
                     } else {
-                        new AlertDialog.Builder(this)
+                        AlertDialog confirm = new AlertDialog.Builder(this)
                                 .setTitle("Delete Playlist")
                                 .setMessage("Delete " + profile.name + "?")
                                 .setNegativeButton("Cancel", null)
                                 .setPositiveButton("Delete", (d, w) -> {
-                                    boolean wasActive =
-                                            profile.id.equals(activePlaylistId);
+                                    boolean wasActive = profile.id.equals(activePlaylistId);
                                     savedPlaylists.remove(profile);
                                     if (wasActive) {
-                                        activePlaylistId = savedPlaylists.isEmpty()
-                                                ? "" : savedPlaylists.get(0).id;
+                                        activePlaylistId = savedPlaylists.isEmpty() ? "" : savedPlaylists.get(0).id;
                                     }
                                     saveSavedPlaylists();
-
                                     if (savedPlaylists.isEmpty()) {
                                         getPreferences(MODE_PRIVATE).edit()
                                                 .remove("playlist_url")
@@ -4001,37 +4047,35 @@ public class MainActivity extends Activity {
                                     } else if (wasActive) {
                                         syncActivePlaylistToConnection();
                                         PlaylistProfile next = savedPlaylists.get(0);
-                                        if ("m3u".equals(next.type)) {
-                                            loadPlaylist(next.url, true);
-                                        } else {
-                                            loadXtreamChannels(next.server, next.username, next.password, true);
-                                        }
+                                        if ("m3u".equals(next.type)) loadPlaylist(next.url, true);
+                                        else loadXtreamChannels(next.server, next.username, next.password, true);
                                     } else {
                                         showPlaylistManager();
                                     }
                                 })
-                                .show();
+                                .create();
+                        confirm.setOnShowListener(v -> stylePlaylistDialog(confirm));
+                        confirm.show();
                     }
                 })
                 .setNegativeButton("Cancel", null)
-                .show();
+                .create();
+        actions.setOnShowListener(v -> stylePlaylistDialog(actions));
+        actions.show();
     }
 
     private void showConnectionDialog() {
-        new AlertDialog.Builder(this)
+        AlertDialog connection = new AlertDialog.Builder(this)
                 .setTitle("Connect Playlist")
-                .setItems(new String[]{
-                        "M3U Playlist",
-                        "Xtream Codes Login"
-                }, (dialog, which) -> {
-                    if (which == 0) {
-                        showPlaylistDialog();
-                    } else {
-                        showXtreamDialog();
-                    }
+                .setItems(new String[]{"M3U Playlist", "Xtream Codes Login"},
+                        (dialog, which) -> {
+                    if (which == 0) showPlaylistDialog();
+                    else showXtreamDialog();
                 })
                 .setNegativeButton("Cancel", null)
-                .show();
+                .create();
+        connection.setOnShowListener(v -> stylePlaylistDialog(connection));
+        connection.show();
     }
 
     private void showXtreamDialog() {
@@ -5278,7 +5322,7 @@ public class MainActivity extends Activity {
     private void applySavedGuideCategoryOrder(java.util.List<String> categories) {
         try {
             JSONArray saved = new JSONArray(getPreferences(MODE_PRIVATE)
-                    .getString("guide_category_order", "[]"));
+                    .getString(playlistPreferenceKey("guide_category_order"), "[]"));
             ArrayList<String> ordered = new ArrayList<>();
             for (int i = 0; i < saved.length(); i++) {
                 String name = saved.optString(i, "");
@@ -5293,7 +5337,7 @@ public class MainActivity extends Activity {
 
     private void applySavedCategoryOrder(LinearLayout list, String key, int fixedCount) {
         try {
-            JSONArray saved = new JSONArray(getPreferences(MODE_PRIVATE).getString(key, "[]"));
+            JSONArray saved = new JSONArray(getPreferences(MODE_PRIVATE).getString(playlistPreferenceKey(key), "[]"));
             ArrayList<View> movable = new ArrayList<>();
             for (int i = fixedCount; i < list.getChildCount(); i++) movable.add(list.getChildAt(i));
             ArrayList<View> ordered = new ArrayList<>();
@@ -5315,7 +5359,7 @@ public class MainActivity extends Activity {
             Object tag = list.getChildAt(i).getTag();
             if (tag instanceof String) order.put((String) tag);
         }
-        getPreferences(MODE_PRIVATE).edit().putString(key, order.toString()).apply();
+        getPreferences(MODE_PRIVATE).edit().putString(playlistPreferenceKey(key), order.toString()).apply();
     }
 
     private void showCategoryMoveMenu(TextView item, LinearLayout list, ScrollView scroll, String key, int fixedCount) {
@@ -5397,7 +5441,7 @@ public class MainActivity extends Activity {
     private void applySavedGuideChannelOrder(String category, ArrayList<Channel> channels) {
         try {
             JSONObject saved = new JSONObject(getPreferences(MODE_PRIVATE)
-                    .getString("guide_channel_orders", "{}"));
+                    .getString(playlistPreferenceKey("guide_channel_orders"), "{}"));
             JSONArray order = saved.optJSONArray(category);
             if (order == null) return;
             ArrayList<Channel> ordered = new ArrayList<>();
@@ -5422,14 +5466,14 @@ public class MainActivity extends Activity {
     private void saveGuideChannelOrder(String category, ArrayList<Channel> channels) {
         try {
             JSONObject saved = new JSONObject(getPreferences(MODE_PRIVATE)
-                    .getString("guide_channel_orders", "{}"));
+                    .getString(playlistPreferenceKey("guide_channel_orders"), "{}"));
             JSONArray order = new JSONArray();
             for (Channel channel : channels) {
                 order.put(guideChannelOrderKey(channel));
             }
             saved.put(category, order);
             getPreferences(MODE_PRIVATE).edit()
-                    .putString("guide_channel_orders", saved.toString()).apply();
+                    .putString(playlistPreferenceKey("guide_channel_orders"), saved.toString()).apply();
         } catch (Exception ignored) {
         }
     }
