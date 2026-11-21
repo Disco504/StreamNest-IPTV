@@ -4953,12 +4953,15 @@ public class MainActivity extends Activity {
     private static class EpgProgram {
         String channelId;
         String title;
+        String description;
         long startMillis;
         long stopMillis;
 
-        EpgProgram(String channelId, String title, long startMillis, long stopMillis) {
+        EpgProgram(String channelId, String title, String description,
+                long startMillis, long stopMillis) {
             this.channelId = channelId;
             this.title = title;
+            this.description = description == null ? "" : description.trim();
             this.startMillis = startMillis;
             this.stopMillis = stopMillis;
         }
@@ -5180,6 +5183,7 @@ public class MainActivity extends Activity {
                     final ArrayList<EpgProgram> loaded = programs;
                     runOnUiThread(() -> {
                         guidePrograms = loaded;
+                        updateGuidePreviewProgramInfo(guidePreviewChannel);
                         renderGuidePrograms(loaded, channelMap, status, categoryList, results);
                     });
                 });
@@ -5211,6 +5215,7 @@ public class MainActivity extends Activity {
 
                     String currentChannel = null;
                     String currentTitle = null;
+                    String currentDescription = null;
                     long currentStart = 0;
                     long currentStop = 0;
                     int event = parser.getEventType();
@@ -5221,6 +5226,7 @@ public class MainActivity extends Activity {
                                 && "programme".equals(parser.getName())) {
                             currentChannel = parser.getAttributeValue(null, "channel");
                             currentTitle = null;
+                            currentDescription = null;
                             currentStart = parseXmltvTime(
                                     parser.getAttributeValue(null, "start"));
                             currentStop = parseXmltvTime(
@@ -5229,15 +5235,21 @@ public class MainActivity extends Activity {
                                 && "title".equals(parser.getName())
                                 && currentChannel != null) {
                             currentTitle = parser.nextText();
+                        } else if (event == XmlPullParser.START_TAG
+                                && "desc".equals(parser.getName())
+                                && currentChannel != null) {
+                            currentDescription = parser.nextText();
                         } else if (event == XmlPullParser.END_TAG
                                 && "programme".equals(parser.getName())) {
                             if (currentChannel != null && currentTitle != null
                                     && currentStart > 0 && currentStop > currentStart) {
                                 programs.add(new EpgProgram(currentChannel,
-                                        currentTitle.trim(), currentStart, currentStop));
+                                        currentTitle.trim(), currentDescription,
+                                        currentStart, currentStop));
                             }
                             currentChannel = null;
                             currentTitle = null;
+                            currentDescription = null;
                         }
                         event = parser.next();
                     }
@@ -5246,6 +5258,7 @@ public class MainActivity extends Activity {
                 final ArrayList<EpgProgram> loaded = programs;
                 runOnUiThread(() -> {
                     guidePrograms = loaded;
+                        updateGuidePreviewProgramInfo(guidePreviewChannel);
                     renderGuidePrograms(loaded, channelMap, status, categoryList, results);
                 });
             } catch (Exception e) {
@@ -5333,7 +5346,7 @@ public class MainActivity extends Activity {
                 if (title != null && !title.trim().isEmpty()
                         && start > 0 && stop > start) {
                     programs.add(new EpgProgram(
-                            channel.tvgId, title.trim(), start, stop));
+                            channel.tvgId, title.trim(), "", start, stop));
                 }
             }
         } finally {
@@ -6372,6 +6385,7 @@ if (categoryPrograms == null) {
         });
 
         final int[] lastWindowIndex = {-1};
+        final long[] lastInfoMinute = {-1L};
         final long twoHoursMillis = 2L * 60L * 60L * 1000L;
         final Runnable[] timelineScroller = new Runnable[1];
         timelineScroller[0] = new Runnable() {
@@ -6379,6 +6393,11 @@ if (categoryPrograms == null) {
             public void run() {
                 long now = System.currentTimeMillis();
                 channelHeader.setText(dateTimeLabel.format(new Date(now)));
+                long infoMinute = now / 60000L;
+                if (infoMinute != lastInfoMinute[0]) {
+                    lastInfoMinute[0] = infoMinute;
+                    updateGuidePreviewProgramInfo(guidePreviewChannel);
+                }
 
                 if (now >= gridEnd) {
                     renderGuideCategoryPrograms(
@@ -6792,6 +6811,57 @@ if (categoryPrograms == null) {
         });
     }
 
+    private void updateGuidePreviewProgramInfo(Channel channel) {
+        if (channel == null || guidePreviewProgramInfoView == null) return;
+
+        long now = System.currentTimeMillis();
+        EpgProgram current = null;
+        EpgProgram next = null;
+        String channelId = channel.tvgId == null
+                ? "" : normalizeEpgId(channel.tvgId);
+
+        if (!channelId.isEmpty()) {
+            for (EpgProgram program : guidePrograms) {
+                if (!channelId.equals(normalizeEpgId(program.channelId))) continue;
+                if (program.startMillis <= now && program.stopMillis > now) {
+                    current = program;
+                }
+                if (program.startMillis > now
+                        && (next == null || program.startMillis < next.startMillis)) {
+                    next = program;
+                }
+            }
+        }
+
+        SimpleDateFormat clock = new SimpleDateFormat("h:mm a", Locale.getDefault());
+        StringBuilder info = new StringBuilder();
+        info.append("Time: ").append(clock.format(new Date(now)));
+
+        if (current != null) {
+            info.append("\nNow: ").append(current.title);
+            info.append("\n").append(clock.format(new Date(current.startMillis)))
+                    .append(" - ").append(clock.format(new Date(current.stopMillis)));
+            if (current.description != null && !current.description.trim().isEmpty()) {
+                info.append("\n").append(current.description.trim());
+            } else {
+                info.append("\nProgramme description unavailable");
+            }
+            if (next != null) info.append("\nUp next: ").append(next.title);
+        } else if (next != null) {
+            info.append("\nNow: No programme information");
+            info.append("\nUp next: ").append(next.title);
+            info.append("\n").append(clock.format(new Date(next.startMillis)))
+                    .append(" - ").append(clock.format(new Date(next.stopMillis)));
+            if (next.description != null && !next.description.trim().isEmpty()) {
+                info.append("\n").append(next.description.trim());
+            }
+        } else {
+            info.append("\nProgramme information unavailable");
+        }
+
+        guidePreviewProgramInfoView.setText(info.toString());
+    }
+
     private void playGuidePreview(Channel channel) {
         if (channel.url == null || channel.url.trim().isEmpty()
                 || previewPlayerView == null) {
@@ -6808,21 +6878,7 @@ if (categoryPrograms == null) {
             guidePreviewChannelNameView.setText(channel.name);
         }
 
-        String currentProgram = "Programme information unavailable";
-        long now = System.currentTimeMillis();
-        for (EpgProgram program : guidePrograms) {
-            if (channel.tvgId != null
-                    && normalizeEpgId(channel.tvgId).equals(normalizeEpgId(program.channelId))
-                    && program.startMillis <= now
-                    && program.stopMillis > now) {
-                currentProgram = program.title;
-                break;
-            }
-        }
-        if (guidePreviewProgramInfoView != null) {
-            guidePreviewProgramInfoView.setText("Time: " + new SimpleDateFormat("h:mm a", Locale.getDefault()).format(new Date()) + "  |  Now: " + currentProgram);
-        }
-
+        updateGuidePreviewProgramInfo(channel);
         if (channel.url.equals(previewChannelUrl) && previewPlayer != null) {
             return;
         }
