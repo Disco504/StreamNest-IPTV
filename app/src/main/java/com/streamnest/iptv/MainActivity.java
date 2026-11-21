@@ -5438,10 +5438,9 @@ public class MainActivity extends Activity {
                     list.addView(item, target);
                     saveCategoryOrder(list, key, fixedCount);
                 }
-                dialog.dismiss();
                 scroll.post(() -> {
                     scroll.smoothScrollTo(0, item.getTop());
-                    item.requestFocus();
+                    button.requestFocus();
                 });
             });
         }
