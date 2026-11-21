@@ -424,6 +424,61 @@ public class MainActivity extends Activity {
         editor.putString("active_playlist_id", activePlaylistId).apply();
     }
 
+    private void restoreXtreamCache(
+            String base, String username, String password,
+            boolean launchAfterLoad) {
+        new Thread(() -> {
+            ArrayList<Channel> cached = new ArrayList<>();
+            try {
+                String providerKey = CatalogDatabase.makeProviderKey(
+                        base + "|" + username);
+                int count = catalogDatabase.getCatalogCount(
+                        providerKey, "live", null);
+
+                for (int offset = 0; offset < count; offset += 500) {
+                    ArrayList<CatalogDatabase.CatalogItem> page =
+                            catalogDatabase.getCatalogPage(
+                                    providerKey, "live", null, 500, offset);
+                    for (CatalogDatabase.CatalogItem item : page) {
+                        String id = item.itemId;
+                        if (id == null || id.isEmpty()) continue;
+
+                        String extension = item.extra;
+                        if (extension == null || extension.isEmpty()) {
+                            extension = "ts";
+                        }
+
+                        String url = base + "/live/"
+                                + Uri.encode(username) + "/"
+                                + Uri.encode(password) + "/"
+                                + Uri.encode(id) + "."
+                                + Uri.encode(extension);
+
+                        cached.add(new Channel(
+                                item.name, url, item.category,
+                                item.epgId, item.artworkUrl, id));
+                    }
+                }
+            } catch (Exception e) {
+                android.util.Log.e("StreamNest",
+                        "Cached Xtream restore failed", e);
+            }
+
+            runOnUiThread(() -> {
+                if (cached.isEmpty()) {
+                    loadXtreamChannels(
+                            base, username, password, launchAfterLoad);
+                    return;
+                }
+
+                channels = cached;
+                selectedCategory = "All Channels";
+                if (launchAfterLoad) showTvGuide();
+                loadXtreamChannels(base, username, password, false);
+            });
+        }).start();
+    }
+
     private void restoreSavedConnection() {
         android.content.SharedPreferences prefs =
                 getPreferences(MODE_PRIVATE);
@@ -441,7 +496,7 @@ public class MainActivity extends Activity {
                         prefs.getBoolean("launch_live_tv_on_boot", true);
                 startupGuidePending = launchOnBoot;
                 startupPreviewSuppressed = launchOnBoot;
-                loadXtreamChannels(server, username, password, launchOnBoot);
+                restoreXtreamCache(server, username, password, launchOnBoot);
             } else {
                 Toast.makeText(this,
                         "Please log in to Xtream Codes once more to save your password.",
@@ -4335,8 +4390,10 @@ public class MainActivity extends Activity {
     private void loadXtreamChannels(
             String base, String username, String password,
             boolean launchAfterLoad) {
-        Toast.makeText(this, "Connecting to provider...",
-                Toast.LENGTH_SHORT).show();
+        if (launchAfterLoad || channels.isEmpty()) {
+            Toast.makeText(this, "Connecting to provider...",
+                    Toast.LENGTH_SHORT).show();
+        }
 
         new Thread(() -> {
             ArrayList<Channel> loaded = new ArrayList<>();
@@ -4443,15 +4500,21 @@ public class MainActivity extends Activity {
 
             final String error = failure;
             runOnUiThread(() -> {
+                boolean keepExisting = !launchAfterLoad && !channels.isEmpty();
+
                 if (error != null) {
-                    Toast.makeText(this,
-                            "Xtream login failed. Check the server, credentials and connection.",
-                            Toast.LENGTH_LONG).show();
+                    if (!keepExisting) {
+                        Toast.makeText(this,
+                                "Xtream login failed. Check the server, credentials and connection.",
+                                Toast.LENGTH_LONG).show();
+                    }
                 } else if (loaded.isEmpty()) {
-                    Toast.makeText(this,
-                            "Login returned no live channels.",
-                            Toast.LENGTH_LONG).show();
-                } else {
+                    if (!keepExisting) {
+                        Toast.makeText(this,
+                                "Login returned no live channels.",
+                                Toast.LENGTH_LONG).show();
+                    }
+                } else if (!keepExisting) {
                     channels = loaded;
                     selectedCategory = "All Channels";
                     if (launchAfterLoad) showTvGuide();
