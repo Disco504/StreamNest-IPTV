@@ -37,6 +37,9 @@ import java.util.Locale;
 import java.text.SimpleDateFormat;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.datasource.HttpDataSource;
+import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.datasource.DefaultDataSource;
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.DefaultLoadControl;
@@ -374,7 +377,14 @@ public class PlayerActivity extends Activity {
                             isLiveStream ? 1500 : 2500,
                             isLiveStream ? 4000 : 8000)
                     .build();
+            DefaultHttpDataSource.Factory httpFactory =
+                    new DefaultHttpDataSource.Factory()
+                            .setAllowCrossProtocolRedirects(true);
+            DefaultDataSource.Factory dataSourceFactory =
+                    new DefaultDataSource.Factory(this, httpFactory);
             player = new ExoPlayer.Builder(this)
+                    .setMediaSourceFactory(
+                            new DefaultMediaSourceFactory(dataSourceFactory))
                     .setLoadControl(loadControl)
                     .build();
             playerView.setPlayer(player);
