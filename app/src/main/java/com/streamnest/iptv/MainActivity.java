@@ -27,6 +27,9 @@ import java.util.Map;
 
 import androidx.media3.common.MediaItem;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.datasource.DefaultDataSource;
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.ui.PlayerView;
 
 import android.app.Activity;
@@ -6764,7 +6767,15 @@ if (categoryPrograms == null) {
 
         try {
             if (previewPlayer == null) {
-                previewPlayer = new ExoPlayer.Builder(this).build();
+                DefaultHttpDataSource.Factory httpFactory =
+                        new DefaultHttpDataSource.Factory()
+                                .setAllowCrossProtocolRedirects(true);
+                DefaultDataSource.Factory dataSourceFactory =
+                        new DefaultDataSource.Factory(this, httpFactory);
+                previewPlayer = new ExoPlayer.Builder(this)
+                        .setMediaSourceFactory(
+                                new DefaultMediaSourceFactory(dataSourceFactory))
+                        .build();
                 previewPlayerView.setPlayer(previewPlayer);
             }
 
