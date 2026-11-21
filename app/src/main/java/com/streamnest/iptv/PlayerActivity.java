@@ -405,6 +405,19 @@ public class PlayerActivity extends Activity {
                                     (HttpDataSource.InvalidResponseCodeException) cause;
                             failureDetails = "HTTP " + httpError.responseCode
                                     + ": " + httpError.responseMessage;
+                            for (java.util.Map.Entry<String, java.util.List<String>> header
+                                    : httpError.headerFields.entrySet()) {
+                                if ("Location".equalsIgnoreCase(header.getKey())
+                                        && header.getValue() != null
+                                        && !header.getValue().isEmpty()) {
+                                    android.net.Uri redirect =
+                                            android.net.Uri.parse(header.getValue().get(0));
+                                    failureDetails += "\nRedirect: "
+                                            + redirect.getScheme() + " / "
+                                            + redirect.getHost();
+                                    break;
+                                }
+                            }
                             break;
                         }
                         cause = cause.getCause();
