@@ -6166,11 +6166,9 @@ if (categoryPrograms == null) {
                 for (int blockIndex = 0; blockIndex < 12; blockIndex++) {
                     long blockStart = gridStart + blockIndex * twoHours;
                     long blockEnd = blockStart + twoHours;
-                    TextView cell = label(rowName, 12);
-                    cell.setGravity(android.view.Gravity.CENTER);
-                    cell.setPadding(dp(4), dp(2), dp(4), dp(2));
-                    cell.setMaxLines(2);
-                    cell.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    android.widget.FrameLayout brick =
+                            new android.widget.FrameLayout(this);
+                    TextView cell = label("", 12);
                     configureGuideNoInfoBrick(cell, rowChannel);
                     cell.setOnClickListener(v -> {
                         long clickTime = System.currentTimeMillis();
@@ -6183,7 +6181,22 @@ if (categoryPrograms == null) {
                             playGuidePreview(rowChannel);
                         }
                     });
-                    row.addView(cell, new LinearLayout.LayoutParams(
+                    brick.addView(cell, new android.widget.FrameLayout.LayoutParams(
+                            -1, -1));
+                    LinearLayout hourLabels = new LinearLayout(this);
+                    hourLabels.setOrientation(LinearLayout.HORIZONTAL);
+                    hourLabels.setGravity(android.view.Gravity.CENTER);
+                    for (int hour = 0; hour < 2; hour++) {
+                        TextView name = label(rowName, 11);
+                        name.setGravity(android.view.Gravity.CENTER);
+                        name.setMaxLines(2);
+                        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                        hourLabels.addView(name, new LinearLayout.LayoutParams(
+                                0, -1, 1f));
+                    }
+                    brick.addView(hourLabels, new android.widget.FrameLayout.LayoutParams(
+                            -1, -1));
+                    row.addView(brick, new LinearLayout.LayoutParams(
                             dp(120 * pixelsPerMinute), rowHeight));
                 }
                 grid.addView(row, new LinearLayout.LayoutParams(
