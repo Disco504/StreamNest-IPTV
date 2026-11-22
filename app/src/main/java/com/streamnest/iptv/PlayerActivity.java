@@ -44,12 +44,16 @@ import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.ui.PlayerView;
+import androidx.media3.ui.AspectRatioFrameLayout;
 
 public class PlayerActivity extends Activity {
 
     private static final String TAG = "StreamNest";
     private ExoPlayer player;
     private PlayerView playerView;
+    private TextView aspectButton;
+    private View aspectPanel;
+    private int aspectMode = 0;
     private String streamUrl;
     private String channelName;
     private String channelLogo;
@@ -152,6 +156,7 @@ public class PlayerActivity extends Activity {
         clockParams.setMargins(0, dp(18), dp(24), 0);
         clockView.setVisibility(View.GONE);
         rootLayout.addView(clockView, clockParams);
+        addAspectControls();
 
         setContentView(rootLayout);
     }
@@ -186,6 +191,102 @@ public class PlayerActivity extends Activity {
                 recentChannels.add(new RecentChannel(item.optString("name", "Channel"), url, item.optString("logo", "")));
             }
         } catch (Exception e) { Log.e(TAG, "Could not load recent channels", e); }
+    }
+
+    private void applyAspectMode() {
+        if (playerView == null) return;
+        int[] modes = {
+                AspectRatioFrameLayout.RESIZE_MODE_FIT,
+                AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
+                AspectRatioFrameLayout.RESIZE_MODE_FILL
+        };
+        aspectMode = Math.max(0, Math.min(2, aspectMode));
+        playerView.setResizeMode(modes[aspectMode]);
+        getSharedPreferences("player_settings", MODE_PRIVATE)
+                .edit().putInt("aspect_mode", aspectMode).apply();
+    }
+
+    private void addAspectControls() {
+        aspectMode = getSharedPreferences("player_settings", MODE_PRIVATE)
+                .getInt("aspect_mode", 0);
+        applyAspectMode();
+
+        aspectButton = new TextView(this);
+        aspectButton.setText("⚙ SETTINGS");
+        aspectButton.setTextColor(Color.WHITE);
+        aspectButton.setTextSize(14);
+        aspectButton.setGravity(Gravity.CENTER);
+        aspectButton.setPadding(dp(14), dp(9), dp(14), dp(9));
+        aspectButton.setBackground(panelBackground(NAVY));
+        aspectButton.setFocusable(true);
+        aspectButton.setClickable(true);
+        aspectButton.setOnClickListener(v -> toggleAspectPanel());
+
+        FrameLayout.LayoutParams buttonLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.END);
+        buttonLp.setMargins(0, 0, dp(24), dp(24));
+        rootLayout.addView(aspectButton, buttonLp);
+        aspectButton.setId(View.generateViewId());
+        View playPause = playerView.findViewById(
+                androidx.media3.ui.R.id.exo_play_pause);
+        if (playPause != null) {
+            playPause.setNextFocusDownId(aspectButton.getId());
+            aspectButton.setNextFocusUpId(playPause.getId());
+        }
+        aspectButton.setVisibility(View.GONE);
+        playerView.setControllerVisibilityListener(visibility ->
+                aspectButton.setVisibility(
+                        visibility == View.VISIBLE || aspectPanel != null
+                                ? View.VISIBLE : View.GONE));
+    }
+
+    private void toggleAspectPanel() {
+        if (aspectPanel != null) {
+            rootLayout.removeView(aspectPanel);
+            aspectPanel = null;
+            aspectButton.requestFocus();
+            return;
+        }
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(12), dp(10), dp(12), dp(10));
+        panel.setBackground(panelBackground(NAVY));
+
+        TextView title = new TextView(this);
+        title.setText("ASPECT RATIO");
+        title.setTextColor(LIGHT_BLUE);
+        title.setTextSize(16);
+        panel.addView(title);
+
+        String[] labels = {"FIT", "ZOOM", "STRETCH"};
+        for (int i = 0; i < labels.length; i++) {
+            final int mode = i;
+            TextView option = new TextView(this);
+            option.setText(labels[i] + (aspectMode == i ? "  ✓" : ""));
+            option.setTextColor(Color.WHITE);
+            option.setTextSize(16);
+            option.setGravity(Gravity.CENTER_VERTICAL);
+            option.setPadding(dp(14), dp(10), dp(14), dp(10));
+            option.setFocusable(true);
+            option.setBackground(recentRowBackground(aspectMode == i));
+            option.setOnClickListener(v -> {
+                aspectMode = mode;
+                applyAspectMode();
+                rootLayout.removeView(aspectPanel);
+                aspectPanel = null;
+                aspectButton.requestFocus();
+            });
+            panel.addView(option, new LinearLayout.LayoutParams(-1, dp(48)));
+        }
+
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                dp(220), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END);
+        lp.setMargins(0, 0, dp(24), dp(80));
+        rootLayout.addView(panel, lp);
+        aspectPanel = panel;
+        panel.getChildAt(aspectMode + 1).requestFocus();
     }
 
     private int dp(float v) { return (int)(v * getResources().getDisplayMetrics().density + 0.5f); }
@@ -614,19 +715,28 @@ public class PlayerActivity extends Activity {
             }
             if (event.getAction() == KeyEvent.ACTION_UP && (key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_DOWN || key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_ENTER || key == KeyEvent.KEYCODE_BACK || key == KeyEvent.KEYCODE_ESCAPE || key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT)) return true;
         }
-        if (key == KeyEvent.KEYCODE_DPAD_RIGHT && getIntent().getBooleanExtra("is_live_stream", true)) {
+        if (aspectPanel != null && event.getAction() == KeyEvent.ACTION_DOWN
+                && key == KeyEvent.KEYCODE_DPAD_LEFT) {
+            rootLayout.removeView(aspectPanel);
+            aspectPanel = null;
+            aspectButton.requestFocus();
+            return true;
+        }
+        if (aspectPanel != null && key == KeyEvent.KEYCODE_DPAD_RIGHT) {
+            return true;
+        }
+        if (key == KeyEvent.KEYCODE_DPAD_RIGHT
+                && getIntent().getBooleanExtra("is_live_stream", true)) {
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 if (event.getRepeatCount() == 0 && !rightLongPressTriggered) {
                     recentHandler.postDelayed(openRecentRunnable, RECENT_LONG_PRESS_MS);
-                } else if (event.getRepeatCount() > 0) {
-                    return true;
                 }
-                if (rightLongPressTriggered) return true;
-            } else if (event.getAction() == KeyEvent.ACTION_UP) {
+                return true;
+            }
+            if (event.getAction() == KeyEvent.ACTION_UP) {
                 recentHandler.removeCallbacks(openRecentRunnable);
-                boolean handled = rightLongPressTriggered;
                 rightLongPressTriggered = false;
-                if (handled) return true;
+                return true;
             }
         }
         return super.dispatchKeyEvent(event);
