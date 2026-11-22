@@ -7028,6 +7028,22 @@ private void playChannel(Channel channel) {
         Intent intent = new Intent(this, PlayerActivity.class);
         intent.putExtra("channel_name", channel.name);
         intent.putExtra("channel_logo", channel.logoUrl);
+        String programTitle = "";
+        String programDescription = "";
+        String channelId = channel.tvgId == null ? "" : normalizeEpgId(channel.tvgId);
+        long now = System.currentTimeMillis();
+        if (!channelId.isEmpty()) {
+            for (EpgProgram program : guidePrograms) {
+                if (channelId.equals(normalizeEpgId(program.channelId))
+                        && program.startMillis <= now && program.stopMillis > now) {
+                    programTitle = program.title == null ? "" : program.title;
+                    programDescription = program.description == null ? "" : program.description;
+                    break;
+                }
+            }
+        }
+        intent.putExtra("program_title", programTitle);
+        intent.putExtra("program_description", programDescription);
         intent.putExtra("stream_url", channel.url);
         intent.putExtra("is_live_stream", true);
         intent.putExtra("show_on_screen_clock",

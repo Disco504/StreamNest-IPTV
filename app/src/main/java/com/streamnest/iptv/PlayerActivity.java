@@ -57,6 +57,9 @@ public class PlayerActivity extends Activity {
     private String streamUrl;
     private String channelName;
     private String channelLogo;
+    private String programTitle;
+    private String programDescription;
+    private TextView programInfoView;
     private final Handler progressHandler = new Handler(Looper.getMainLooper());
     private String activeProgressKey = "";
     private static final long PROGRESS_SAVE_INTERVAL_MS = 5000;
@@ -115,6 +118,8 @@ public class PlayerActivity extends Activity {
         streamUrl = getIntent().getStringExtra("stream_url");
         channelName = getIntent().getStringExtra("channel_name");
         channelLogo = getIntent().getStringExtra("channel_logo");
+        programTitle = getIntent().getStringExtra("program_title");
+        programDescription = getIntent().getStringExtra("program_description");
 
         if (streamUrl == null || streamUrl.trim().isEmpty()) {
             Toast.makeText(this, "Missing channel stream URL",
@@ -156,6 +161,38 @@ public class PlayerActivity extends Activity {
         clockParams.setMargins(0, dp(18), dp(24), 0);
         clockView.setVisibility(View.GONE);
         rootLayout.addView(clockView, clockParams);
+
+        StringBuilder programInfo = new StringBuilder();
+        if (channelName != null && !channelName.trim().isEmpty()) {
+            programInfo.append(channelName.trim());
+        }
+        if (programTitle != null && !programTitle.trim().isEmpty()) {
+            if (programInfo.length() > 0) programInfo.append("\n");
+            programInfo.append(programTitle.trim());
+        }
+        if (programDescription != null && !programDescription.trim().isEmpty()) {
+            if (programInfo.length() > 0) programInfo.append("\n");
+            programInfo.append(programDescription.trim());
+        }
+        programInfoView = new TextView(this);
+        programInfoView.setText(programInfo.toString());
+        programInfoView.setTextColor(Color.WHITE);
+        programInfoView.setTextSize(16);
+        programInfoView.setMaxWidth(dp(520));
+        programInfoView.setMaxLines(5);
+        programInfoView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        programInfoView.setPadding(dp(14), dp(10), dp(14), dp(10));
+        programInfoView.setBackgroundColor(0xB0000000);
+        programInfoView.setClickable(false);
+        programInfoView.setFocusable(false);
+        FrameLayout.LayoutParams infoParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.START);
+        infoParams.setMargins(dp(24), dp(18), dp(24), 0);
+        programInfoView.setVisibility(View.GONE);
+        rootLayout.addView(programInfoView, infoParams);
+
         addAspectControls();
 
         setContentView(rootLayout);
@@ -235,10 +272,12 @@ public class PlayerActivity extends Activity {
             aspectButton.setNextFocusUpId(playPause.getId());
         }
         aspectButton.setVisibility(View.GONE);
-        playerView.setControllerVisibilityListener(visibility ->
-                aspectButton.setVisibility(
-                        visibility == View.VISIBLE || aspectPanel != null
-                                ? View.VISIBLE : View.GONE));
+        playerView.setControllerVisibilityListener(visibility -> {
+            boolean show = visibility == View.VISIBLE || aspectPanel != null;
+            aspectButton.setVisibility(show ? View.VISIBLE : View.GONE);
+            programInfoView.setVisibility(show && programInfoView.length() > 0
+                    ? View.VISIBLE : View.GONE);
+        });
     }
 
     private void toggleAspectPanel() {
