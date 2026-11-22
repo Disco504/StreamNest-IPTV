@@ -618,6 +618,8 @@ public class PlayerActivity extends Activity {
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 if (event.getRepeatCount() == 0 && !rightLongPressTriggered) {
                     recentHandler.postDelayed(openRecentRunnable, RECENT_LONG_PRESS_MS);
+                } else if (event.getRepeatCount() > 0) {
+                    return true;
                 }
                 if (rightLongPressTriggered) return true;
             } else if (event.getAction() == KeyEvent.ACTION_UP) {
