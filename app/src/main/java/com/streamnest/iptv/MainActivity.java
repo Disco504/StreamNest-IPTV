@@ -6273,7 +6273,35 @@ if (categoryPrograms == null) {
             });
                 LinearLayout.LayoutParams brickParams =
                         new LinearLayout.LayoutParams(brickWidth, rowHeight);
-                row.addView(brick, brickParams);
+                if (!isPhoneLayout() && durationMillis >= 120L * 60L * 1000L) {
+                    brick.setGravity(android.view.Gravity.TOP
+                            | android.view.Gravity.CENTER_HORIZONTAL);
+                    brick.setPadding(dp(5), dp(3), dp(5), dp(16));
+
+                    android.widget.FrameLayout frame =
+                            new android.widget.FrameLayout(this);
+                    frame.addView(brick, new android.widget.FrameLayout.LayoutParams(
+                            -1, -1));
+
+                    LinearLayout labels = new LinearLayout(this);
+                    labels.setOrientation(LinearLayout.HORIZONTAL);
+                    for (int i = 0; i < 2; i++) {
+                        TextView channelName = label(rowName, 9);
+                        channelName.setGravity(android.view.Gravity.CENTER);
+                        channelName.setSingleLine(true);
+                        channelName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                        labels.addView(channelName, new LinearLayout.LayoutParams(
+                                0, -1, 1f));
+                    }
+
+                    android.widget.FrameLayout.LayoutParams labelParams =
+                            new android.widget.FrameLayout.LayoutParams(
+                                    -1, dp(15), android.view.Gravity.BOTTOM);
+                    frame.addView(labels, labelParams);
+                    row.addView(frame, brickParams);
+                } else {
+                    row.addView(brick, brickParams);
+                }
 
                 cursor = Math.max(cursor, stopTime);
             }
