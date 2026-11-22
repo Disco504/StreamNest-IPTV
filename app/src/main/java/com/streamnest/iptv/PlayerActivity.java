@@ -272,7 +272,7 @@ public class PlayerActivity extends Activity {
             aspectButton.setNextFocusUpId(playPause.getId());
         }
         aspectButton.setVisibility(View.GONE);
-        playerView.setControllerVisibilityListener(visibility -> {
+        playerView.setControllerVisibilityListener((PlayerView.ControllerVisibilityListener) visibility -> {
             boolean show = visibility == View.VISIBLE || aspectPanel != null;
             aspectButton.setVisibility(show ? View.VISIBLE : View.GONE);
             programInfoView.setVisibility(show && programInfoView.length() > 0
