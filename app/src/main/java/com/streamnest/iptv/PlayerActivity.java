@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import android.util.Log;
 
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.C;
 import androidx.media3.common.MediaMetadata;
 import java.util.ArrayList;
 import java.util.Date;
@@ -45,14 +46,15 @@ import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.ui.PlayerView;
 import androidx.media3.ui.AspectRatioFrameLayout;
+import androidx.media3.ui.TrackSelectionDialogBuilder;
 
 public class PlayerActivity extends Activity {
 
     private static final String TAG = "StreamNest";
     private ExoPlayer player;
     private PlayerView playerView;
-    private TextView aspectButton;
-    private View aspectPanel;
+    private View playbackSettingsButton;
+    private View playbackSettingsPanel;
     private int aspectMode = 0;
     private String streamUrl;
     private String channelName;
@@ -178,22 +180,23 @@ public class PlayerActivity extends Activity {
         programInfoView.setText(programInfo.toString());
         programInfoView.setTextColor(Color.WHITE);
         programInfoView.setTextSize(16);
-        programInfoView.setMaxWidth(dp(520));
+        programInfoView.setMaxWidth(dp(900));
+        programInfoView.setGravity(Gravity.CENTER);
         programInfoView.setMaxLines(5);
         programInfoView.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        programInfoView.setPadding(dp(14), dp(10), dp(14), dp(10));
-        programInfoView.setBackgroundColor(0xB0000000);
+        programInfoView.setPadding(0, 0, 0, 0);
+        programInfoView.setBackgroundColor(Color.TRANSPARENT);
         programInfoView.setClickable(false);
         programInfoView.setFocusable(false);
         FrameLayout.LayoutParams infoParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.START);
-        infoParams.setMargins(dp(24), dp(18), dp(24), 0);
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        infoParams.setMargins(dp(24), 0, dp(24), dp(24));
         programInfoView.setVisibility(View.GONE);
         rootLayout.addView(programInfoView, infoParams);
 
-        addAspectControls();
+        setupPlaybackSettings();
 
         setContentView(rootLayout);
     }
@@ -243,49 +246,39 @@ public class PlayerActivity extends Activity {
                 .edit().putInt("aspect_mode", aspectMode).apply();
     }
 
-    private void addAspectControls() {
+    private void setupPlaybackSettings() {
         aspectMode = getSharedPreferences("player_settings", MODE_PRIVATE)
                 .getInt("aspect_mode", 0);
         applyAspectMode();
 
-        aspectButton = new TextView(this);
-        aspectButton.setText("⚙ SETTINGS");
-        aspectButton.setTextColor(Color.WHITE);
-        aspectButton.setTextSize(14);
-        aspectButton.setGravity(Gravity.CENTER);
-        aspectButton.setPadding(dp(14), dp(9), dp(14), dp(9));
-        aspectButton.setBackground(panelBackground(NAVY));
-        aspectButton.setFocusable(true);
-        aspectButton.setClickable(true);
-        aspectButton.setOnClickListener(v -> toggleAspectPanel());
-
-        FrameLayout.LayoutParams buttonLp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM | Gravity.END);
-        buttonLp.setMargins(0, 0, dp(24), dp(24));
-        rootLayout.addView(aspectButton, buttonLp);
-        aspectButton.setId(View.generateViewId());
-        View playPause = playerView.findViewById(
-                androidx.media3.ui.R.id.exo_play_pause);
-        if (playPause != null) {
-            playPause.setNextFocusDownId(aspectButton.getId());
-            aspectButton.setNextFocusUpId(playPause.getId());
+        playbackSettingsButton = playerView.findViewById(
+                androidx.media3.ui.R.id.exo_settings);
+        if (playbackSettingsButton != null) {
+            playbackSettingsButton.setFocusable(true);
+            playbackSettingsButton.setOnClickListener(
+                    v -> showPlaybackSettingsMenu(0));
         }
-        aspectButton.setVisibility(View.GONE);
-        playerView.setControllerVisibilityListener((PlayerView.ControllerVisibilityListener) visibility -> {
-            boolean show = visibility == View.VISIBLE || aspectPanel != null;
-            aspectButton.setVisibility(show ? View.VISIBLE : View.GONE);
-            programInfoView.setVisibility(show && programInfoView.length() > 0
-                    ? View.VISIBLE : View.GONE);
-        });
+
+        playerView.setControllerVisibilityListener(
+                (PlayerView.ControllerVisibilityListener) visibility -> {
+                    programInfoView.setVisibility(
+                            visibility == View.VISIBLE && programInfoView.length() > 0
+                                    ? View.VISIBLE : View.GONE);
+                });
     }
 
-    private void toggleAspectPanel() {
-        if (aspectPanel != null) {
-            rootLayout.removeView(aspectPanel);
-            aspectPanel = null;
-            aspectButton.requestFocus();
-            return;
+    private void closePlaybackSettings() {
+        if (playbackSettingsPanel != null) {
+            rootLayout.removeView(playbackSettingsPanel);
+            playbackSettingsPanel = null;
+        }
+        if (playbackSettingsButton != null) playbackSettingsButton.requestFocus();
+    }
+
+    private void showPlaybackSettingsMenu(int page) {
+        if (playbackSettingsPanel != null) {
+            rootLayout.removeView(playbackSettingsPanel);
+            playbackSettingsPanel = null;
         }
 
         LinearLayout panel = new LinearLayout(this);
@@ -294,38 +287,82 @@ public class PlayerActivity extends Activity {
         panel.setBackground(panelBackground(NAVY));
 
         TextView title = new TextView(this);
-        title.setText("ASPECT RATIO");
+        title.setText(page == 0 ? "PLAYBACK SETTINGS"
+                : page == 1 ? "VIDEO SPEED" : "ASPECT RATIO");
         title.setTextColor(LIGHT_BLUE);
         title.setTextSize(16);
+        title.setPadding(dp(12), dp(6), dp(12), dp(10));
         panel.addView(title);
 
-        String[] labels = {"FIT", "ZOOM", "STRETCH"};
+        String[] labels = page == 0
+                ? new String[]{"VIDEO SPEED", "AUDIO", "ASPECT RATIO"}
+                : page == 1
+                ? new String[]{"BACK", "0.5x", "0.75x", "1.0x",
+                        "1.25x", "1.5x", "2.0x"}
+                : new String[]{"BACK", "FIT", "ZOOM", "STRETCH"};
+
+        float[] speeds = {0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f};
+
         for (int i = 0; i < labels.length; i++) {
-            final int mode = i;
+            final int item = i;
+            boolean selected = false;
+
+            if (page == 1 && player != null && i > 0) {
+                selected = Math.abs(player.getPlaybackParameters().speed
+                        - speeds[i - 1]) < 0.01f;
+            } else if (page == 2 && i > 0) {
+                selected = aspectMode == i - 1;
+            }
+
             TextView option = new TextView(this);
-            option.setText(labels[i] + (aspectMode == i ? "  ✓" : ""));
+            option.setText(labels[i] + (selected ? "  ✓" : ""));
             option.setTextColor(Color.WHITE);
             option.setTextSize(16);
             option.setGravity(Gravity.CENTER_VERTICAL);
-            option.setPadding(dp(14), dp(10), dp(14), dp(10));
+            option.setPadding(dp(14), dp(8), dp(14), dp(8));
             option.setFocusable(true);
-            option.setBackground(recentRowBackground(aspectMode == i));
+            option.setClickable(true);
+            option.setBackground(recentRowBackground(selected));
+
             option.setOnClickListener(v -> {
-                aspectMode = mode;
-                applyAspectMode();
-                rootLayout.removeView(aspectPanel);
-                aspectPanel = null;
-                aspectButton.requestFocus();
+                if (page == 0) {
+                    if (item == 0) showPlaybackSettingsMenu(1);
+                    if (item == 1) {
+                        closePlaybackSettings();
+                        if (player != null) {
+                            new TrackSelectionDialogBuilder(
+                                    this, "Audio", player, C.TRACK_TYPE_AUDIO)
+                                    .build().show();
+                        }
+                    }
+                    if (item == 2) showPlaybackSettingsMenu(2);
+                } else if (item == 0) {
+                    showPlaybackSettingsMenu(0);
+                } else if (page == 1) {
+                    if (player != null) {
+                        player.setPlaybackParameters(
+                                new androidx.media3.common.PlaybackParameters(
+                                        speeds[item - 1]));
+                    }
+                    showPlaybackSettingsMenu(1);
+                } else {
+                    aspectMode = item - 1;
+                    applyAspectMode();
+                    showPlaybackSettingsMenu(2);
+                }
             });
-            panel.addView(option, new LinearLayout.LayoutParams(-1, dp(48)));
+
+            panel.addView(option,
+                    new LinearLayout.LayoutParams(-1, dp(48)));
         }
 
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                dp(220), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END);
+                dp(260), ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.END);
         lp.setMargins(0, 0, dp(24), dp(80));
         rootLayout.addView(panel, lp);
-        aspectPanel = panel;
-        panel.getChildAt(aspectMode + 1).requestFocus();
+        playbackSettingsPanel = panel;
+        panel.getChildAt(1).requestFocus();
     }
 
     private int dp(float v) { return (int)(v * getResources().getDisplayMetrics().density + 0.5f); }
@@ -754,14 +791,16 @@ public class PlayerActivity extends Activity {
             }
             if (event.getAction() == KeyEvent.ACTION_UP && (key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_DOWN || key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_ENTER || key == KeyEvent.KEYCODE_BACK || key == KeyEvent.KEYCODE_ESCAPE || key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT)) return true;
         }
-        if (aspectPanel != null && event.getAction() == KeyEvent.ACTION_DOWN
-                && key == KeyEvent.KEYCODE_DPAD_LEFT) {
-            rootLayout.removeView(aspectPanel);
-            aspectPanel = null;
-            aspectButton.requestFocus();
+        if (playbackSettingsPanel != null
+                && event.getAction() == KeyEvent.ACTION_DOWN
+                && (key == KeyEvent.KEYCODE_DPAD_LEFT
+                || key == KeyEvent.KEYCODE_BACK
+                || key == KeyEvent.KEYCODE_ESCAPE)) {
+            closePlaybackSettings();
             return true;
         }
-        if (aspectPanel != null && key == KeyEvent.KEYCODE_DPAD_RIGHT) {
+        if (playbackSettingsPanel != null
+                && key == KeyEvent.KEYCODE_DPAD_RIGHT) {
             return true;
         }
         if (key == KeyEvent.KEYCODE_DPAD_RIGHT
