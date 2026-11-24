@@ -323,8 +323,9 @@ public class PlayerActivity extends Activity {
             option.setFocusable(true);
             option.setClickable(true);
             option.setBackground(recentRowBackground(selected));
+            final boolean optionSelected = selected;
             option.setOnFocusChangeListener((v, hasFocus) -> {
-                v.setBackground(recentRowBackground(hasFocus || selected));
+                v.setBackground(recentRowBackground(hasFocus || optionSelected));
             });
 
             option.setOnClickListener(v -> {
