@@ -2256,8 +2256,22 @@ public class MainActivity extends Activity {
     private void playVodExternal(Channel item) {
         if (item == null || item.url == null || item.url.trim().isEmpty()) return;
         try {
+            Uri streamUri = Uri.parse(item.url);
+            String path = streamUri.getLastPathSegment();
+            String extension = "";
+            if (path != null) {
+                int dot = path.lastIndexOf('.');
+                if (dot >= 0 && dot < path.length() - 1) {
+                    extension = path.substring(dot + 1).toLowerCase(Locale.ROOT);
+                }
+            }
+            String mimeType = android.webkit.MimeTypeMap.getSingleton()
+                    .getMimeTypeFromExtension(extension);
+            if (mimeType == null || !mimeType.startsWith("video/")) {
+                mimeType = "video/*";
+            }
             Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(Uri.parse(item.url), "video/*");
+            intent.setDataAndType(streamUri, mimeType);
             startActivity(Intent.createChooser(intent, "Play movie with"));
         } catch (Exception e) {
             Toast.makeText(this, "No compatible external player found.",
