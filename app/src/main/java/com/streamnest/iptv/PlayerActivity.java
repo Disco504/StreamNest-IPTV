@@ -52,6 +52,7 @@ public class PlayerActivity extends Activity {
 
     private static final String TAG = "StreamNest";
     private ExoPlayer player;
+    private boolean resumePlaybackAfterPause = false;
     private PlayerView playerView;
     private View playbackSettingsButton;
     private View playbackSettingsPanel;
@@ -822,6 +823,24 @@ public class PlayerActivity extends Activity {
             }
         }
         return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    protected void onPause() {
+        resumePlaybackAfterPause = player != null && player.getPlayWhenReady();
+        if (player != null) {
+            player.pause();
+        }
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (player != null && resumePlaybackAfterPause && !isFinishing()) {
+            player.play();
+        }
+        resumePlaybackAfterPause = false;
     }
 
     @Override
