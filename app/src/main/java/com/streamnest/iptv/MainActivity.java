@@ -865,21 +865,9 @@ public class MainActivity extends Activity {
                     focusGuideSelectedCategory();
                 }
             } else if (guideCategoryScrollView.getVisibility() == View.VISIBLE) {
-                guideCategoryScrollView.setVisibility(View.GONE);
-                String selectedUrl = guidePreviewChannel != null
-                        ? guidePreviewChannel.url
-                        : getPreferences(MODE_PRIVATE)
-                                .getString("last_channel_url", "");
-                boolean focusedChannel = false;
-                for (View cell : guideChannelNameCells) {
-                    if (selectedUrl != null && selectedUrl.equals(cell.getTag())) {
-                        cell.requestFocus();
-                        focusedChannel = true;
-                        break;
-                    }
-                }
-                if (!focusedChannel && !guideChannelNameCells.isEmpty()) {
-                    guideChannelNameCells.get(0).requestFocus();
+                if (guideMainMenuScroll != null) {
+                    guideMainMenuScroll.setVisibility(View.VISIBLE);
+                    focusFirstGuideMenuItem();
                 }
             } else {
                 guideCategoryScrollView.setVisibility(View.VISIBLE);
@@ -6855,8 +6843,9 @@ if (categoryPrograms == null) {
             Object value = cell.getTag();
             boolean playing = guidePreviewChannel != null
                     && guidePreviewChannel.url != null
-                    && value instanceof String
-                    && guidePreviewChannel.url.equals(value);
+                    && value instanceof Channel
+                    && guidePreviewChannel.url.equals(
+                            ((Channel) value).url);
 
             android.graphics.drawable.GradientDrawable background =
                     new android.graphics.drawable.GradientDrawable();
