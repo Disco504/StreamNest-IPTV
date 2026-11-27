@@ -6290,7 +6290,7 @@ if (categoryPrograms == null) {
                         new android.graphics.drawable.GradientDrawable();
                 focusedBrick.setColor(BLUE);
                 focusedBrick.setCornerRadius(dp(4));
-                focusedBrick.setStroke(dp(1), 0xFFFFFFFF);
+                focusedBrick.setStroke(dp(1), 0xFF555555);
 
                 brick.setBackground(normalBrick);
                 brick.setOnFocusChangeListener((v, focused) -> {
@@ -6879,7 +6879,7 @@ if (categoryPrograms == null) {
         android.graphics.drawable.GradientDrawable focused =
                 new android.graphics.drawable.GradientDrawable();
         focused.setColor(BLUE);
-        focused.setStroke(dp(1), Color.WHITE);
+        focused.setStroke(dp(1), 0xFF555555);
 
         brick.setBackground(normal);
         brick.setFocusable(true);
