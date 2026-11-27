@@ -6968,6 +6968,7 @@ if (categoryPrograms == null) {
 
         updateGuidePreviewProgramInfo(channel);
         if (channel.url.equals(previewChannelUrl) && previewPlayer != null) {
+            previewPlayer.play();
             return;
         }
 
@@ -7042,7 +7043,9 @@ private void playChannel(Channel channel) {
                 .putString("last_channel_name", channel.name)
                 .apply();
 
-        releaseGuidePreviewPlayer();
+        if (previewPlayer != null) {
+            previewPlayer.pause();
+        }
         if (startupCoverView != null) {
             startupPlayerLaunched = true;
         }
