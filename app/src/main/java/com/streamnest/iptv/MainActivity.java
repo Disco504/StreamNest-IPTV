@@ -6130,8 +6130,19 @@ if (categoryPrograms == null) {
             channelCell.setFocusable(true);
             channelCell.setClickable(true);
             channelCell.setTag(rowChannel);
-            channelCell.setOnFocusChangeListener((v, focused) ->
-                    updateGuideChannelNameCell(v, rowChannel, focused));
+            channelCell.setOnFocusChangeListener((v, focused) -> {
+                updateGuideChannelNameCell(v, rowChannel, focused);
+                if (focused && isTelevisionDevice()) {
+                    ScrollView scroll = rowScrollRef[0];
+                    if (scroll != null) {
+                        scroll.post(() -> {
+                            int targetY = v.getTop() + v.getHeight() / 2
+                                    - scroll.getHeight() / 2;
+                            scroll.scrollTo(0, Math.max(0, targetY));
+                        });
+                    }
+                }
+            });
             guideChannelNameCells.add(channelCell);
             updateGuideChannelNameCell(channelCell, rowChannel, false);
             channelCell.setOnClickListener(v -> playGuidePreview(rowChannel));
@@ -6368,8 +6379,12 @@ if (categoryPrograms == null) {
                     && !lastWatchedScrollScheduled[0]
                     && guidePendingMoveChannelKey.isEmpty()) {
                 lastWatchedScrollScheduled[0] = true;
-                rowScrollRef[0].post(() -> rowScrollRef[0].smoothScrollTo(
-                        0, lastWatchedRow[0].getTop()));
+                rowScrollRef[0].post(() -> {
+                  int targetY = lastWatchedRow[0].getTop()
+                          + lastWatchedRow[0].getHeight() / 2
+                          - rowScrollRef[0].getHeight() / 2;
+                  rowScrollRef[0].scrollTo(0, Math.max(0, targetY));
+              });
             }
         };
         guideAppendMoreRows = appendGuideRows[0];
@@ -6426,21 +6441,12 @@ if (categoryPrograms == null) {
         final android.os.Handler clockHandler =
                 new android.os.Handler(android.os.Looper.getMainLooper());
 
-        ScrollView channelVerticalScroll = new ScrollView(this);
-        channelVerticalScroll.setFillViewport(false);
-        channelVerticalScroll.addView(channelRows);
-
-        ScrollView rowVerticalScroll = new ScrollView(this);
-        rowScrollRef[0] = rowVerticalScroll;
-        rowVerticalScroll.setFillViewport(false);
-        rowVerticalScroll.addView(horizontalScroll);
-
         android.widget.FrameLayout programRowsFrame =
                 new android.widget.FrameLayout(this);
-        programRowsFrame.addView(rowVerticalScroll,
+        programRowsFrame.addView(horizontalScroll,
                 new android.widget.FrameLayout.LayoutParams(
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                        android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
 
         android.view.View currentTimeMarker = new android.view.View(this);
         currentTimeMarker.setBackgroundColor(BLUE);
@@ -6451,6 +6457,18 @@ if (categoryPrograms == null) {
                         android.view.ViewGroup.LayoutParams.MATCH_PARENT);
         markerParams.leftMargin = 0;
         programRowsFrame.addView(currentTimeMarker, markerParams);
+        LinearLayout guideRows = new LinearLayout(this);
+        guideRows.setOrientation(LinearLayout.HORIZONTAL);
+        guideRows.addView(channelRows, new LinearLayout.LayoutParams(
+                channelWidth, LinearLayout.LayoutParams.WRAP_CONTENT));
+        guideRows.addView(programRowsFrame, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        ScrollView guideVerticalScroll = new ScrollView(this);
+        guideVerticalScroll.setFillViewport(false);
+        guideVerticalScroll.addView(guideRows);
+        rowScrollRef[0] = guideVerticalScroll;
+
         horizontalScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
             if (headerScroll.getScrollX() != x) {
                 headerScroll.scrollTo(x, 0);
@@ -6523,64 +6541,54 @@ if (categoryPrograms == null) {
                     }
                 });
 
-        channelVerticalScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
-            if (rowVerticalScroll.getScrollY() != y) {
-                rowVerticalScroll.scrollTo(0, y);
-            }
-        });
-        rowVerticalScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
-            if (channelVerticalScroll.getScrollY() != y) {
-                channelVerticalScroll.scrollTo(0, y);
-            }
+        guideVerticalScroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
             if (guideAppendMoreRows != null
-                    && y + v.getHeight() >= rowVerticalScroll.getChildAt(0).getHeight() - dp(500)) {
+                    && y + v.getHeight() >= guideVerticalScroll.getChildAt(0).getHeight() - dp(500)) {
                 guideAppendMoreRows.run();
             }
         });
-
         final View targetLastWatchedRow = lastWatchedRow[0];
         if (!isPhoneLayout() && targetLastWatchedRow != null
                 && guidePendingMoveChannelKey.isEmpty()) {
-            rowVerticalScroll.post(() ->
-                    rowVerticalScroll.smoothScrollTo(0, targetLastWatchedRow.getTop()));
+            guideVerticalScroll.post(() -> {
+               int targetY = targetLastWatchedRow.getTop()
+                       + targetLastWatchedRow.getHeight() / 2
+                       - guideVerticalScroll.getHeight() / 2;
+               guideVerticalScroll.scrollTo(0, Math.max(0, targetY));
+           });
         }
 
-        LinearLayout channelColumn = new LinearLayout(this);
-        channelColumn.setOrientation(LinearLayout.VERTICAL);
-        channelColumn.addView(channelHeader, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(isPhoneLayout() ? 42 : 32)));
-        channelColumn.addView(channelVerticalScroll, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
-
-        LinearLayout programColumn = new LinearLayout(this);
-        programColumn.setOrientation(LinearLayout.VERTICAL);
-        programColumn.addView(headerScroll, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(isPhoneLayout() ? 42 : 32)));
-        programColumn.addView(programRowsFrame, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+        LinearLayout timelineHeader = new LinearLayout(this);
+        timelineHeader.setOrientation(LinearLayout.HORIZONTAL);
+        int guideHeaderHeight = dp(isPhoneLayout() ? 42 : 32);
+        timelineHeader.addView(channelHeader, new LinearLayout.LayoutParams(
+                channelWidth, guideHeaderHeight));
+        timelineHeader.addView(headerScroll, new LinearLayout.LayoutParams(
+                0, guideHeaderHeight, 1f));
 
         LinearLayout timeline = new LinearLayout(this);
-        timeline.setOrientation(LinearLayout.HORIZONTAL);
-        timeline.addView(channelColumn, new LinearLayout.LayoutParams(channelWidth, LinearLayout.LayoutParams.MATCH_PARENT));
-        timeline.addView(programColumn, new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.MATCH_PARENT, 1f));
+        timeline.setOrientation(LinearLayout.VERTICAL);
+        timeline.addView(timelineHeader, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, guideHeaderHeight));
+        timeline.addView(guideVerticalScroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         results.addView(timeline, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         if (!guidePendingMoveChannelKey.isEmpty()) {
-            restoreMovedGuideChannel(rowVerticalScroll, renderGeneration);
+            restoreMovedGuideChannel(guideVerticalScroll, renderGeneration);
         }
         if (findLastWatchedRow && lastWatchedRow[0] == null
                 && guidePendingMoveChannelKey.isEmpty()) {
-            rowVerticalScroll.post(new Runnable() {
+            guideVerticalScroll.post(new Runnable() {
                 @Override
                 public void run() {
                     if (renderGeneration != guideRenderGeneration) return;
                     if (lastWatchedRow[0] != null || guideAppendMoreRows == null) return;
                     guideAppendMoreRows.run();
                     if (lastWatchedRow[0] == null && guideAppendMoreRows != null) {
-                        rowVerticalScroll.post(this);
+                        guideVerticalScroll.post(this);
                     }
                 }
             });
@@ -6594,12 +6602,13 @@ if (categoryPrograms == null) {
         for (View cell : guideChannelNameCells) {
             if (cell.getTag() instanceof Channel
                     && targetUrl.equals(guideChannelOrderKey((Channel) cell.getTag()))) {
-                int scrollY = guidePendingMoveScrollY;
                 guidePendingMoveChannelKey = "";
                 guidePendingMoveScrollY = -1;
                 rowScroll.post(() -> {
                     if (generation != guideRenderGeneration) return;
-                    rowScroll.scrollTo(0, Math.max(0, scrollY));
+                    int targetY = cell.getTop() + cell.getHeight() / 2
+                            - rowScroll.getHeight() / 2;
+                    rowScroll.scrollTo(0, Math.max(0, targetY));
                     cell.requestFocus();
                 });
                 return;
