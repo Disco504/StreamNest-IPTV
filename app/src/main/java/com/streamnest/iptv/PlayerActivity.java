@@ -612,7 +612,19 @@ public class PlayerActivity extends Activity {
             }
             player.addListener(playerListener);
 
-            if (player.getMediaItemCount() == 0) {
+            boolean requestedItemLoaded = false;
+            android.net.Uri requestedUri = android.net.Uri.parse(streamUrl);
+            for (int i = 0; i < player.getMediaItemCount(); i++) {
+                MediaItem loadedItem = player.getMediaItemAt(i);
+                if (loadedItem.localConfiguration != null
+                        && requestedUri.equals(
+                                loadedItem.localConfiguration.uri)) {
+                    requestedItemLoaded = true;
+                    break;
+                }
+            }
+
+            if (!requestedItemLoaded) {
                 boolean autoPlayNext = getIntent().getBooleanExtra(
                         "auto_play_next_episode", false);
                 ArrayList<String> episodeUrls =

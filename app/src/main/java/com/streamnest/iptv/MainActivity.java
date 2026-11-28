@@ -171,6 +171,7 @@ public class MainActivity extends Activity {
     private PlayerView previewPlayerView;
     private String previewChannelUrl;
     private Channel guidePreviewChannel;
+    private String guideLastOkChannelUrl = "";
     private int guideRenderGeneration = 0;
     private Runnable guideAppendMoreRows;
     private String guidePendingMoveChannelKey = "";
@@ -885,6 +886,14 @@ public class MainActivity extends Activity {
         } else {
             super.onBackPressed();
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (isFinishing() && isTelevisionDevice()) {
+            PlaybackManager.get(this).release();
+        }
+        super.onDestroy();
     }
 
     @Override
@@ -3806,6 +3815,10 @@ public class MainActivity extends Activity {
         });
 
         item.setOnClickListener(v -> {
+            if (isTelevisionDevice() && !"TV GUIDE".equals(title)) {
+                releaseGuidePreview();
+            }
+
             if ("SETTINGS".equals(title)) {
                 showSettingsDialog();
             } else if ("SEARCH".equals(title)) {
@@ -5017,6 +5030,7 @@ public class MainActivity extends Activity {
     }
 
     private void showTvGuide() {
+        guideLastOkChannelUrl = "";
         showingTvVod = false;
         showingTvGuide = true;
         String epgUrl = getPreferences(MODE_PRIVATE).getString("epg_url", "");
@@ -6977,6 +6991,11 @@ if (categoryPrograms == null) {
             return;
         }
 
+        if (channel.url.equals(guideLastOkChannelUrl)) {
+            guideLastOkChannelUrl = "";
+            playChannel(channel);
+            return;
+        }
         try {
             PlaybackManager manager = PlaybackManager.get(this);
             ExoPlayer sharedPlayer = manager.getOrCreatePlayer(true);
@@ -7006,6 +7025,7 @@ if (categoryPrograms == null) {
                 sharedPlayer.prepare();
             }
             sharedPlayer.play();
+            guideLastOkChannelUrl = channel.url;
 
         } catch (Exception e) {
             android.util.Log.e("StreamNest",
@@ -7079,6 +7099,10 @@ if (categoryPrograms == null) {
         previewChannelUrl = null;
         previewPlayerView = null;
         guidePreviewChannel = null;
+        guideLastOkChannelUrl = "";
+        if (isTelevisionDevice()) {
+            PlaybackManager.get(this).release();
+        }
     }
 
     private boolean launchLastPlayedChannel() {
