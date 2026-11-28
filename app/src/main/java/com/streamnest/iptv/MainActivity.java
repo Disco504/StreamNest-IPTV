@@ -913,6 +913,41 @@ public class MainActivity extends Activity {
         }
         if (showingTvGuide && previewPlayerView != null) {
             if (isTelevisionDevice()) {
+                android.content.SharedPreferences handoff =
+                        getSharedPreferences("streamnest_player_state", MODE_PRIVATE);
+
+                if (handoff.getBoolean("pending_recent_channel_update", false)) {
+                    String recentUrl = handoff.getString("last_channel_url", "");
+                    Channel matchedChannel = null;
+
+                    for (Channel channel : channels) {
+                        if (channel != null && channel.url != null
+                                && channel.url.equals(recentUrl)) {
+                            matchedChannel = channel;
+                            break;
+                        }
+                    }
+
+                    if (matchedChannel != null) {
+                        guidePreviewChannel = matchedChannel;
+                        getPreferences(MODE_PRIVATE).edit()
+                                .putString("last_channel_url", matchedChannel.url)
+                                .putString("last_channel_name", matchedChannel.name)
+                                .apply();
+
+                        if (guidePreviewChannelNameView != null) {
+                            guidePreviewChannelNameView.setText(matchedChannel.name);
+                        }
+                        updateGuidePreviewProgramInfo(matchedChannel);
+                        refreshGuideChannelNameBorders();
+                        focusGuideSelectedCategory();
+                    }
+
+                    handoff.edit()
+                            .putBoolean("pending_recent_channel_update", false)
+                            .apply();
+                }
+
                 PlaybackManager playbackManager = PlaybackManager.get(this);
                 if (playbackManager.getPlayer() != null) {
                     playbackManager.attach(previewPlayerView);

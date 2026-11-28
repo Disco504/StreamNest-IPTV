@@ -485,16 +485,53 @@ public class PlayerActivity extends Activity {
         if (playerView != null) playerView.requestFocus();
     }
 
+    private void refreshProgramInfo() {
+        if (programInfoView == null) return;
+
+        StringBuilder info = new StringBuilder();
+        if (channelName != null && !channelName.trim().isEmpty()) {
+            info.append(channelName.trim());
+        }
+        if (programTitle != null && !programTitle.trim().isEmpty()) {
+            if (info.length() > 0) info.append("\n");
+            info.append(programTitle.trim());
+        }
+        if (programDescription != null && !programDescription.trim().isEmpty()) {
+            if (info.length() > 0) info.append("\n");
+            info.append(programDescription.trim());
+        }
+
+        programInfoView.setText(info.toString());
+        programInfoView.setVisibility(
+                playerView != null && playerView.isControllerFullyVisible()
+                        && info.length() > 0 ? View.VISIBLE : View.GONE);
+    }
+
     private void tuneRecentChannel() {
         if (selectedRecentIndex < 0 || selectedRecentIndex >= recentChannels.size()) return;
         RecentChannel channel = recentChannels.get(selectedRecentIndex);
         closeRecentPanel();
+
         streamUrl = channel.url;
         channelName = channel.name;
         channelLogo = channel.logo;
+        programTitle = "";
+        programDescription = "";
+
         getIntent().putExtra("stream_url", streamUrl);
         getIntent().putExtra("channel_name", channelName);
         getIntent().putExtra("channel_logo", channelLogo);
+        getIntent().putExtra("program_title", "");
+        getIntent().putExtra("program_description", "");
+
+        getSharedPreferences("streamnest_player_state", MODE_PRIVATE).edit()
+                .putString("last_channel_url", streamUrl)
+                .putString("last_channel_name", channelName)
+                .putBoolean("pending_recent_channel_update", true)
+                .apply();
+
+        refreshProgramInfo();
+
         if (player != null) {
             player.setMediaItem(MediaItem.fromUri(streamUrl));
             player.prepare();
