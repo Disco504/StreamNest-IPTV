@@ -854,7 +854,14 @@ public class PlayerActivity extends Activity {
             playerListener = null;
         }
 
-        PlaybackManager.get(this).detach(playerView);
+        PlaybackManager playbackManager = PlaybackManager.get(this);
+
+        if (getIntent().getBooleanExtra("is_live_stream", true)) {
+            playbackManager.detach(playerView);
+        } else {
+            playbackManager.release();
+        }
+
         player = null;
 
         super.onStop();
