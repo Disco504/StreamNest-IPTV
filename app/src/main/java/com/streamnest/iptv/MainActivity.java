@@ -6012,20 +6012,20 @@ if (categoryPrograms == null) {
 
         LinearLayout channelRows = new LinearLayout(this);
         channelRows.setOrientation(LinearLayout.VERTICAL);
-        channelRows.setDividerDrawable(new android.graphics.drawable.ColorDrawable(0xFF777777));
+        channelRows.setDividerDrawable(new android.graphics.drawable.ColorDrawable(0xFF101827));
         channelRows.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
         LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
         LinearLayout stationaryLabels = new LinearLayout(this);
         stationaryLabels.setOrientation(LinearLayout.VERTICAL);
         grid.setDividerDrawable(
-                new android.graphics.drawable.ColorDrawable(0xFF777777));
+                new android.graphics.drawable.ColorDrawable(0xFF101827));
         grid.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
 
         LinearLayout timeHeader = new LinearLayout(this);
         timeHeader.setOrientation(LinearLayout.HORIZONTAL);
         timeHeader.setDividerDrawable(
-                new android.graphics.drawable.ColorDrawable(0xFF777777));
+                new android.graphics.drawable.ColorDrawable(0xFF101827));
         timeHeader.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
 
 
@@ -6114,7 +6114,7 @@ if (categoryPrograms == null) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setDividerDrawable(
-                    new android.graphics.drawable.ColorDrawable(0xFF777777));
+                    new android.graphics.drawable.ColorDrawable(0xFF101827));
             row.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
 
             String rowName = rowChannel.name == null || rowChannel.name.trim().isEmpty() ? "Unnamed channel" : rowChannel.name;
@@ -6251,7 +6251,7 @@ if (categoryPrograms == null) {
                         android.graphics.drawable.GradientDrawable gapBackground =
                         new android.graphics.drawable.GradientDrawable();
                 gapBackground.setColor(PANEL);
-                gapBackground.setStroke(dp(1), 0xFF777777);
+                gapBackground.setStroke(dp(1), 0xFF101827);
                 gap.setBackground(gapBackground);
                         configureGuideNoInfoBrick(gap, rowChannel);
                         gap.setMaxLines(3);
@@ -6288,7 +6288,7 @@ if (categoryPrograms == null) {
                         new android.graphics.drawable.GradientDrawable();
                 normalBrick.setColor(PANEL);
                 normalBrick.setCornerRadius(dp(4));
-                normalBrick.setStroke(dp(1), 0xFF777777);
+                normalBrick.setStroke(dp(1), 0xFF101827);
 
                 android.graphics.drawable.GradientDrawable focusedBrick =
                         new android.graphics.drawable.GradientDrawable();
@@ -6357,7 +6357,7 @@ if (categoryPrograms == null) {
                 android.graphics.drawable.GradientDrawable gapBackground =
                         new android.graphics.drawable.GradientDrawable();
                 gapBackground.setColor(PANEL);
-                gapBackground.setStroke(dp(1), 0xFF777777);
+                gapBackground.setStroke(dp(1), 0xFF101827);
                 gap.setBackground(gapBackground);
                 configureGuideNoInfoBrick(gap, rowChannel);
                 gap.setMaxLines(3);
@@ -6878,7 +6878,7 @@ if (categoryPrograms == null) {
         android.graphics.drawable.GradientDrawable normal =
                 new android.graphics.drawable.GradientDrawable();
         normal.setColor(PANEL);
-        normal.setStroke(dp(1), 0xFF777777);
+        normal.setStroke(dp(1), 0xFF101827);
 
         android.graphics.drawable.GradientDrawable focused =
                 new android.graphics.drawable.GradientDrawable();
