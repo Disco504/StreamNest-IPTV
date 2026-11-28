@@ -6003,7 +6003,7 @@ if (categoryPrograms == null) {
         final long gridEnd = gridStart + 24L * 60L * 60L * 1000L;
         final int pixelsPerMinute = Math.max(2,
                 (getResources().getConfiguration().screenWidthDp - 144) / 120);
-        final int channelWidth = dp(isPhoneLayout() ? 120 : 175);
+        final int channelWidth = dp(isPhoneLayout() ? 120 : 220);
         final int slotWidth = dp(30 * pixelsPerMinute);
         final int rowHeight = dp(isPhoneLayout() ? 54 : 50);
 
@@ -6130,19 +6130,6 @@ if (categoryPrograms == null) {
             channelCell.setFocusable(true);
             channelCell.setClickable(true);
             channelCell.setTag(rowChannel);
-            channelCell.setOnFocusChangeListener((v, focused) -> {
-                updateGuideChannelNameCell(v, rowChannel, focused);
-                if (focused && isTelevisionDevice()) {
-                    ScrollView scroll = rowScrollRef[0];
-                    if (scroll != null) {
-                        scroll.post(() -> {
-                            int targetY = v.getTop() + v.getHeight() / 2
-                                    - scroll.getHeight() / 2;
-                            scroll.scrollTo(0, Math.max(0, targetY));
-                        });
-                    }
-                }
-            });
             guideChannelNameCells.add(channelCell);
             updateGuideChannelNameCell(channelCell, rowChannel, false);
             channelCell.setOnClickListener(v -> playGuidePreview(rowChannel));
@@ -6161,9 +6148,26 @@ if (categoryPrograms == null) {
                     dp(34), dp(34)));
 
             TextView channelLabel = label(rowName, 13);
+            channelLabel.setSingleLine(true);
+            channelLabel.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+            channelLabel.setMarqueeRepeatLimit(-1);
             channelLabel.setGravity(
                     android.view.Gravity.CENTER_VERTICAL);
             channelLabel.setPadding(dp(6), dp(4), dp(2), dp(4));
+            channelCell.setOnFocusChangeListener((v, focused) -> {
+                updateGuideChannelNameCell(v, rowChannel, focused);
+                channelLabel.setSelected(focused);
+                if (focused && isTelevisionDevice()) {
+                    ScrollView scroll = rowScrollRef[0];
+                    if (scroll != null) {
+                        scroll.post(() -> {
+                            int targetY = v.getTop() + v.getHeight() / 2
+                                    - scroll.getHeight() / 2;
+                            scroll.scrollTo(0, Math.max(0, targetY));
+                        });
+                    }
+                }
+            });
             channelCell.addView(channelLabel, new LinearLayout.LayoutParams(
                     0, rowHeight, 1f));
 
@@ -6290,7 +6294,7 @@ if (categoryPrograms == null) {
                         new android.graphics.drawable.GradientDrawable();
                 focusedBrick.setColor(BLUE);
                 focusedBrick.setCornerRadius(dp(4));
-                focusedBrick.setStroke(dp(1), 0xFF555555);
+                focusedBrick.setStroke(dp(1), 0xFF101827);
 
                 brick.setBackground(normalBrick);
                 brick.setOnFocusChangeListener((v, focused) -> {
@@ -6879,7 +6883,7 @@ if (categoryPrograms == null) {
         android.graphics.drawable.GradientDrawable focused =
                 new android.graphics.drawable.GradientDrawable();
         focused.setColor(BLUE);
-        focused.setStroke(dp(1), 0xFF555555);
+        focused.setStroke(dp(1), 0xFF101827);
 
         brick.setBackground(normal);
         brick.setFocusable(true);
