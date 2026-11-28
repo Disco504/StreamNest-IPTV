@@ -52,6 +52,7 @@ public class PlayerActivity extends Activity {
 
     private static final String TAG = "StreamNest";
     private ExoPlayer player;
+    private Player.Listener playerListener;
     private boolean resumePlaybackAfterPause = false;
     private PlayerView playerView;
     private View playbackSettingsButton;
@@ -552,26 +553,12 @@ public class PlayerActivity extends Activity {
         try {
             boolean isLiveStream = getIntent().getBooleanExtra("is_live_stream", true);
             if (isLiveStream) recordRecentChannel();
-            DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
-                    .setBufferDurationsMs(
-                            isLiveStream ? 10000 : 20000,
-                            isLiveStream ? 30000 : 60000,
-                            isLiveStream ? 1500 : 2500,
-                            isLiveStream ? 4000 : 8000)
-                    .build();
-            DefaultHttpDataSource.Factory httpFactory =
-                    new DefaultHttpDataSource.Factory()
-                            .setAllowCrossProtocolRedirects(true);
-            DefaultDataSource.Factory dataSourceFactory =
-                    new DefaultDataSource.Factory(this, httpFactory);
-            player = new ExoPlayer.Builder(this)
-                    .setMediaSourceFactory(
-                            new DefaultMediaSourceFactory(dataSourceFactory))
-                    .setLoadControl(loadControl)
-                    .build();
-            playerView.setPlayer(player);
+            PlaybackManager playbackManager = PlaybackManager.get(this);
+            player = playbackManager.getOrCreatePlayer(isLiveStream);
+            playbackManager.attach(playerView);
 
-            player.addListener(new Player.Listener() {
+            if (playerListener == null) {
+            playerListener = new Player.Listener() {
                 @Override
                 public void onPlaybackStateChanged(int playbackState) {
                     if (playbackState == Player.STATE_READY) {
@@ -621,16 +608,19 @@ public class PlayerActivity extends Activity {
                             PlayerActivity.this, message,
                             Toast.LENGTH_LONG).show());
                 }
-            });
+            };
+            }
+            player.addListener(playerListener);
 
-            boolean autoPlayNext = getIntent().getBooleanExtra(
-                    "auto_play_next_episode", false);
-            ArrayList<String> episodeUrls =
-                    getIntent().getStringArrayListExtra("series_episode_urls");
-            ArrayList<String> episodeNames =
-                    getIntent().getStringArrayListExtra("series_episode_names");
+            if (player.getMediaItemCount() == 0) {
+                boolean autoPlayNext = getIntent().getBooleanExtra(
+                        "auto_play_next_episode", false);
+                ArrayList<String> episodeUrls =
+                        getIntent().getStringArrayListExtra("series_episode_urls");
+                ArrayList<String> episodeNames =
+                        getIntent().getStringArrayListExtra("series_episode_names");
 
-            if (autoPlayNext && episodeUrls != null && !episodeUrls.isEmpty()) {
+                if (autoPlayNext && episodeUrls != null && !episodeUrls.isEmpty()) {
                 ArrayList<MediaItem> playlist = new ArrayList<>();
                 for (int i = 0; i < episodeUrls.size(); i++) {
                     String url = episodeUrls.get(i);
@@ -658,7 +648,8 @@ public class PlayerActivity extends Activity {
                 player.setMediaItem(MediaItem.fromUri(streamUrl));
             }
 
-            player.prepare();
+                player.prepare();
+            }
             player.play();
             if (!isLiveStream) {
                 progressHandler.removeCallbacks(progressRunnable);
@@ -827,20 +818,15 @@ public class PlayerActivity extends Activity {
 
     @Override
     protected void onPause() {
-        resumePlaybackAfterPause = player != null && player.getPlayWhenReady();
-        if (player != null) {
-            player.pause();
-        }
         super.onPause();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (player != null && resumePlaybackAfterPause && !isFinishing()) {
+        if (player != null && player.getMediaItemCount() > 0) {
             player.play();
         }
-        resumePlaybackAfterPause = false;
     }
 
     @Override
@@ -848,15 +834,16 @@ public class PlayerActivity extends Activity {
         clockHandler.removeCallbacks(clockRunnable);
         progressHandler.removeCallbacks(progressRunnable);
         saveCurrentVodProgress();
+
         if (clockView != null) clockView.setVisibility(View.GONE);
-        if (playerView != null) {
-            playerView.setPlayer(null);
+
+        if (player != null && playerListener != null) {
+            player.removeListener(playerListener);
+            playerListener = null;
         }
 
-        if (player != null) {
-            player.release();
-            player = null;
-        }
+        PlaybackManager.get(this).detach(playerView);
+        player = null;
 
         super.onStop();
     }

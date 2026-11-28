@@ -853,7 +853,13 @@ public class MainActivity extends Activity {
             if (isTelevisionDevice()) {
                 if (guideMainMenuScroll != null
                         && guideMainMenuScroll.getVisibility() == View.VISIBLE) {
-                    super.onBackPressed();
+                    if (guidePreviewChannel != null
+                            && guidePreviewChannel.url != null
+                            && !guidePreviewChannel.url.trim().isEmpty()) {
+                        playChannel(guidePreviewChannel);
+                    } else {
+                        super.onBackPressed();
+                    }
                 } else if (guideCategoryScrollView.getVisibility() == View.VISIBLE) {
                     guideCategoryScrollView.setVisibility(View.GONE);
                     if (guideMainMenuScroll != null) {
@@ -884,7 +890,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        if (previewPlayer != null) {
+        if (!isTelevisionDevice() && previewPlayer != null) {
             previewPlayer.pause();
         }
     }
@@ -896,9 +902,15 @@ public class MainActivity extends Activity {
             removeStartupCover();
             startupPlayerLaunched = false;
         }
-        if (showingTvGuide && previewPlayerView != null
-                && guidePreviewChannel != null) {
-            playGuidePreview(guidePreviewChannel);
+        if (showingTvGuide && previewPlayerView != null) {
+            if (isTelevisionDevice()) {
+                PlaybackManager playbackManager = PlaybackManager.get(this);
+                if (playbackManager.getPlayer() != null) {
+                    playbackManager.attach(previewPlayerView);
+                }
+            } else if (guidePreviewChannel != null) {
+                playGuidePreview(guidePreviewChannel);
+            }
         }
     }
 
@@ -5052,7 +5064,13 @@ public class MainActivity extends Activity {
                 androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM);
         previewPlayerView.setFocusable(false);
         previewPlayerView.setBackgroundColor(Color.BLACK);
-        if (previewPlayer != null) {
+        if (isTelevisionDevice()) {
+            PlaybackManager playbackManager = PlaybackManager.get(this);
+            ExoPlayer sharedPlayer = playbackManager.getPlayer();
+            if (sharedPlayer != null) {
+                playbackManager.attach(previewPlayerView);
+            }
+        } else if (previewPlayer != null) {
             previewPlayerView.setPlayer(previewPlayer);
         }
         previewRow.addView(previewPlayerView, new LinearLayout.LayoutParams(
@@ -5072,7 +5090,13 @@ public class MainActivity extends Activity {
 
         screen.addView(previewRow, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, previewHeight));
-        if (guidePreviewChannel != null && previewPlayer != null) {
+        if (isTelevisionDevice() && guidePreviewChannel != null) {
+            if (guidePreviewChannelNameView != null) {
+                guidePreviewChannelNameView.setText(guidePreviewChannel.name);
+            }
+            updateGuidePreviewProgramInfo(guidePreviewChannel);
+        } else if (!isTelevisionDevice()
+                && guidePreviewChannel != null && previewPlayer != null) {
             playGuidePreview(guidePreviewChannel);
         }
 
@@ -6132,7 +6156,7 @@ if (categoryPrograms == null) {
             channelCell.setTag(rowChannel);
             guideChannelNameCells.add(channelCell);
             updateGuideChannelNameCell(channelCell, rowChannel, false);
-            channelCell.setOnClickListener(v -> playGuidePreview(rowChannel));
+            channelCell.setOnClickListener(v -> selectGuideChannel(rowChannel));
             channelCell.setLongClickable(true);
             channelCell.setOnLongClickListener(v -> {
                 showGuideChannelMoveMenu(channelCell, rowChannel, category,
@@ -6200,13 +6224,7 @@ if (categoryPrograms == null) {
                     cell.setOnClickListener(v -> {
                         long clickTime = System.currentTimeMillis();
                         if (clickTime < blockStart || clickTime >= blockEnd) return;
-                        if (guidePreviewChannel != null
-                                && rowChannel.url != null
-                                && rowChannel.url.equals(guidePreviewChannel.url)) {
-                            playChannel(rowChannel);
-                        } else {
-                            playGuidePreview(rowChannel);
-                        }
+                        selectGuideChannel(rowChannel);
                     });
                     brick.addView(cell, new android.widget.FrameLayout.LayoutParams(
                             -1, -1));
@@ -6303,13 +6321,7 @@ if (categoryPrograms == null) {
                 });
 
                 brick.setOnClickListener(v -> {
-                if (guidePreviewChannel != null
-                        && rowChannel.url != null
-                        && rowChannel.url.equals(guidePreviewChannel.url)) {
-                    playChannel(rowChannel);
-                } else {
-                    playGuidePreview(rowChannel);
-                }
+                selectGuideChannel(rowChannel);
             });
                 LinearLayout.LayoutParams brickParams =
                         new LinearLayout.LayoutParams(brickWidth, rowHeight);
@@ -6425,7 +6437,7 @@ if (categoryPrograms == null) {
                     previewChannel = lastChannel;
                 }
             }
-            if (previewChannel != null) {
+            if (previewChannel != null && !isTelevisionDevice()) {
                 if (startupPreviewSuppressed) {
                     guidePreviewChannel = previewChannel;
                 } else {
@@ -6952,6 +6964,53 @@ if (categoryPrograms == null) {
         }
 
         guidePreviewProgramInfoView.setText(info.toString());
+    }
+
+    private void selectGuideChannel(Channel channel) {
+        if (channel == null || channel.url == null
+                || channel.url.trim().isEmpty()) {
+            return;
+        }
+
+        if (!isTelevisionDevice()) {
+            playGuidePreview(channel);
+            return;
+        }
+
+        try {
+            PlaybackManager manager = PlaybackManager.get(this);
+            ExoPlayer sharedPlayer = manager.getOrCreatePlayer(true);
+
+            if (previewPlayerView != null) {
+                manager.attach(previewPlayerView);
+            }
+
+            guidePreviewChannel = channel;
+            getPreferences(MODE_PRIVATE).edit()
+                    .putString("last_channel_url", channel.url)
+                    .putString("last_channel_name", channel.name)
+                    .apply();
+
+            if (guidePreviewChannelNameView != null) {
+                guidePreviewChannelNameView.setText(channel.name);
+            }
+            updateGuidePreviewProgramInfo(channel);
+            refreshGuideChannelNameBorders();
+
+            android.net.Uri selectedUri = android.net.Uri.parse(channel.url);
+            if (sharedPlayer.getCurrentMediaItem() == null
+                    || sharedPlayer.getCurrentMediaItem().localConfiguration == null
+                    || !selectedUri.equals(
+                            sharedPlayer.getCurrentMediaItem().localConfiguration.uri)) {
+                sharedPlayer.setMediaItem(MediaItem.fromUri(selectedUri));
+                sharedPlayer.prepare();
+            }
+            sharedPlayer.play();
+
+        } catch (Exception e) {
+            android.util.Log.e("StreamNest",
+                    "TV Guide channel selection failed", e);
+        }
     }
 
     private void playGuidePreview(Channel channel) {
